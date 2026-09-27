@@ -1,0 +1,1246 @@
+{
+ "version": 1,
+ "generated": "2026-09-27",
+ "notes": "Researched landmark heights/styles for Harare CBD. See docs/references/LANDMARKS.md for sources. Colours are hex guesses. Entries with part_of are extra footprints of a landmark (podiums, wings, cores); style_confidence rates facade/colour notes separately from height/match confidence.",
+ "landmarks": [
+  {
+   "key": "rbz",
+   "name": "Reserve Bank of Zimbabwe",
+   "match": {
+    "overture_id": "135760d3-d950-40fa-9374-9a624e30a98e",
+    "name": "Reserve Bank of Zimbabwe",
+    "lat": -17.826147,
+    "lon": 31.049471,
+    "footprint_m2": 1105
+   },
+   "height": 120,
+   "floors": 28,
+   "year": 1997,
+   "streets": "80 Samora Machel Ave (north side), between First St and Sam Nujoma St",
+   "style": {
+    "facade": "#b8a99c",
+    "accent": "#6f625a",
+    "glass": "#26323b",
+    "pattern": "fins",
+    "roof": "crown",
+    "notes": "Tallest in Zimbabwe (1997, Clinton & Evans). Design modelled on the Great Zimbabwe conical tower / a grain silo: broad base tapering toward the top. ~37x37 m chamfered-square plan (OSM 9-sided). 5 podium levels + 23 office floors. Polished granite walls (etched rural-Zimbabwe scenes at podium) with narrow vertical dark-glass strips between granite piers. Taper/step the top ~6 floors in 2-3 setbacks to a narrow crown + short mast. Granite podium/banking hall = rbz_podium. Colours approximate."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "rbz_podium",
+   "name": "Reserve Bank of Zimbabwe (podium)",
+   "match": {
+    "overture_id": "0dd9bf4b-0631-4bc0-8e63-02871a0a0071",
+    "lat": -17.825971,
+    "lon": 31.049488,
+    "footprint_m2": 1704
+   },
+   "height": 20,
+   "floors": 5,
+   "year": 1997,
+   "style": {
+    "facade": "#b8a99c",
+    "accent": "#6f625a",
+    "glass": "#26323b",
+    "pattern": "fins",
+    "roof": "flat",
+    "notes": "5-level granite podium attached to the RBZ tower (adjoining footprint; assumed)."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low",
+   "part_of": "rbz"
+  },
+  {
+   "key": "joina_city",
+   "name": "Joina City",
+   "match": {
+    "overture_id": "c02aad16-149d-4978-b37d-0bc0123c2d78",
+    "name": "Joina City Tower",
+    "lat": -17.831684,
+    "lon": 31.047303,
+    "footprint_m2": 963
+   },
+   "height": 105,
+   "floors": 24,
+   "year": 2010,
+   "streets": "Cnr Jason Moyo Ave & Julius Nyerere Way",
+   "style": {
+    "facade": "#dcd6ca",
+    "accent": "#8f9aa1",
+    "glass": "#3e6f80",
+    "pattern": "curtain",
+    "roof": "crown",
+    "notes": "Office tower (opened 2010, 'second/third tallest in Zimbabwe') on the Jason Moyo Ave / Julius Nyerere Way corner. Concrete shaft that becomes glass-sheathed toward the top and ends in a circular ring crown ('concrete form rises to a crescendo atop a circular ring'). 3 basement parking levels, 4 retail floors, 16 office floors. Podium = joina_city_podium. Glass colour is a guess."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "joina_city_podium",
+   "name": "Joina City (mall podium)",
+   "match": {
+    "overture_id": "cc9964a4-086a-4722-85d3-883dbf9eb292",
+    "lat": -17.831863,
+    "lon": 31.047382,
+    "footprint_m2": 5458
+   },
+   "height": 22,
+   "floors": 5,
+   "year": 2010,
+   "style": {
+    "facade": "#dcd6ca",
+    "accent": "#8f9aa1",
+    "glass": "#3e6f80",
+    "pattern": "curtain",
+    "roof": "flat",
+    "notes": "Shopping-mall podium ~69x104 m: ground + 4 retail floors, big glazed atrium roof lights, 'JOINA CITY' signage on the corners."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low",
+   "part_of": "joina_city"
+  },
+  {
+   "key": "karigamombe",
+   "name": "Karigamombe Centre",
+   "match": {
+    "overture_id": "30e93056-1f67-4e00-a0e4-1a81bd380433",
+    "name": "Karigamombe Centre",
+    "lat": -17.827418,
+    "lon": 31.047857,
+    "footprint_m2": 577
+   },
+   "height": 92,
+   "floors": 20,
+   "year": 1985,
+   "streets": "53 Samora Machel Ave, cnr Julius Nyerere Way",
+   "style": {
+    "facade": "#cfc8bb",
+    "accent": "#7d756b",
+    "glass": "#2d3a44",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "1985 Clinton & Evans office tower of glass and concrete; Overture num_floors=8 is WRONG (20 floors, 92 m). Slender point tower (~26x22 m footprint) on the SE corner of Samora Machel Ave & Julius Nyerere Way; NBS (National Building Society) head office. The Mbuya Nehanda statue and pedestrian footbridges sit at this intersection. Facade details not verified."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "low"
+  },
+  {
+   "key": "livingstone_house",
+   "name": "Livingstone House",
+   "match": {
+    "overture_id": "d39bca33-caf9-4f00-a7b5-44f3f7a7d67f",
+    "name": "Livingstone House",
+    "lat": -17.827019,
+    "lon": 31.04562,
+    "footprint_m2": 560
+   },
+   "height": 80,
+   "floors": 20,
+   "year": 1960,
+   "streets": "30 Samora Machel Ave (north side), between Leopold Takawira St and Julius Nyerere Way",
+   "style": {
+    "facade": "#e3ddcf",
+    "accent": "#8c8579",
+    "glass": "#3a4a52",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "1960 modernist office slab; tallest building in the Federation when completed. Continuous horizontal spandrel bands with ribbon windows, flat roof with lift overrun. Low podium = livingstone_house_podium. Colours approximate."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "low"
+  },
+  {
+   "key": "livingstone_house_podium",
+   "name": "Livingstone House (podium)",
+   "match": {
+    "overture_id": "056d56bf-824b-475d-a4da-981eebcfc3b3",
+    "lat": -17.826988,
+    "lon": 31.045676,
+    "footprint_m2": 1502
+   },
+   "height": 12,
+   "floors": 3,
+   "style": {
+    "facade": "#e3ddcf",
+    "accent": "#8c8579",
+    "glass": "#3a4a52",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Adjoining lower block/podium of Livingstone House (assumed from adjacency)."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "livingstone_house"
+  },
+  {
+   "key": "mukwati",
+   "name": "Mukwati Building",
+   "match": {
+    "overture_id": "cadc33d0-9a61-4c40-b86a-7728ce165e3e",
+    "name": "Mukwati Building",
+    "lat": -17.822243,
+    "lon": 31.053708,
+    "footprint_m2": 1844
+   },
+   "height": 76,
+   "floors": 21,
+   "streets": "Cnr Fourth St (S.V. Muzenda St) & Livingstone Ave (Overture: Oliver Tambo Ave)",
+   "style": {
+    "facade": "#c9bfae",
+    "accent": "#6b6257",
+    "glass": "#34424a",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Government office slab 84x23.5 m, long axis parallel to the avenues. Near-identical twin of Kaguvi Building one block south (same footprint and orientation) - build both from one kit. Probably the building listed as 'Earl Grey Building' (76 m/21 fl) in tallest-building lists (its colonial name). Facade = repetitive horizontal bands; approximate."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "low"
+  },
+  {
+   "key": "kaguvi",
+   "name": "Kaguvi Building",
+   "match": {
+    "overture_id": "35afc071-b1e5-46a5-8ecf-746b156fc9cd",
+    "name": "Kaguvi Building",
+    "lat": -17.82364,
+    "lon": 31.054094,
+    "footprint_m2": 1857
+   },
+   "height": 73,
+   "floors": 18,
+   "streets": "Cnr Fourth St (S.V. Muzenda St) & Central Ave (Overture: Ahmed Ben Bella Ave)",
+   "style": {
+    "facade": "#c9bfae",
+    "accent": "#6b6257",
+    "glass": "#34424a",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Government offices (several ministries). Twin slab of Mukwati Building (84x23.5 m). Model identically."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "low"
+  },
+  {
+   "key": "old_mutual_centre",
+   "name": "Old Mutual Centre",
+   "match": {
+    "overture_id": "ba5d9248-6072-4901-aa4a-1e598b73a8f4",
+    "name": "Old Mutual Centre",
+    "lat": -17.829404,
+    "lon": 31.053518,
+    "footprint_m2": 1131
+   },
+   "height": 72,
+   "floors": 18,
+   "streets": "Cnr Jason Moyo Ave & Third St (Overture: Patrice Lumumba St)",
+   "style": {
+    "facade": "#c2b6a3",
+    "accent": "#5b4e42",
+    "glass": "#4a3d30",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "18-storey office tower ~40x28 m, one block east of Africa Unity Square (~160 m). OSM height 66 m; lists say 72 m. Bronze-tinted glazing and 'OLD MUTUAL' crown signage are guesses."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "zb_life_towers",
+   "name": "ZB Life Towers",
+   "match": {
+    "overture_id": "f1efdd93-9a1d-4e9e-b9bd-7247c5c5dd42",
+    "name": "ZB Life Towers",
+    "lat": -17.830774,
+    "lon": 31.051884,
+    "footprint_m2": 1112
+   },
+   "height": 66,
+   "floors": 19,
+   "streets": "77 Jason Moyo Ave, near Sam Nujoma St / Speke Ave (Overture: Agostinho Neto Ave)",
+   "style": {
+    "facade": "#d6d2c8",
+    "accent": "#51606b",
+    "glass": "#35536b",
+    "pattern": "curtain",
+    "roof": "stepped",
+    "notes": "19-storey office + retail complex, 2 basement parking levels, ground-floor shopping arcade and lobby. Complex 74x30 m footprint (47 vertices) - model as lower wing + tower with stepped profile. OSM height 61.5 m. Listed among Harare's 'most beautiful' buildings; facade details unverified."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "defence_house",
+   "name": "Defence House",
+   "match": {
+    "overture_id": "eb21c32f-74da-481f-a657-2c21c98c9a40",
+    "name": "Defence house",
+    "lat": -17.826881,
+    "lon": 31.051343,
+    "footprint_m2": 577
+   },
+   "height": 71,
+   "floors": 20,
+   "streets": "Kwame Nkrumah Ave, between Sam Nujoma St and Third St",
+   "style": {
+    "facade": "#cfc6b5",
+    "accent": "#6d6a5f",
+    "glass": "#2f3a40",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Ministry of Defence HQ. OSM: thin 54x10.7 m slab at 71 m plus a 13.6x11.4 m service core (defence_house_core) at 77.5 m rising above the roof. Floors estimated."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "defence_house_core",
+   "name": "Defence House (lift core)",
+   "match": {
+    "overture_id": "c7553a7c-d051-4567-a593-8f291a210e85",
+    "lat": -17.827035,
+    "lon": 31.051176,
+    "footprint_m2": 153
+   },
+   "height": 77.5,
+   "floors": null,
+   "style": {
+    "facade": "#cfc6b5",
+    "accent": "#6d6a5f",
+    "glass": "#2f3a40",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Lift/stair core rising above Defence House roof (OSM height)."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low",
+   "part_of": "defence_house"
+  },
+  {
+   "key": "century_towers",
+   "name": "Century Towers",
+   "match": {
+    "overture_id": "7a4dcaee-501a-44ab-b384-ea8a11b7a96e",
+    "name": "Century Towers",
+    "lat": -17.827595,
+    "lon": 31.046432,
+    "footprint_m2": 796
+   },
+   "height": 64,
+   "floors": 18,
+   "streets": "45 Samora Machel Ave (south side), between Leopold Takawira St and Julius Nyerere Way",
+   "style": {
+    "facade": "#d2cbbd",
+    "accent": "#77706a",
+    "glass": "#3a4852",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "Office tower; tenants listed on floors 4-17, so >=17 floors (18 assumed). Footprint ~33x25 m; adjoining f031ec8c likely its lower block."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "pearl_house",
+   "name": "Pearl House (Pearl Assurance House)",
+   "match": {
+    "overture_id": "2fcf0ef2-7718-4781-8675-2ede7463d1b2",
+    "name": "First Capital Bank",
+    "lat": -17.826978,
+    "lon": 31.048617,
+    "footprint_m2": 471,
+    "candidates": [
+     "4b76a206-a492-4488-b029-9c2941846c7e"
+    ]
+   },
+   "height": 58,
+   "floors": 17,
+   "year": 1959,
+   "streets": "61 Samora Machel Ave, cnr First St",
+   "style": {
+    "facade": "#e0d9c9",
+    "accent": "#8d8577",
+    "glass": "#40505a",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "1959 office slab, 17 floors ('First Mutual Building'). Matched via a tenant address point at 'Pearl House cnr Samora Machel & First St' that falls on this 35x13.5 m footprint (Overture labels it 'First Capital Bank', a ground-floor tenant). Alternative candidate across First St: 4b76a206 (60x23 m)."
+   },
+   "label": true,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "monomotapa",
+   "name": "Monomotapa Hotel",
+   "match": {
+    "overture_id": "51104f8b-901d-41d2-9c66-28f215484865",
+    "name": "Monomatapa Hotel",
+    "lat": -17.826133,
+    "lon": 31.047095,
+    "footprint_m2": 732
+   },
+   "height": 62,
+   "floors": 19,
+   "year": 1974,
+   "streets": "54 Park Lane (Overture: Jomo Kenyatta Lane) / Julius Nyerere Way",
+   "style": {
+    "facade": "#ece8df",
+    "accent": "#b9b2a5",
+    "glass": "#3e4b52",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "1974 hotel (Roy Densem & Partners), crescent/semicircular 'open book' slab overlooking Harare Gardens; concave face toward the gardens (NW). Continuous horizontal balcony bands; rooftop hotel sign. OSM footprint is only a thin curved sliver (~82 m arc) - extrude a ~16-20 m deep curved slab along it. Forms an 'S' (Salisbury) with the curved Charter House from the air."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "social_security_centre",
+   "name": "Social Security Centre (NSSA)",
+   "match": {
+    "overture_id": "4536040b-9619-4840-9b2c-bb03e4355b46",
+    "name": "Social Security Centre (NSSA)",
+    "lat": -17.824731,
+    "lon": 31.049706,
+    "footprint_m2": 1614
+   },
+   "height": 58,
+   "floors": 16,
+   "streets": "Cnr Sam Nujoma St & Julius Nyerere Way (Selous Ave / Park Lane end)",
+   "style": {
+    "facade": "#d8d0c0",
+    "accent": "#7a6e60",
+    "glass": "#2e3d47",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "NSSA HQ opposite the National Gallery at the head of Julius Nyerere Way; tenants up to 14th floor (>=15 floors, 16 assumed). Irregular 55x55 m footprint; adjoining 832051c2 (94x45 m) is the lower complex/annex."
+   },
+   "label": true,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "chiyedza_house",
+   "name": "Chiyedza House",
+   "match": {
+    "overture_id": "819a6e3c-ed80-4983-ad1a-296021f373f9",
+    "name": "Chiyedza House",
+    "lat": -17.827584,
+    "lon": 31.049372,
+    "footprint_m2": 1061
+   },
+   "height": 42,
+   "floors": 12,
+   "streets": "Cnr First St & Kwame Nkrumah Ave",
+   "style": {
+    "facade": "#d4ccbb",
+    "accent": "#7f776b",
+    "glass": "#3a4a55",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "12-floor office slab 44.5x24 m; OSM height 38.5 m."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "angwa_city",
+   "name": "Angwa City",
+   "match": {
+    "overture_id": "139d1bfd-3efd-4e18-aba5-4059e5e6cf6f",
+    "name": "Angwa City Building",
+    "lat": -17.828938,
+    "lon": 31.047405,
+    "footprint_m2": 686
+   },
+   "height": 50,
+   "floors": 12,
+   "streets": "Cnr Angwa St (Overture: Sir Seretse Khama St) & Kwame Nkrumah Ave, by Julius Nyerere Way",
+   "style": {
+    "facade": "#d8dde0",
+    "accent": "#9aa6ad",
+    "glass": "#4f7486",
+    "pattern": "curtain",
+    "roof": "flat",
+    "notes": "Modern glass commercial high-rise ('gleaming glass facade and steel structural details'), 12 floors, award-winning; OSM gives 60 m for this part and 46 m for the adjoining angwa_city_annex (cc564026). Retail + offices."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "angwa_city_annex",
+   "name": "Angwa City (annex)",
+   "match": {
+    "overture_id": "cc564026-bc84-426d-a573-b4b9fdd1c510",
+    "lat": -17.828781,
+    "lon": 31.047592,
+    "footprint_m2": 1050
+   },
+   "height": 46,
+   "floors": 11,
+   "style": {
+    "facade": "#d8dde0",
+    "accent": "#9aa6ad",
+    "glass": "#4f7486",
+    "pattern": "curtain",
+    "roof": "flat",
+    "notes": "Adjoining block of the Angwa City complex (OSM height 46 m)."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "angwa_city"
+  },
+  {
+   "key": "zanu_pf_hq",
+   "name": "ZANU-PF Headquarters",
+   "match": {
+    "overture_id": "fecdb06c-680f-417d-b7fc-402d0ca00ff2",
+    "name": "Zanu Pf Headquarters",
+    "lat": -17.830135,
+    "lon": 31.039581,
+    "footprint_m2": 584
+   },
+   "height": 58,
+   "floors": 15,
+   "year": 1990,
+   "streets": "Rotten Row (Overture: Abdel Gamal Nasser Rd) & Samora Machel Ave",
+   "style": {
+    "facade": "#dcd3c2",
+    "accent": "#6b6a52",
+    "glass": "#2f3b3f",
+    "pattern": "grid",
+    "roof": "crown",
+    "notes": "15-storey postmodern HQ (completed 1990; architects Peter Martin & Tony Wales-Smith), nicknamed the 'Shake Shake' building after the gable-top Chibuku 'Shake Shake' beer carton - give it a pitched/gabled crown. Party emblem signage. Matched to the named OSM footprint ~140 m south of the Samora Machel / Rotten Row corner; adjoining b551a4bb may be its podium."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "rainbow_towers",
+   "name": "Rainbow Towers Hotel & HICC",
+   "match": {
+    "overture_id": "9db2ac07-3dfe-4292-8f15-0598a175e21f",
+    "lat": -17.831238,
+    "lon": 31.035114,
+    "footprint_m2": 13098
+   },
+   "height": 24,
+   "floors": 5,
+   "year": 1985,
+   "streets": "Samora Machel Ave West / Pennefather Ave, west of the Kopje area",
+   "style": {
+    "facade": "#c9a44f",
+    "accent": "#8a6d2e",
+    "glass": "#b8923f",
+    "pattern": "curtain",
+    "roof": "flat",
+    "notes": "Ex-Sheraton (1985, Energoprojekt / arch. Dragoljub & Ljiljana Bakic) - 'golden icon': gold reflective-glass hotel tower with a curved lower section and flat top; rooms up to floor 17 (marketing claims 104 m; ~75 m assumed). Overture footprint 9db2ac07 (192x107 m) merges hotel + Harare International Conference Centre: put the tower near the east side (hotel POI -17.8315, 31.0361) and model the HICC (4,500-seat auditorium) as a ~22 m block on the rest. height/floors here are for the merged footprint (HICC level) so the pipeline does not extrude the whole 1.3 ha complex to tower height; the tower itself is in synthetic_parts."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium",
+   "synthetic_parts": [
+    {
+     "role": "hotel_tower",
+     "lat": -17.8314,
+     "lon": 31.0359,
+     "length_m": 55,
+     "depth_m": 20,
+     "height": 75,
+     "floors": 19,
+     "rotation_note": "align long side with the complex long axis (~25 deg clockwise from east-west, per the footprint's minimum rotated rectangle); position approximate",
+     "confidence": "low"
+    }
+   ]
+  },
+  {
+   "key": "chaminuka_building",
+   "name": "Chaminuka Building",
+   "match": {
+    "overture_id": "e9528786-11d6-4714-9252-804fa28daaff",
+    "lat": -17.822825,
+    "lon": 31.053916,
+    "footprint_m2": 1183
+   },
+   "height": 38.3,
+   "floors": 11,
+   "streets": "Fourth St & Central Ave area",
+   "style": {
+    "facade": "#cbc2b0",
+    "accent": "#6c665c",
+    "glass": "#303a40",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Government (CIO) slab 80x18.5 m next to Mukwati; OSM height kept."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "compensation_house",
+   "name": "Compensation House (probable)",
+   "match": {
+    "overture_id": "bf3dc8ff-0687-4adb-bce7-ecb3e2013c64",
+    "lat": -17.824148,
+    "lon": 31.052367,
+    "footprint_m2": 622
+   },
+   "height": 58.7,
+   "floors": 17,
+   "streets": "Cnr Central Ave (Ahmed Ben Bella Ave) & Fourth St",
+   "style": {
+    "facade": "#cbc2b0",
+    "accent": "#6c665c",
+    "glass": "#303a40",
+    "pattern": "bands",
+    "roof": "stepped",
+    "notes": "Unnamed OSM tower cluster: bf3dc8ff 58.7 m + core e85a413e 70 m + wing 737201aa 45.2 m, at the Central Ave / Fourth St corner where Compensation House is listed. Identity unconfirmed - keep label off."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "compensation_house_core",
+   "name": "Compensation House (core)",
+   "match": {
+    "overture_id": "e85a413e-eb38-4df8-8e33-bc6449e733bf",
+    "lat": -17.824134,
+    "lon": 31.052525,
+    "footprint_m2": 113
+   },
+   "height": 70,
+   "floors": null,
+   "style": {
+    "facade": "#cbc2b0",
+    "accent": "#6c665c",
+    "glass": "#303a40",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Tall core of the cluster (OSM 70 m)."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "compensation_house"
+  },
+  {
+   "key": "compensation_house_wing",
+   "name": "Compensation House (wing)",
+   "match": {
+    "overture_id": "737201aa-806b-48ba-aba6-bcbceab417e5",
+    "lat": -17.824188,
+    "lon": 31.052604,
+    "footprint_m2": 448
+   },
+   "height": 45.2,
+   "floors": 13,
+   "style": {
+    "facade": "#cbc2b0",
+    "accent": "#6c665c",
+    "glass": "#303a40",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Lower wing (OSM 45.2 m)."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "compensation_house"
+  },
+  {
+   "key": "construction_house",
+   "name": "Construction House",
+   "match": {
+    "overture_id": "aeb51053-559d-44b6-afcb-f076d6e58d62",
+    "lat": -17.830719,
+    "lon": 31.044857,
+    "footprint_m2": 632
+   },
+   "height": 44,
+   "floors": 12,
+   "streets": "110 Leopold Takawira St, near Nelson Mandela Ave / Park St",
+   "style": {
+    "facade": "#d0c9bb",
+    "accent": "#7a7266",
+    "glass": "#34424b",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "110 Leopold Takawira St office block (tenants to 9th floor+); 26.6 m square tower on an L-shaped retail podium (d53604e5, 'Park Street mall' shops). Floors estimated."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "runhare_house",
+   "name": "Runhare House",
+   "match": {
+    "overture_id": "f3997add-9ee1-43be-99d1-d3f033a7a478",
+    "name": "Runhare House",
+    "lat": -17.827165,
+    "lon": 31.053605,
+    "footprint_m2": 1268
+   },
+   "height": 43,
+   "floors": 12,
+   "streets": "Kwame Nkrumah Ave near Fourth St",
+   "style": {
+    "facade": "#d3cbbb",
+    "accent": "#7a7266",
+    "glass": "#34424b",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "12-floor office block (OSM 43 m); 72x29 m footprint."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "electra_house",
+   "name": "Electra House",
+   "match": {
+    "overture_id": "79f1011e-3ff0-49cc-8628-f9395d7260c5",
+    "name": "Electra House",
+    "lat": -17.827601,
+    "lon": 31.046841,
+    "footprint_m2": 538
+   },
+   "height": 42,
+   "floors": 12,
+   "streets": "Samora Machel Ave (south side) near Julius Nyerere Way",
+   "style": {
+    "facade": "#d3cbbb",
+    "accent": "#7a7266",
+    "glass": "#34424b",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "12-floor office block beside Karigamombe (Overture num_floors 12)."
+   },
+   "label": false,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "holiday_inn",
+   "name": "Holiday Inn Harare",
+   "match": {
+    "overture_id": "4f446f0d-6295-47b6-8738-ccc9c7097d47",
+    "name": "Holiday Inn Hotel",
+    "lat": -17.825755,
+    "lon": 31.056026,
+    "footprint_m2": 1076
+   },
+   "height": 38,
+   "floors": 11,
+   "streets": "Cnr Samora Machel Ave & Fifth St",
+   "style": {
+    "facade": "#e6e1d6",
+    "accent": "#2e7d4f",
+    "glass": "#3d4a52",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "201-room hotel slab (62x23 m); green 'Holiday Inn' sign on the roofline. Floors estimated."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "eastgate",
+   "name": "Eastgate Centre",
+   "match": {
+    "overture_id": "85a3b9cc-2648-420c-a04c-310bbf77a137",
+    "name": "Eastgate Shopping Mall",
+    "lat": -17.831497,
+    "lon": 31.0526,
+    "footprint_m2": 3123
+   },
+   "height": 22,
+   "floors": 2,
+   "year": 1996,
+   "streets": "Cnr Robert Mugabe Rd & Second St (Sam Nujoma St), to Third St",
+   "style": {
+    "facade": "#b6ad9f",
+    "accent": "#9c4a33",
+    "glass": "#5b6c70",
+    "pattern": "fins",
+    "roof": "chimneys",
+    "notes": "1996, Mick Pearce / Arup, termite-mound-inspired passive cooling. TWO parallel 9-storey precast-concrete slabs (eastgate_block_n, eastgate_block_s: each ~142x14.5 m) either side of this ~131x24 m glass-roofed atrium (this entry = atrium; glass roof at ~22 m on steel lattice beams, suspended steel bridges + glass lifts, skywalk at level 2). Retail on 2 lower floors, offices above; parking for 450 cars."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "high"
+  },
+  {
+   "key": "eastgate_block_s",
+   "name": "Eastgate Centre (south block)",
+   "match": {
+    "overture_id": "b44718b4-e08e-45aa-9b6c-6ebfdb2f9396",
+    "lat": -17.83133,
+    "lon": 31.052553,
+    "footprint_m2": 2048
+   },
+   "height": 33,
+   "floors": 9,
+   "year": 1996,
+   "style": {
+    "facade": "#b6ad9f",
+    "accent": "#9c4a33",
+    "glass": "#5b6c70",
+    "pattern": "fins",
+    "roof": "chimneys",
+    "notes": "9 storeys (~31 m to eaves). Grey unpainted precast facade with deep protruding window hoods/'teeth' shading recessed glazing; columns of steel rings on the outside carry green creepers. Red-tiled pitched roof ridge along the block carrying ~24 brick chimney funnels (48 total across both blocks), each ~1.5x1.5 m, rising ~4-6 m above the ridge."
+   },
+   "label": false,
+   "confidence": "high",
+   "style_confidence": "high",
+   "part_of": "eastgate"
+  },
+  {
+   "key": "eastgate_block_n",
+   "name": "Eastgate Centre (north block)",
+   "match": {
+    "overture_id": "66a6bf36-a578-466f-aaa7-e5de6d64337d",
+    "lat": -17.831667,
+    "lon": 31.052635,
+    "footprint_m2": 2071
+   },
+   "height": 33,
+   "floors": 9,
+   "year": 1996,
+   "style": {
+    "facade": "#b6ad9f",
+    "accent": "#9c4a33",
+    "glass": "#5b6c70",
+    "pattern": "fins",
+    "roof": "chimneys",
+    "notes": "Mirror of the south block (see eastgate_block_s)."
+   },
+   "label": false,
+   "confidence": "high",
+   "style_confidence": "high",
+   "part_of": "eastgate"
+  },
+  {
+   "key": "meikles",
+   "name": "Meikles Hotel (Hyatt Regency Harare The Meikles)",
+   "match": {
+    "overture_id": "e22c478a-a4ce-415d-b99c-688de808a01f",
+    "name": "Miekles Hotel",
+    "lat": -17.830338,
+    "lon": 31.052733,
+    "footprint_m2": 854
+   },
+   "height": 43,
+   "floors": 13,
+   "year": 1976,
+   "streets": "Cnr Jason Moyo Ave & Third St, south side of Africa Unity Square",
+   "style": {
+    "facade": "#e3ddcf",
+    "accent": "#7a6a55",
+    "glass": "#3b4650",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "Two offset multi-storey wings (North & South, 312 rooms) facing Africa Unity Square; hotel founded 1915, rebuilt 1974-76, 12-storey tower block 1980, +5 floors on North Wing 1991. This entry = north wing (OSM 43 m); south wing = meikles_south. Balconied north faces, 'MEIKLES' / 'HYATT REGENCY' roof signs."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "meikles_south",
+   "name": "Meikles Hotel (south wing)",
+   "match": {
+    "overture_id": "3b4e7482-9dbe-4333-b7bb-6b1c1d9b34af",
+    "name": "Hyatt Regency Harare The Meikles",
+    "lat": -17.830589,
+    "lon": 31.052819,
+    "footprint_m2": 1465
+   },
+   "height": 42,
+   "floors": 12,
+   "year": 1980,
+   "style": {
+    "facade": "#e3ddcf",
+    "accent": "#7a6a55",
+    "glass": "#3b4650",
+    "pattern": "bands",
+    "roof": "flat",
+    "notes": "South wing / tower block (12 storeys, 1980) offset behind the north wing."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "meikles"
+  },
+  {
+   "key": "town_house",
+   "name": "Harare Town House",
+   "match": {
+    "overture_id": "3edd0d5d-1dd3-40c3-a5e9-8df102eb4057",
+    "name": "Harare Town House",
+    "lat": -17.831913,
+    "lon": 31.046114,
+    "footprint_m2": 1594
+   },
+   "height": 14,
+   "floors": 2,
+   "year": 1933,
+   "streets": "Cnr Julius Nyerere Way & Jason Moyo Ave",
+   "style": {
+    "facade": "#e8d9b5",
+    "accent": "#a3573a",
+    "glass": "#3a3a36",
+    "pattern": "colonial",
+    "roof": "clocktower",
+    "notes": "City Hall (1933, Mediterranean/Italian-Renaissance style, Public Works under Major Roberts). Cream rendered walls, terracotta tile roofs, arched loggia/entrance on Julius Nyerere Way, clock tower (~26 m, assumed) over the entrance. Gardens in front with a floral clock and fountain. Footprint 40x50 m U/courtyard shape."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "parliament_house",
+   "name": "Parliament House (old Parliament of Zimbabwe)",
+   "match": {
+    "overture_id": "d9f9a3a0-0581-4a9e-b68c-90073031ed73",
+    "name": "Parliament of Zimbabwe",
+    "lat": -17.828052,
+    "lon": 31.052186,
+    "footprint_m2": 968
+   },
+   "height": 15,
+   "floors": 3,
+   "year": 1899,
+   "streets": "Cnr Nelson Mandela Ave & Third St, north side of Africa Unity Square",
+   "style": {
+    "facade": "#e8e0cc",
+    "accent": "#8a4a3a",
+    "glass": "#3a3a36",
+    "pattern": "colonial",
+    "roof": "flat",
+    "notes": "Began 1895 as a hotel, completed/inaugurated 1899 as the Legislative Assembly; used by Parliament until Nov 2023. 3-storey colonial block with arcaded/verandah front and hipped iron roof (renderer: flat + parapet OK). Parts: d1e9bc60, c99836f9 (later 5-floor annex)."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  },
+  {
+   "key": "parliament_annex",
+   "name": "Parliament of Zimbabwe (annex)",
+   "match": {
+    "overture_id": "c99836f9-cb12-440a-bcca-4e4231365d78",
+    "name": "Parliament of Zimbabwe",
+    "lat": -17.827398,
+    "lon": 31.051884,
+    "footprint_m2": 186
+   },
+   "height": 18,
+   "floors": 5,
+   "style": {
+    "facade": "#e8e0cc",
+    "accent": "#8a4a3a",
+    "glass": "#3a3a36",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "Later 5-floor annex (Overture num_floors 5)."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low",
+   "part_of": "parliament_house"
+  },
+  {
+   "key": "anglican_cathedral",
+   "name": "Cathedral of St Mary and All Saints",
+   "match": {
+    "overture_id": "9a46dbf1-dcaa-4bfc-86b9-0c73ef2d0b50",
+    "name": "The Anglican Church",
+    "lat": -17.828081,
+    "lon": 31.051232,
+    "footprint_m2": 1257
+   },
+   "height": 16,
+   "floors": 1,
+   "year": 1913,
+   "streets": "Cnr Nelson Mandela Ave & Sam Nujoma St, NW corner of Africa Unity Square",
+   "style": {
+    "facade": "#b39a7c",
+    "accent": "#6f5a45",
+    "glass": "#2f3a45",
+    "pattern": "colonial",
+    "roof": "clocktower",
+    "notes": "Anglican cathedral by Herbert Baker, begun 1913, finished 1961. Romanesque Revival in local stone (sandstone/granite), cruciform ~79x23 m plan. Square bell tower with 10 bells (~28 m, assumed; no clock face needed). Stained glass, round-arched openings."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "sacred_heart_cathedral",
+   "name": "Cathedral of the Sacred Heart",
+   "match": {
+    "overture_id": "0f116200-dedd-41b7-af57-256178f53c39",
+    "name": "Cathedral of the Sacred Heart",
+    "lat": -17.820991,
+    "lon": 31.053213,
+    "footprint_m2": 728
+   },
+   "height": 14,
+   "floors": 1,
+   "year": 1925,
+   "streets": "Cnr Fourth St & Herbert Chitepo Ave",
+   "style": {
+    "facade": "#a86f52",
+    "accent": "#e0d3bd",
+    "glass": "#2f3a45",
+    "pattern": "brick",
+    "roof": "spire",
+    "notes": "Catholic cathedral (1925), Gothic Revival with two heavily adorned front towers (~24 m, assumed) with pinnacles; timber roof, stained glass. Footprint 43x22 m."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "national_gallery",
+   "name": "National Gallery of Zimbabwe",
+   "match": {
+    "overture_id": "16ad6b4e-8312-4f41-aaca-283791103e2a",
+    "name": "National Gallery of Zimbabwe",
+    "lat": -17.82491,
+    "lon": 31.048874,
+    "footprint_m2": 2381
+   },
+   "height": 10,
+   "floors": 2,
+   "year": 1957,
+   "streets": "20 Julius Nyerere Way, cnr Park Lane",
+   "style": {
+    "facade": "#ece9e1",
+    "accent": "#6d6d6d",
+    "glass": "#2f3b44",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "1957 modernist gallery (Montgomerie & Oldfield), large naturally-lit open-plan hall; white walls, flat roof with clerestory/roof-lights; sits at the SE corner of Harare Gardens."
+   },
+   "label": true,
+   "confidence": "high",
+   "style_confidence": "medium"
+  },
+  {
+   "key": "main_post_office",
+   "name": "Harare Main Post Office",
+   "match": {
+    "overture_id": "4dc8db31-54bb-469a-85c3-e48f2d090954",
+    "name": "Main Post Office",
+    "lat": -17.83016,
+    "lon": 31.047181,
+    "footprint_m2": 2382
+   },
+   "height": 18,
+   "floors": 4,
+   "streets": "Julius Nyerere Way / Inez Terrace (Overture: Mayor Urimbo Terrace), between Nelson Mandela & Jason Moyo",
+   "style": {
+    "facade": "#dac9a6",
+    "accent": "#7b6a50",
+    "glass": "#3a3f40",
+    "pattern": "colonial",
+    "roof": "flat",
+    "notes": "Main Post Office block (second footprint 56182f90 'Harare Main Post Ofiice'). Height/style not verified - mid-century stone-coloured civic building assumed."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "munhumutapa_building",
+   "name": "Munhumutapa Building (Office of the President and Cabinet)",
+   "match": {
+    "overture_id": "bc535a44-dd78-4908-bc5b-134d8f3a743d",
+    "name": "Monomutapa Building",
+    "lat": -17.826543,
+    "lon": 31.051171,
+    "footprint_m2": 4685
+   },
+   "height": 20,
+   "floors": 5,
+   "streets": "Samora Machel Ave / Sam Nujoma St",
+   "style": {
+    "facade": "#e0d6c0",
+    "accent": "#7d7160",
+    "glass": "#343c40",
+    "pattern": "grid",
+    "roof": "flat",
+    "notes": "Seat of the Office of the President and Cabinet; ministries of Foreign Affairs/Information inside. Large 132x51 m irregular footprint (Overture num_floors 2 looks low). Height assumed."
+   },
+   "label": false,
+   "confidence": "low",
+   "style_confidence": "low"
+  },
+  {
+   "key": "harare_station",
+   "name": "Harare Railway Station (NRZ)",
+   "match": {
+    "overture_id": "effddafc-85ef-4984-aa55-0c1c83667ae0",
+    "name": "National Railways Of Zimbabwe, Harare Train Station",
+    "lat": -17.834957,
+    "lon": 31.051675,
+    "footprint_m2": 1788
+   },
+   "height": 10,
+   "floors": 2,
+   "streets": "Kenneth Kaunda Ave, at the south end of Sam Nujoma St",
+   "style": {
+    "facade": "#e3d6b8",
+    "accent": "#8e3b2e",
+    "glass": "#34393c",
+    "pattern": "colonial",
+    "roof": "flat",
+    "notes": "Main passenger station + railway museum; low colonial-era block with pitched roof (renderer: flat+parapet OK). Style assumed."
+   },
+   "label": true,
+   "confidence": "medium",
+   "style_confidence": "low"
+  }
+ ],
+ "places": [
+  {
+   "key": "africa_unity_square",
+   "name": "Africa Unity Square",
+   "lat": -17.829318,
+   "lon": 31.052023,
+   "type": "square",
+   "notes": "Ex-Cecil Square (1890 pioneer flag site). ~2.4 ha rectangle (Overture land_use polygon, bounds lon 31.05117-31.05288, lat -17.83018 to -17.82846) bounded by Nelson Mandela Ave (N, Parliament + Anglican cathedral), Jason Moyo Ave (S, Meikles), Sam Nujoma St (W), Third St/Patrice Lumumba St (E). Paths laid out as a Union Jack: two corner-to-corner diagonals + a cross (one path lines up with George Silundika Ave), large central fountain (with smaller fountains), lawns, old jacarandas (purple in Oct-Nov), flower sellers and photographers along the edges.",
+   "confidence": "high",
+   "bounds": {
+    "minLon": 31.05117,
+    "maxLon": 31.05288,
+    "minLat": -17.83018,
+    "maxLat": -17.82846
+   }
+  },
+  {
+   "key": "harare_gardens",
+   "name": "Harare Gardens",
+   "lat": -17.8243,
+   "lon": 31.0463,
+   "type": "park",
+   "notes": "Main city park, ~17 ha: bordered by Herbert Chitepo Ave (N), Julius Nyerere Way / Park Lane (E and S) and Leopold Takawira St (W); the Les Brown pool, Monomotapa Hotel and parking occupy the SW corner. Lawns, flower beds, a pond on the north side, a 1930s bandstand (Sunday jazz), restaurant, playground. National Gallery at the SE corner. Approx corners: NW (-17.8235,31.0440), NE (-17.8218,31.0484), SE (-17.8252,31.0492), S (-17.8262,31.0476), SW (-17.8269,31.0448).",
+   "confidence": "medium"
+  },
+  {
+   "key": "the_kopje",
+   "name": "The Kopje",
+   "lat": -17.841,
+   "lon": 31.0386,
+   "type": "hill",
+   "notes": "Granite hill where Salisbury/Harare was founded (1890), SW edge of the CBD; national monument (~15 ha). Rises roughly 45-55 m above Robert Mugabe Rd (toposcope quoted at 1,539.8 m ASL; PeakVisor lists 1,496 m). Summit reached by Skipper Hoste Drive, a one-way loop from Robert Mugabe Rd/Kaguvi St. Eternal Flame of Independence (carried here from Rufaro Stadium, 18 Apr 1980) and a (vandalised) toposcope at the top. Wooded (msasa), boulders. Summit location approximate; lies just south of the current map bbox (S=-17.840).",
+   "confidence": "low"
+  },
+  {
+   "key": "first_street_mall",
+   "name": "First Street Mall",
+   "lat": -17.8302,
+   "lon": 31.0497,
+   "type": "mall",
+   "notes": "Pedestrianised First Street (Harare's first pedestrian mall), from about Robert Mugabe Rd/Speke Ave north to Kwame Nkrumah Ave (Overture segment lat -17.8324 to -17.8279); Edgars at the Jason Moyo corner, Galaxy Mall, OK, banks. Paved, benches, vendors, crowds; open to traffic north of Kwame Nkrumah to Samora Machel.",
+   "confidence": "high"
+  },
+  {
+   "key": "mbuya_nehanda_statue",
+   "name": "Mbuya Nehanda Statue",
+   "lat": -17.82699,
+   "lon": 31.04753,
+   "type": "monument",
+   "notes": "Bronze statue of the spirit medium Mbuya Nehanda (unveiled 25 May 2021, David Mutasa): 3 m figure on a 1.5 m pedestal on a corner plaza at the Samora Machel Ave / Julius Nyerere Way intersection, with pedestrian footbridges over the junction. Karigamombe Centre on the SE corner.",
+   "confidence": "high"
+  },
+  {
+   "key": "fourth_street_rank",
+   "name": "Simon Muzenda (Fourth Street) Bus Terminus",
+   "lat": -17.830129,
+   "lon": 31.055802,
+   "type": "rank",
+   "notes": "Main kombi/bus terminus for Ruwa, Marondera, eastern & north-eastern suburbs; ~2.6 ha open lot (Overture polygon) east of Fourth St between Jason Moyo Ave and Robert Mugabe Rd; shelters, touts, vendors.",
+   "confidence": "high"
+  },
+  {
+   "key": "charge_office_rank",
+   "name": "Charge Office Terminus",
+   "lat": -17.8341,
+   "lon": 31.048873,
+   "type": "rank",
+   "notes": "Kombi rank for Chitungwiza and southern suburbs, next to Harare Central Police Station (Charge Office).",
+   "confidence": "high"
+  },
+  {
+   "key": "copacabana_rank",
+   "name": "Copacabana Terminus",
+   "lat": -17.832082,
+   "lon": 31.043902,
+   "type": "rank",
+   "notes": "Kombi rank for western and north-western suburbs, on Chinhoyi St / Speke Ave in the western (Kopje-side) CBD.",
+   "confidence": "high"
+  },
+  {
+   "key": "market_square_rank",
+   "name": "Market Square Terminus",
+   "lat": -17.837042,
+   "lon": 31.042044,
+   "type": "rank",
+   "notes": "Large bus/kombi terminus (~1.3 ha) for western & southern suburbs, Harare St / Bank St area near the Kopje.",
+   "confidence": "high"
+  },
+  {
+   "key": "roadport",
+   "name": "Roadport",
+   "lat": -17.83017,
+   "lon": 31.057004,
+   "type": "rank",
+   "notes": "Long-distance / cross-border coach terminal (Fifth St & Robert Mugabe Rd).",
+   "confidence": "high"
+  },
+  {
+   "key": "greenwood_park",
+   "name": "Greenwood Park",
+   "lat": -17.817478,
+   "lon": 31.057539,
+   "type": "park",
+   "notes": "Leafy park in the Avenues NE of the CBD (~5.8 ha).",
+   "confidence": "high"
+  },
+  {
+   "key": "heroes_acre",
+   "name": "National Heroes' Acre",
+   "lat": -17.826,
+   "lon": 30.984,
+   "type": "monument",
+   "notes": "Out of map: ~7 km W on the Bulawayo/Norton road ridge. 40 m obelisk tower topped by an Eternal Flame (lit 1982), visible from Harare - use as a distant skyline marker only. Coordinates approximate (+-1 km).",
+   "confidence": "low"
+  }
+ ]
+}
