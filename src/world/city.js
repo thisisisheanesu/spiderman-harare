@@ -171,10 +171,11 @@ export class City {
     this._mesh(plane, mats.base);
     this._mesh(grounds.landuse, mats.landuse);
     this._mesh(hill, mats.landuse, true);
+    // Pavements share the areas material: one draw call for both.
+    grounds.areas.append(streets.walks);
     this._mesh(grounds.areas, mats.areas);
     this._mesh(grounds.paths, mats.paths);
     this._mesh(streets.asphalt, mats.roads);
-    this._mesh(streets.walks, mats.areas);
     streets.marks.append(grounds.marks);
     this._mesh(streets.marks, mats.marks);
 
@@ -223,17 +224,21 @@ export class City {
     const half = CHUNK / 2;
     const far = (game.scene.fog?.far ?? 3000) + half;
     // The key light's shadow box spans about +-shadowSize around a focus just ahead of the player,
-    // so only chunks near the camera can cast into it (tall buildings a little further: long
-    // shadows); the rest would only add whole-chunk draws to the shadow pass.
-    const shadows = this.game.sky?.sun?.castShadow;
-    const reach = (this.game.sky?.shadowSize ?? 110) * 1.6;
+    // so only chunks near the camera can cast into it: street-level detail from close by, whole
+    // buildings from as far as the tallest tower's shadow reaches at the current light elevation.
+    // The rest would only add whole-chunk draws (tens of thousands of triangles) to the shadow pass.
+    const sky = this.game.sky;
+    const shadows = sky?.sun?.castShadow;
+    const reach = (sky?.shadowSize ?? 110) * 1.6;
+    const ly = Math.min(0.999, Math.max(0.05, sky?.lightDirection?.y ?? 1));
+    const reachBase = reach + Math.min(450, (125 * Math.sqrt(1 - ly * ly)) / ly); // 125 m tower / tan(elevation)
     for (const c of this.chunks) {
       const dx = Math.max(0, Math.abs(cam.x - c.x) - half);
       const dz = Math.max(0, Math.abs(cam.z - c.z) - half);
       const d = Math.hypot(dx, dz);
       if (c.base) {
         c.base.visible = d < far;
-        if (shadows) c.base.castShadow = d < reach + 90;
+        if (shadows) c.base.castShadow = d < reachBase;
       }
       if (c.detail) {
         c.detail.visible = d < this.detailRange;

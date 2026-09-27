@@ -123,11 +123,19 @@ export class Bubbles {
     vis.length = 0;
     for (const b of this.items) if (b.agent && b.visible) vis.push(b);
     vis.sort((p, q) => p.dist - q.dist);
+    // Re-check earlier bubbles after each move so a nudged bubble never lands on a third one.
     for (let i = 1; i < vis.length; i++) {
-      for (let j = 0; j < i; j++) {
-        const p = vis[i];
-        const q = vis[j];
-        if (Math.abs(p.x - q.x) < 170 * Math.max(p.s, q.s) && Math.abs(p.y - q.y) < 46 * Math.max(p.s, q.s)) p.y = q.y - 48 * Math.max(p.s, q.s);
+      const p = vis[i];
+      for (let pass = 0, moved = true; moved && pass < i + 1; pass++) {
+        moved = false;
+        for (let j = 0; j < i; j++) {
+          const q = vis[j];
+          const k = Math.max(p.s, q.s);
+          if (Math.abs(p.x - q.x) < 170 * k && Math.abs(p.y - q.y) < 58 * k) {
+            p.y = q.y - 60 * k;
+            moved = true;
+          }
+        }
       }
     }
     for (const b of vis) {

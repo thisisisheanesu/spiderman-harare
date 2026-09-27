@@ -267,7 +267,7 @@ function treeGeometry(name, lod) {
 // (mean 1). farBlobFit(name) maps it onto that species' own far blob: centre offset, half-sizes
 // and mean colour (at scale 1, before the per-tree rotation and scale).
 export function farBlobGeometry() {
-  const g = new THREE.OctahedronGeometry(1, 0).toNonIndexed();
+  const g = new THREE.OctahedronGeometry(1, 0);
   g.deleteAttribute('uv');
   const pos = g.attributes.position;
   const nrm = g.attributes.normal;

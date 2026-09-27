@@ -40,6 +40,7 @@ const PLUNGE_HS = 5.5; // max horizontal drift while plunging
 const PLUNGE_DRIFT = 3.5; // ...and the least
 const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
 const PLUNGE_RUN_HS = 10; // running / jumping off a tower's roof: the plunge keeps up to this drift
+const DROP_WAIT = 0.1; // s over a big drop after leaving a roof before that plunge starts
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, x) => {
@@ -103,6 +104,7 @@ export class Controller {
     this.plungeArmed = false;
     this.plungeHs = PLUNGE_HS;
     this.fromRoof = false; // airborne straight off a roof / the ground (not a swing, zip or wall)
+    this.dropTime = 0;
     this.contact = {
       hit: false,
       ground: false,
@@ -234,6 +236,7 @@ export class Controller {
     const p = this.p;
     // (Off the ground, or a coyote-time jump just after running off an edge.)
     this.fromRoof = p.state === 'ground' || (p.state === 'air' && this.fromRoof);
+    this.dropTime = 0;
     p.velocity.set(vx, vy, vz);
     p.state = 'air';
     this.coyote = 0;
@@ -259,7 +262,8 @@ export class Controller {
   }
 
   // Nothing to land on for PLUNGE_DROP below the feet (a lookup first; a ray cast confirms, since
-  // landmark crowns and ledges stick out of the footprints the lookup knows).
+  // landmark crowns and ledges stick out of the footprints the lookup knows). The caller also waits
+  // DROP_WAIT with this true, as the capsule can still be riding a roof's lip past the edge.
   _bigDrop() {
     const pos = this.p.position;
     if (pos.y - this.floorAt(pos.x, pos.z) <= PLUNGE_DROP) return false;
@@ -466,6 +470,7 @@ export class Controller {
         v.y = 0;
         this.coyote = 0.14;
         this.fromRoof = true;
+        this.dropTime = 0;
         return;
       }
     }
@@ -482,15 +487,18 @@ export class Controller {
     if (this.plungeArmed && v.y < -1) {
       this._startPlunge();
       dive = true;
-    } else if (!dive && this.fromRoof && v.y < -1 && this._bigDrop()) {
+    } else if (!dive && this.fromRoof && v.y < -1) {
       // Ran or jumped off a tower's roof (not from a perch): the same head-first plunge down its
       // face, so holding swing catches a web back up it instead of falling past every roof in
       // reach with nothing to swing from.
-      const hs = Math.hypot(v.x, v.z);
-      if (hs > 1) this.perchOut.set(v.x / hs, 0, v.z / hs);
-      else this.perchOut.set(-Math.sin(p.heading), 0, -Math.cos(p.heading));
-      this._startPlunge();
-      dive = true;
+      this.dropTime = this._bigDrop() ? this.dropTime + h : 0;
+      if (this.dropTime > DROP_WAIT) {
+        const hs = Math.hypot(v.x, v.z);
+        if (hs > 1) this.perchOut.set(v.x / hs, 0, v.z / hs);
+        else this.perchOut.set(-Math.sin(p.heading), 0, -Math.cos(p.heading));
+        this._startPlunge();
+        dive = true;
+      }
     }
     let g = dive ? DIVE_G : G;
     // Floatier rise only while the jump button that launched us is still held (launches by swing /

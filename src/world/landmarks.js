@@ -807,15 +807,21 @@ function nehanda(gb, col, L, x, z) {
 // central jet with ring jets, a paved surround and flower beds.
 function fountainAt(gb, col, jets, L, x, z, paths, G) {
   const R = 7.5;
+  const circle = (r, n = 32) => {
+    const out = [];
+    for (let i = 0; i < n; i++) out.push(x + Math.cos((i / n) * Math.PI * 2) * r, z + Math.sin((i / n) * Math.PI * 2) * r);
+    return out;
+  };
+  // Knee wall: outer face and a flat coping ring (an annulus, so the pool stays open to the sky).
   gb.brush(tint('#d8d0c2'), L.concrete, 6, 2);
-  gb.cylinder(x, 0, z, R + 0.35, 0.6, 32, 2, false);
-  gb.cylinder(x, 0.6, z, R + 0.35, 0.08, 32, 2, true);
+  gb.cylinder(x, 0, z, R + 0.35, 0.68, 32, 2, false);
+  gb.polygon(circle(R + 0.35), [circle(R)], 0.68, 2);
   gb.brush(tint('#43add3'), L.concrete, 6, 2);
   const base = gb.vCount;
   for (let i = 0; i <= 32; i++) {
     const a = (i / 32) * Math.PI * 2;
     gb.vertex(x + Math.cos(a) * R, 0.05, z + Math.sin(a) * R, -Math.cos(a), 0, -Math.sin(a), i / 4, 0);
-    gb.vertex(x + Math.cos(a) * R, 0.66, z + Math.sin(a) * R, -Math.cos(a), 0, -Math.sin(a), i / 4, 0.2);
+    gb.vertex(x + Math.cos(a) * R, 0.68, z + Math.sin(a) * R, -Math.cos(a), 0, -Math.sin(a), i / 4, 0.2);
   }
   for (let i = 0; i < 32; i++) {
     const a = base + i * 2;

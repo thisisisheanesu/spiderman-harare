@@ -277,7 +277,7 @@ function reliefNormalMap() {
   const N = ATLAS_SIZE / 2;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = N;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, N, N);
   ctx.scale(0.5, 0.5);

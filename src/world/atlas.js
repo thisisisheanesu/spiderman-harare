@@ -78,7 +78,9 @@ let noiseCanvas = null;
 export function noiseTile(size = 256) {
   if (noiseCanvas && noiseCanvas.width === size) return noiseCanvas;
   const c = makeCanvas(size);
-  const ctx = c.getContext('2d');
+  // CPU-backed like the layer canvases it is drawn into: an accelerated source canvas would be read
+  // back from the GPU on every grime() pass (seconds of load time on software GL).
+  const ctx = c.getContext('2d', { willReadFrequently: true });
   const img = ctx.createImageData(size, size);
   const rng = makeRng(1234);
   const octaves = [

@@ -34,9 +34,9 @@ const KEYS = [
   { el: 12, zenith: '#6d97cb', horizon: '#e3d6bd', fog: '#d8ceb8', glow: '#ffd9a8', hemiSky: '#c9d3df', hemiGround: '#9a8066', hemi: 1.4, sun: '#ffe2b8', sunI: 2.45 },
   { el: 5, zenith: '#6a88bd', horizon: '#ebbf93', fog: '#d6b99a', glow: '#ffb070', hemiSky: '#cdc6cc', hemiGround: '#8e705a', hemi: 1.22, sun: '#ffbd80', sunI: 2.0 },
   { el: 0, zenith: '#4d6399', horizon: '#ee9868', fog: '#c38f74', glow: '#ff8040', hemiSky: '#b6a8bc', hemiGround: '#6e5648', hemi: 1.02, sun: '#ff8a4a', sunI: 1.1 },
-  { el: -4, zenith: '#2b3666', horizon: '#a8695c', fog: '#735657', glow: '#d06040', hemiSky: '#7a7c9e', hemiGround: '#3e3430', hemi: 0.85, sun: '#ff7040', sunI: 0 },
-  { el: -9, zenith: '#131b3a', horizon: '#46374a', fog: '#352d3c', glow: '#503040', hemiSky: '#56628f', hemiGround: '#302826', hemi: 1.1, sun: '#000000', sunI: 0 },
-  { el: -16, zenith: '#070b1c', horizon: '#2a2230', fog: '#1f1b25', glow: '#1a1418', hemiSky: '#4c5b8e', hemiGround: '#2c2522', hemi: 1.5, sun: '#000000', sunI: 0 },
+  { el: -4, zenith: '#2b3666', horizon: '#a8695c', fog: '#735657', glow: '#d06040', hemiSky: '#7a7c9e', hemiGround: '#3e3430', hemi: 1.35, sun: '#ff7040', sunI: 0 },
+  { el: -9, zenith: '#131b3a', horizon: '#46374a', fog: '#352d3c', glow: '#503040', hemiSky: '#5e6a9a', hemiGround: '#342c28', hemi: 1.9, sun: '#000000', sunI: 0 },
+  { el: -16, zenith: '#070b1c', horizon: '#2a2230', fog: '#1f1b25', glow: '#1a1418', hemiSky: '#6a78a8', hemiGround: '#3a332e', hemi: 2.4, sun: '#000000', sunI: 0 },
 ];
 
 const MOON_COLOR = new THREE.Color('#9fb4dc');
