@@ -6,10 +6,11 @@ import { makeCanvas } from './atlas.js';
 import { KERB_HEIGHT } from './streetMetrics.js';
 import { leafTexture, modelFor } from './treeModels.js';
 
-// Trees of late-September Harare: jacarandas in full purple bloom lining the avenues and filling
+// Trees of late-September Harare: jacarandas in full lavender bloom lining the avenues and filling
 // the parks, African flame trees (Spathodea) with orange-red flower clusters, msasa with their
-// wine-red spring flush, plain green bauhinia/eucalyptus, and a few palms. Instanced per species
-// with a three-level distance LOD rebuilt as the camera moves (models in treeModels.js).
+// wine-red spring flush, plain green shade trees and eucalyptus, cypresses and palms in the squares
+// and hotel frontages. Instanced per species with a distance LOD rebuilt as the camera moves
+// (models in treeModels.js), plus fallen-petal carpets under the jacarandas.
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -134,8 +135,10 @@ class InstanceLOD {
       while (k < lv.length && d2 >= lv[k].d2) k++;
       if (k === lv.length) continue;
       const l = lv[k];
-      l.mesh.instanceMatrix.array.set(this.matrices.subarray(i * 16, i * 16 + 16), l.n * 16);
-      l.mesh.instanceColor.array.set(this.colors.subarray(i * 3, i * 3 + 3), l.n * 3);
+      const m = l.mesh.instanceMatrix.array;
+      const c = l.mesh.instanceColor.array;
+      for (let e = 0; e < 16; e++) m[l.n * 16 + e] = this.matrices[i * 16 + e];
+      for (let e = 0; e < 3; e++) c[l.n * 3 + e] = this.colors[i * 3 + e];
       l.n++;
     }
     // Upload only the part of the instance buffers that is in use.
@@ -195,14 +198,6 @@ export function planTrees(ctx) {
     const shade = 0.85 + rng() * 0.3;
     trees.push({ species, x, y: y + heightAt(x, z), z, s, rot: rng() * Math.PI * 2, c: [shade, shade * (0.95 + rng() * 0.1), shade] });
     return true;
-  };
-  const pickMix = (mix) => {
-    let t = rng() * Object.values(mix).reduce((a, b) => a + b, 0);
-    for (const k in mix) {
-      t -= mix[k];
-      if (t <= 0) return k;
-    }
-    return 'green';
   };
 
   // Street trees: one species per street name (avenues are planted uniformly).
@@ -265,7 +260,7 @@ export function planTrees(ctx) {
         const pz = z + (rng() - 0.5) * spacing * 0.8;
         if (!pointInRing(px, pz, ring) || distToRing(px, pz, ring) < edgeKeep) continue;
         if (!clearOfRoads(px, pz, 2) || !clearOfBuildings(px, pz, 2.5)) continue;
-        add(pickMix(mix), px, pz, 0, scale * (0.85 + rng() * 0.35));
+        add(pickFrom(rng, mix), px, pz, 0, scale * (0.85 + rng() * 0.35));
       }
     }
   };
@@ -298,7 +293,7 @@ export function planTrees(ctx) {
       const pz = z + rng() * 15;
       if (urbanAt(px, pz) > 0.35) continue;
       if (!clearOfRoads(px, pz, 3.5) || !clearOfBuildings(px, pz, 3)) continue;
-      add(pickMix({ green: 5, jacaranda: 3, msasa: 0.8, flame: 0.4, eucalyptus: 0.8 }), px, pz, 0, 0.8 + rng() * 0.35);
+      add(pickFrom(rng, { green: 5, jacaranda: 3, msasa: 0.8, flame: 0.4, eucalyptus: 0.8 }), px, pz, 0, 0.8 + rng() * 0.35);
     }
   }
   for (const [x, z] of data.trees) add('green', x, z, 0, 1);

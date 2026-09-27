@@ -279,7 +279,8 @@ export class Crowd {
     if (a.state === 'flee') {
       target = 3.6 + (a.look.child ? 0.4 : 0);
       a.timer -= dt;
-      if (a.timer <= 0) a.state = 'walk';
+      // Calm down, but whoever is out on a crossing by then still finishes crossing.
+      if (a.timer <= 0) a.state = e.kind === CROSS ? 'cross' : 'walk';
     }
     // Cars: hurry across when one bears down on the crossing; on the pavement, give a kombi that
     // mounts the kerb a wide berth.
@@ -318,7 +319,11 @@ export class Crowd {
     if (a.next < 0 && e.len - a.s < PLAN) this._plan(a, ctx);
     const lo = a.next >= 0 ? a.nextLo : -spread;
     const hi = a.next >= 0 ? a.nextHi : spread;
-    a.lat = approach(a.lat, Math.max(lo, Math.min(hi, a.latGoal)), 0.8 * dt);
+    const goal = Math.max(lo, Math.min(hi, a.latGoal));
+    // Outside the next edge's lane on a short last stretch: side-step fast enough to make the node.
+    let rate = 0.8;
+    if (a.lat < lo || a.lat > hi) rate = Math.min(2.5, Math.max(rate, (Math.abs(goal - a.lat) * Math.max(a.speed, 0.5)) / Math.max(0.5, e.len - a.s)));
+    a.lat = approach(a.lat, goal, rate * dt);
     if (a.s >= e.len) this._arrive(a, ctx);
     this._place(a);
     // Hard guarantee: never step inside a building (the network is validated, avoidance may not be).
@@ -401,11 +406,12 @@ export class Crowd {
       a.blocked = 0;
       return;
     }
-    // Pass on the side with room; oncoming walkers both keep left.
+    // Pass on the side with room (within the lane that leads onto the next edge); oncoming walkers
+    // both keep left.
     const passL = a.lat + side + clear;
     const passR = a.lat + side - clear;
-    const okL = passL <= spread;
-    const okR = passR >= -spread;
+    const okL = passL <= (a.next >= 0 ? a.nextHi : spread);
+    const okR = passR >= (a.next >= 0 ? a.nextLo : -spread);
     if (okL && (oncoming || !okR || Math.abs(passL - a.lat) <= Math.abs(passR - a.lat))) a.latGoal = passL;
     else if (okR) a.latGoal = passR;
     else {
@@ -429,7 +435,8 @@ export class Crowd {
     a.lat = -a.lat;
     a.latGoal = a.lat;
     a.blocked = 0;
-    if (a.state === 'cross' || a.state === 'wait') a.state = 'walk';
+    // Someone turning back halfway across is still in the road: they stay 'cross' until the kerb.
+    if (a.state === 'wait') a.state = 'walk';
   }
 
   // Choose the edge to take at the node ahead (-1: dead end, turn back).
@@ -481,8 +488,8 @@ export class Crowd {
   }
 
   // Commit to the next edge a few metres early and keep our lateral offset inside the band that maps
-  // onto it (across it: |c*lat| <= its spread; along it: not behind its start), so walkers drift into
-  // a narrow crossing or link in time instead of snapping sideways at the node.
+  // onto it (across it: |c*lat| <= its spread; along it: k*lat within the range _arrive allows), so
+  // walkers drift into a narrow crossing or link in time instead of snapping onto it at the node.
   _plan(a, ctx) {
     const W = this.walk;
     const e = W.edges[a.edge];
@@ -501,8 +508,16 @@ export class Crowd {
       a.nextLo = Math.max(a.nextLo, -m);
       a.nextHi = Math.min(a.nextHi, m);
     }
-    if (k > 0.05) a.nextLo = Math.max(a.nextLo, -0.5 / k);
-    else if (k < -0.05) a.nextHi = Math.min(a.nextHi, 0.5 / -k);
+    // Along-edge range _arrive allows (a crossing's is the kerb strip where people wait).
+    const sMin = n.kind === CROSS ? -Math.max(0, n.kerb - 0.3) : -0.5;
+    const sMax = n.kind === CROSS ? Math.max(0, Math.min(n.kerb - 0.3, 0.3)) : Infinity;
+    if (k > 0.05) {
+      a.nextLo = Math.max(a.nextLo, sMin / k);
+      a.nextHi = Math.min(a.nextHi, sMax / k);
+    } else if (k < -0.05) {
+      a.nextLo = Math.max(a.nextLo, sMax / k);
+      a.nextHi = Math.min(a.nextHi, sMin / k);
+    }
   }
 
   // Reached the end of the edge: move onto the chosen next one (or turn back at a dead end).

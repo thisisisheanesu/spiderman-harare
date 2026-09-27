@@ -4,9 +4,9 @@
 Usage:
     python3 tools/build_extras.py [--out public/audio] [--cache DIR] [--ffmpeg PATH] [--verify-only]
 
-Everything is rebuilt from the public source URLs listed in AMBIENCE and FSI_UNITS below (each with its
-author, title, licence and page). Downloads are cached in --cache and fetched at most one per ~1.2 s with a
-descriptive User-Agent (backing off on HTTP 429/5xx).
+Everything is rebuilt from the public source URLs listed in AMBIENCE and CLIPS below (each with its author,
+title, licence and page; the FSI unit files come from fsi_url()). Downloads are cached in --cache and fetched at
+most one per ~1.2 s with a descriptive User-Agent (backing off on HTTP 429/5xx).
 
 Outputs (in --out; URLs in the manifest are relative to the site root, no leading slash):
     street/<id>.mp3          seamless ambience loops, 44.1 kHz, 96 kbps CBR, integrated loudness -20 LUFS
@@ -30,7 +30,10 @@ How the greeting windows were chosen (not repeated at build time, recorded here 
 split at pauses by an energy detector, every pause-delimited segment of the basic dialogues was transcribed with
 Meta's MMS-1b-all Shona ASR model and matched against the dialogue text printed in the FSI Shona Basic Course
 (1965); only segments whose ASR transcript matched the book's text were kept (the transcript is stored as `asr`
-next to each clip below; "Hongu" alone was cut at the pause found by CTC forced alignment of "hongu tingaenda").
+next to each clip below). One exception, kept on purpose: in Unit 8 the book prints "Hongu, tingaenda" but the
+speaker clearly says "Hunde, tingaenda" (ASR and CTC scores agree; the book uses "Hunde" for "yes" elsewhere), so the
+text follows the audio. "Hunde" alone was cut at the energy minimum (58.19 s) of the short pause before
+"tingaenda" (found with CTC forced alignment, then refined on the energy curve).
 Speaker: the course preface credits the Shona tape voices to Mr. and Mrs. Matthew Mataranyika. Every clip used here
 is the same male voice: a WavLM speaker-verification model scores all of them as close to each other as two takes of
 one line, and a wav2vec2 gender classifier (Common Voice) gives male >= 0.98 for each. Pitch (`f0`, median Hz)
@@ -38,7 +41,6 @@ still varies a lot (108-273 Hz) with the tone pattern and emphasis of the phrase
 """
 import argparse
 import json
-import math
 import re
 import subprocess
 import sys
@@ -83,7 +85,7 @@ AMBIENCE = [
          source='https://freesound.org/people/KevZim/sounds/534700/',
          title='Suburban Shopping Centre Zimbabwe', author='KevZim (Freesound)', license=CC0,
          place='Outside Avondale Flea Market, Avondale shopping centre, Harare (geotagged -17.8007, 31.0384)',
-         recorded='2020 (uploaded 11 Sep 2020), Zoom H4n',
+         recorded='uploaded 11 Sep 2020 (recording date not given), Zoom H4n',
          desc='Outdoor bustle outside a flea market: many voices at a distance, footsteps, traffic behind. '
               'Source is the Freesound high-quality MP3 preview (the original WAV needs a login).'),
     dict(id='rank-entumbane', use='rank', ch=1, hp=90, t0=41.0, len=60.0, xfade=3.0,
@@ -107,7 +109,7 @@ AMBIENCE = [
          source='https://archive.org/details/aporee_22319_25903',
          title='Avenues, Harare, Zimbabwe - Sabbath service', author=RCD, license=BY_SA_3,
          place='Open field on Herbert Chitepo Avenue, the Avenues, Harare (-17.8199, 31.0580)',
-         recorded='Saturday 8 Aug 2012 (listed 2012-08-08), midday',
+         recorded='listed 8 Aug 2012, 14:15 (the recordist describes a Saturday-midday service)',
          desc='Sabbath service of the African Apostolic Church in the open: a large white-robed congregation seated '
               'on the grass, call-and-response singing led by one voice. Recorded close to the group.'),
 ]
@@ -119,16 +121,20 @@ AMBIENCE = [
 FSI_ITEM = 'https://archive.org/details/Shona_201407'
 FSI_BOOK = 'https://archive.org/details/micro_IA41153663_0434'
 
-# Honest notes for the 'call' clips: they are real Shona speech, but read calmly for a textbook, not shouted.
-CALL_NOTE = {cid: ('Destination read calmly from the course vocabulary list (1960s place-name forms), not a real '
+# Honest notes shown with some clips (the 'call' clips are real Shona speech, but read calmly, not shouted).
+CLIP_NOTE = {cid: ('Destination read calmly from the course vocabulary list (1960s place-name forms), not a real '
                    'conductor shout; pitch/volume it up for a hwindi.') for cid in (
     'sn-ku-harare', 'sn-kwa-mutare', 'sn-ku-marondera', 'sn-ku-kwekwe', 'sn-ku-gweru', 'sn-ku-bhuruwayo',
     'sn-ku-chipinga')}
-CALL_NOTE['sn-ndiri-kutengesa-mahobo'] = "Vendor's line from a textbook market dialogue, spoken calmly."
+CLIP_NOTE['sn-ndiri-kutengesa-mahobo'] = "Vendor's line from a textbook market dialogue, spoken calmly."
+CLIP_NOTE['sn-hunde'] = CLIP_NOTE['sn-hunde-tingaenda'] = (
+    "'Hunde' is this speaker's regional word for 'yes' (the course book prints 'Hongu' in this dialogue and "
+    "'Hunde' elsewhere); in Harare you would more often hear 'Hongu' or 'Ehe'.")
 
 
 def fsi_url(unit):
-    return 'https://archive.org/download/Shona_201407/' + urllib.parse.quote(f'FSI - Shona Basic Course - Unit {unit:02d}.mp3')
+    name = f'FSI - Shona Basic Course - Unit {unit:02d}.mp3'
+    return 'https://archive.org/download/Shona_201407/' + urllib.parse.quote(name)
 
 
 FSI_SPEAKER = {'male': 'Matthew Mataranyika (FSI tape voice)'}
@@ -190,11 +196,11 @@ CLIPS = [
     dict(id='sn-aiwa-zvitambo', unit=2, win=(36.68, 38.12), kind='exclaim', lang='sn',
          text='Aiwa, zvitambo.', en='Oh, very well indeed!',
          gender='male', asr='aiwa zvitambo', f0=122),
-    dict(id='sn-hongu', unit=8, win=(57.37, 58.12), kind='exclaim', lang='sn',
-         text='Hongu.', en='Yes.',
+    dict(id='sn-hunde', unit=8, win=(57.37, 58.19), kind='exclaim', lang='sn',
+         text='Hunde.', en='Yes.',
          gender='male', asr='hunde', f0=273),
-    dict(id='sn-hongu-tingaenda', unit=8, win=(57.37, 59.20), kind='exclaim', lang='sn',
-         text='Hongu, tingaenda.', en="Yes, let's go.",
+    dict(id='sn-hunde-tingaenda', unit=8, win=(57.37, 59.20), kind='exclaim', lang='sn',
+         text='Hunde, tingaenda.', en="Yes, let's go.",
          gender='male', asr='hunde tingaenda', f0=168),
     dict(id='sn-munhu-ndiani', unit=5, win=(26.78, 28.41), kind='exclaim', lang='sn',
          text='Munhu ndiani?', en='Who is that? / Who are you?',
@@ -382,7 +388,8 @@ def verify_ambience(ffmpeg, spec, path):
     good = (abs(dur - spec['len']) < 0.02 and abs(lufs - AMB_LUFS) <= 1.0 and tp <= -0.5
             and seam <= np.percentile(steps, 99.5) and jump <= typical)
     log(f'  VERIFY {path.name}: {dur:.3f} s, {lufs:.1f} LUFS, peak {tp:.1f} dBFS; loop point: level step '
-        f'{seam:.1f} dB (body 50 ms steps: median {np.median(steps):.1f}, 99.5th pct {np.percentile(steps, 99.5):.1f}), '
+        f'{seam:.1f} dB (body 50 ms steps: median {np.median(steps):.1f}, '
+        f'99.5th pct {np.percentile(steps, 99.5):.1f}), '
         f'sample step {jump:.4f} (body 99.9th pct {typical:.4f}) -> {"OK" if good else "FAIL"}')
     return good, dict(dur=dur, lufs=lufs, peak=tp)
 
@@ -398,7 +405,7 @@ def speech_bounds(x, sr, frame=0.01):
     return on[0] * h, (on[-1] + 1) * h
 
 
-def render_clip(ffmpeg, units, c):
+def render_clip(units, c):
     x = units[c['unit']]
     a, b = int(c['win'][0] * SPRITE_SR), int(c['win'][1] * SPRITE_SR)
     w = x[a:b]
@@ -427,7 +434,7 @@ def build_sprite(ffmpeg, cache, out_dir):
     gap = np.zeros(int(GAP_S * SPRITE_SR))
     parts, n, clips = [], 0, []
     for i, c in enumerate(CLIPS):
-        y = render_clip(ffmpeg, units, c)
+        y = render_clip(units, c)
         if i:
             parts.append(gap)
             n += len(gap)
@@ -442,7 +449,7 @@ def build_sprite(ffmpeg, cache, out_dir):
 
 def verify_sprite(ffmpeg, path, clips, seconds):
     """Decode the sprite and check every clip: speech must begin 20-200 ms after `start` (60 ms pad + trimmed
-    onset) and end 20-200 ms before `start + dur`, and the 0.30 s gap before each clip must be digital silence."""
+    onset) and end at most 200 ms before `start + dur`, and the 0.30 s gap before each clip must be digital silence."""
     y = decode(ffmpeg, path, SPRITE_SR, 1)[:, 0]
     ok = abs(len(y) / SPRITE_SR - seconds) < 0.01
     log(f'  VERIFY {path.name}: decoded {len(y) / SPRITE_SR:.3f} s (PCM {seconds:.3f} s)')
@@ -461,7 +468,8 @@ def verify_sprite(ffmpeg, path, clips, seconds):
         worst_gap = max(worst_gap, before)
         ok &= good
         log(f'    {c["id"]:<26} start {c["start"]:7.3f} dur {c["dur"]:5.2f}  speech from +{onset * 1000:3.0f} ms to '
-            f'-{tail * 1000:3.0f} ms  clip {rms_db(seg):6.1f} dBFS  gap before {before:7.1f} dBFS  {"OK" if good else "FAIL"}')
+            f'-{tail * 1000:3.0f} ms  clip {rms_db(seg):6.1f} dBFS  gap before {before:7.1f} dBFS  '
+            f'{"OK" if good else "FAIL"}')
     log(f'  {len(clips)} clips, loudest gap {worst_gap:.1f} dBFS -> {"OK" if ok else "FAIL"}')
     return ok
 
@@ -483,15 +491,16 @@ def manifest(amb, clips):
                        en=c['en'], gender=c['gender'], speaker=FSI_SPEAKER[c['gender']],
                        author='Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)',
                        license=PD_US[0], license_url=PD_US[1], source=FSI_ITEM, source_file=fsi_url(c['unit']),
-                       **({'note': CALL_NOTE[c['id']]} if c['id'] in CALL_NOTE else {})) for c in clips],
+                       **({'note': CLIP_NOTE[c['id']]} if c['id'] in CLIP_NOTE else {})) for c in clips],
     }
 
 
 def credits(amb, clips):
+    units = ', '.join(f'{u:02d}' for u in sorted({c['unit'] for c in clips}))
     lines = ['# Extra street audio credits', '',
-             'Real recordings made in Zimbabwe, used under their open licences. Built reproducibly from the source',
-             'URLs below by `tools/build_extras.py` (see the docstring for the exact processing). The FLEURS voices',
-             'and `crowd_loop.mp3` are credited separately in `CREDITS.md`.', '',
+             'Real recordings made in Zimbabwe, used under their open licences and rebuilt reproducibly from the',
+             'source URLs below by `tools/build_extras.py` (its docstring documents every processing step). The FLEURS',
+             'voices and `crowd_loop.mp3` are credited separately in `CREDITS.md`.', '',
              '## Street ambience loops (`street/*.mp3`)', '',
              '| File | Use | Where | Recording | Author | Licence |', '|---|---|---|---|---|---|']
     for s in AMBIENCE:
@@ -500,34 +509,40 @@ def credits(amb, clips):
     lines += ['']
     for s in AMBIENCE:
         a = amb[s['id']]
-        lines += [f'- **`street/{s["id"]}.mp3`** — "{s["title"]}" by {s["author"]}, {s["source"]} '
-                  f'(file: {s["url"]}), licensed {s["license"][0]} ({s["license"][1]}). {s["desc"]} '
-                  f'Changes: excerpt {s["t0"]:.0f}–{s["t0"] + s["len"] + s["xfade"]:.0f} s, {s["hp"]} Hz high-pass, '
+        lines += [f'- **`street/{s["id"]}.mp3`**: "{s["title"]}" by {s["author"]}, <{s["source"]}> '
+                  f'(file: <{s["url"]}>), licensed {s["license"][0]} (<{s["license"][1]}>). {s["desc"]} '
+                  f'Changes: excerpt {s["t0"]:.0f}-{s["t0"] + s["len"] + s["xfade"]:.0f} s, {s["hp"]} Hz high-pass, '
                   f'{"downmixed to mono, " if s["ch"] == 1 else ""}{s["xfade"]:.0f} s cross-fade into a '
                   f'{s["len"]:.0f} s seamless loop, gain {a["gain_db"]:+.1f} dB to -20 LUFS with a -1.5 dBFS limiter, '
                   f'start rotated by {a["rotate_s"]:.1f} s, MP3 {AMB_KBPS} kbps.']
-    lines += ['', 'The adapted loops from radio continental drift recordings are themselves licensed CC BY-SA 3.0.',
-              'radio continental drift is the radio/sound-art project of Claudia Wegener; the recordings are part of',
-              'the radio aporee ::: maps "All Africa Sound Map" and the archive "The Women Sing at Both Sides of the',
-              'Zambezi" (https://archive.org/details/Voices_from_Harare_422).', '',
+    lines += ['',
+              'The three loops adapted from radio continental drift recordings are licensed CC BY-SA 3.0 like their',
+              'sources (attribution + share-alike). radio continental drift is the radio/sound-art project of Claudia',
+              'Wegener; the recordings belong to the radio aporee ::: maps "All Africa Sound Map" and to the archive',
+              '"The Women Sing at Both Sides of the Zambezi" (<https://archive.org/details/Voices_from_Harare_422>).',
+              '`market-avondale.mp3` is CC0 (no conditions; credit given as a courtesy).', '',
               '## Shona greetings sprite (`street/greetings.mp3`)', '',
-              '- Source: *Shona Basic Course* audio tapes, Units ' +
-              ', '.join(f'{u:02d}' for u in sorted({c["unit"] for c in clips})) +
-              f', Foreign Service Institute, U.S. Department of State (Earl W. Stevick, 1965). Audio: {FSI_ITEM}; '
-              f'book (Shona text and English translations used for `text`/`en`): {FSI_BOOK}.',
-              '- Voices: "Shona texts, exercises, and tape voicings were furnished by Mr. and Mrs. Matthew Mataranyika"',
-              '  (course preface), Shona speakers from what was then Southern Rhodesia (today Zimbabwe), recorded in 1963–65.',
-              '  All clips used here are the male voice (checked with a speaker-verification model and a gender',
+              f'- Source: *Shona Basic Course* audio tapes, Units {units}, Foreign Service Institute, U.S. Department',
+              f'  of State (Earl W. Stevick, 1965). Audio: <{FSI_ITEM}>; book (Shona text and English translations',
+              f'  used for `text` / `en`): <{FSI_BOOK}>.',
+              '- Voice: the preface says "Shona texts, exercises, and tape voicings were furnished by Mr. and Mrs.',
+              '  Matthew Mataranyika", Shona speakers from what was then Southern Rhodesia (today Zimbabwe), 1963-65.',
+              '  Every clip used here is the male voice (checked with a speaker-verification model and a gender',
               '  classifier), i.e. Mr. Matthew Mataranyika. No female voice is included.',
-              f'- Licence: {PD_US[0]} — FSI courses are works of the U.S. federal government (17 U.S.C. § 105); the',
-              f'  archive.org item carries the Public Domain Mark ({PD_US[1]}). Attribution given as a courtesy.',
+              f'- Licence: {PD_US[0]}. FSI courses are works of the U.S. federal government (17 U.S.C. 105); the',
+              f'  archive.org item carries the Public Domain Mark (<{PD_US[1]}>). Attribution given as a courtesy.',
               '- Changes: cut from the unit recordings, 90 Hz high-pass, FFT denoise, trimmed to the phrase, loudness',
               '  matched, resampled to 24 kHz, concatenated into one MP3 sprite.',
-              '- The phrases are 1960s textbook Shona: polite, rural-flavoured greetings still in everyday use',
-              '  (Mangwanani / Masikati / Mwaswera here?), not Harare street slang.', '',
-              '| id | Shona | English | kind | voice | unit |', '|---|---|---|---|---|---|']
+              '- Checks: every clip was transcribed with an automatic Shona speech recogniser (Meta MMS) and matches',
+              '  the text below up to small recogniser slips (e.g. "kamusiya" for Tamusiya); the offsets in',
+              '  `extras.json` were verified on the decoded sprite.',
+              '- Style: 1960s textbook Shona. The greetings (Mangwanani / Masikati / Mwaswera here? / Mwazviita) are',
+              '  still everyday polite Shona; the place names use the old spellings (Chipinga = Chipinge) and are read',
+              '  calmly, not shouted. Not Harare street slang.', '',
+              '| id | Shona | English | kind | unit | note |', '|---|---|---|---|---|---|']
     for c in clips:
-        lines.append(f'| `{c["id"]}` | {c["text"]} | {c["en"]} | {c["kind"]} | {c["gender"]} | {c["unit"]:02d} |')
+        lines.append(f'| `{c["id"]}` | {c["text"]} | {c["en"]} | {c["kind"]} | {c["unit"]:02d} | '
+                     f'{CLIP_NOTE.get(c["id"], "")} |')
     lines += ['']
     return '\n'.join(lines)
 

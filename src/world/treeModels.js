@@ -10,28 +10,28 @@ import { makeCanvas } from './atlas.js';
 export const SPECIES = {
   // In bloom the canopy reads pale lavender-blue rather than saturated purple (PHOTOS.md §22).
   jacaranda: {
-    trunk: '#5a4632', height: [8, 12], radius: [4.5, 6.5], blobs: 8, flat: 0.62, tile: 'flowers', cards: 64,
+    trunk: '#5a4632', height: [8, 12], radius: [4.5, 6.5], blobs: 8, flat: 0.62, tile: 'flowers', cards: 96,
     colors: ['#a498d0', '#b3a9df', '#9387c2', '#c0b8ea', '#8b7fb6', '#6f8f4a'],
     weights: [3, 3, 2, 2, 2, 0.6],
   },
   flame: {
-    trunk: '#6d655e', height: [9, 13], radius: [3.5, 5], blobs: 7, flat: 0.85, tile: 'leaves', cards: 50,
+    trunk: '#6d655e', height: [9, 13], radius: [3.5, 5], blobs: 7, flat: 0.85, tile: 'leaves', cards: 72,
     colors: ['#3f6a2e', '#4d7a35', '#355d28', '#d9542e', '#c94a2a'],
     weights: [4, 4, 3, 1, 0.8],
   },
   msasa: {
-    trunk: '#4c4038', height: [7, 11], radius: [4, 6], blobs: 7, flat: 0.55, tile: 'leaves', cards: 50,
+    trunk: '#4c4038', height: [7, 11], radius: [4, 6], blobs: 7, flat: 0.55, tile: 'leaves', cards: 72,
     colors: ['#9a3b3f', '#b5553f', '#c9804f', '#5f7a3a', '#6f8a3e', '#a5463f'],
     weights: [1.6, 1.2, 0.8, 2.5, 2, 1],
   },
   green: {
-    trunk: '#6a5d52', height: [7, 12], radius: [3, 5], blobs: 6, flat: 0.9, tile: 'leaves', cards: 46,
+    trunk: '#6a5d52', height: [7, 12], radius: [3, 5], blobs: 6, flat: 0.9, tile: 'leaves', cards: 64,
     colors: ['#4f6f35', '#5f7f3e', '#6e8a48', '#44612e', '#7a8f5a', '#8a9a68'],
     weights: [3, 3, 2, 2, 1, 1],
   },
   cypress: {
-    trunk: '#4a3d33', height: [18, 24], radius: [1.8, 2.4], blobs: 5, flat: 3.2, tile: 'leaves', cards: 30, column: true,
-    colors: ['#2f4a2a', '#36522e', '#2a4226', '#3d5a33'],
+    trunk: '#4a3d33', height: [18, 24], radius: [1.8, 2.4], blobs: 6, flat: 3.2, tile: 'leaves', cards: 40, column: true,
+    colors: ['#46643c', '#4f6e42', '#3f5b37', '#587848'],
     weights: [3, 3, 2, 2],
   },
   eucalyptus: {
@@ -52,9 +52,9 @@ export function leafTexture() {
   const ctx = c.getContext('2d');
   const rng = makeRng(55);
   const tile = (x0, draw) => {
-    for (let i = 0; i < 260; i++) {
+    for (let i = 0; i < 170; i++) {
       const a = rng() * Math.PI * 2;
-      const d = Math.sqrt(rng()) * 54;
+      const d = Math.sqrt(rng()) * 56;
       draw(x0 + 64 + Math.cos(a) * d, 64 + Math.sin(a) * d, d / 54);
     }
   };
@@ -177,7 +177,9 @@ function canopyGeometry(def, h, r, rng, blobs, detail, cards, blobScale = 1) {
   const pos = geo.attributes.position;
   const nrm = geo.attributes.normal;
   for (let k = 0; k < pos.count; k++) {
-    _p.set(pos.getX(k), (pos.getY(k) - cy) / Math.max(0.6, def.flat), pos.getZ(k)).normalize();
+    // Columnar crowns shade like a cylinder, others like one squashed sphere.
+    if (def.column) _p.set(pos.getX(k), 0.35, pos.getZ(k)).normalize();
+    else _p.set(pos.getX(k), (pos.getY(k) - cy) / Math.max(0.6, def.flat), pos.getZ(k)).normalize();
     nrm.setXYZ(k, _p.x, _p.y, _p.z);
   }
   return geo;
@@ -215,9 +217,9 @@ function cardGeometry(def, info, cy, r, rng, count) {
     _n.normalize();
     _t.set(rng() - 0.5, rng() - 0.5, rng() - 0.5).cross(_n).normalize();
     _b.crossVectors(_n, _t);
-    const s = r * (0.28 + rng() * 0.14);
+    const s = r * (0.18 + rng() * 0.12);
     const corners = [[-1, -1, u0, 0.02], [1, -1, u1, 0.02], [1, 1, u1, 0.98], [-1, 1, u0, 0.98]];
-    const shade = 1.0 + rng() * 0.25;
+    const shade = 0.9 + rng() * 0.2;
     for (const idx of [0, 1, 2, 0, 2, 3]) {
       const [a, b, u, v] = corners[idx];
       pos.push(_p.x + (_t.x * a + _b.x * b) * s, _p.y + (_t.y * a + _b.y * b) * s, _p.z + (_t.z * a + _b.z * b) * s);

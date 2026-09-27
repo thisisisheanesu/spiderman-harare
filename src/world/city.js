@@ -157,12 +157,20 @@ export class City {
     return mesh;
   }
 
+  // Called by the sky whenever the time of day changes (also while paused, from the settings).
   setNight(t) {
-    this.uniforms.uNight.value = t;
-    this.uniforms.uShutterFrac.value = 0.18 + 0.5 * t;
+    const u = this.uniforms;
+    u.uNight.value = t;
+    u.uShutterFrac.value = 0.18 + 0.5 * t;
     if (this.lightPools) {
       this.lightPools.material.opacity = 0.85 * t;
       this.lightPools.visible = t > 0.02;
+    }
+    const pal = this.game?.sky?.palette;
+    if (pal) {
+      u.uSkyZenith.value.copy(pal.zenith);
+      u.uSkyHorizon.value.copy(pal.horizon);
+      u.uSkyGround.value.copy(pal.ground);
     }
   }
 
@@ -181,12 +189,5 @@ export class City {
       if (c.detail) c.detail.visible = d < this.detailRange;
     }
     for (const fx of this.effects) fx.update(this.uniforms.uTime.value);
-    const pal = game.sky?.palette;
-    if (pal && pal.version !== this._palVersion) {
-      this._palVersion = pal.version;
-      this.uniforms.uSkyZenith.value.copy(pal.zenith);
-      this.uniforms.uSkyHorizon.value.copy(pal.horizon);
-      this.uniforms.uSkyGround.value.copy(pal.ground);
-    }
   }
 }

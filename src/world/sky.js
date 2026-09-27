@@ -8,7 +8,7 @@ import { createSkyDome, createStars } from './skyDome.js';
 // Public: sun (DirectionalLight, follows the player: the sun by day, the moon at night), hemi,
 // setTimeOfDay(hours), timeOfDay, isNight, nightFactor (0..1), sunDirection / moonDirection (unit
 // vectors towards them, may point below the horizon), lightDirection (towards the current key
-// light), palette {zenith, horizon, ground (linear Colors), version} for reflections.
+// light), palette {zenith, horizon, ground} (linear Colors, for glass reflections).
 
 const LAT = (-17.83 * Math.PI) / 180;
 const SUN_DECL = (-1.7 * Math.PI) / 180;
@@ -39,20 +39,20 @@ const KEYS = [
 const MOON_COLOR = new THREE.Color('#9fb4dc');
 const COLOR_KEYS = ['zenith', 'horizon', 'fog', 'glow', 'hemiSky', 'hemiGround', 'sun'];
 
-function celestial(hours, decl, transit) {
+// Unit vector towards a body with declination `decl` that transits at `transit` hours (local
+// time), from Harare's latitude. Azimuth measured from north through east. Returns elevation (rad).
+function celestial(hours, decl, transit, out) {
   const H = ((hours - transit) * 15 * Math.PI) / 180;
-  const sinEl = Math.sin(LAT) * Math.sin(decl) + Math.cos(LAT) * Math.cos(decl) * Math.cos(H);
-  const el = Math.asin(sinEl);
+  const el = Math.asin(Math.sin(LAT) * Math.sin(decl) + Math.cos(LAT) * Math.cos(decl) * Math.cos(H));
   const az = Math.atan2(-Math.sin(H), Math.tan(decl) * Math.cos(LAT) - Math.sin(LAT) * Math.cos(H));
-  return { el, az };
+  out.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+  return el;
 }
 
-function dirFrom({ el, az }, out) {
-  return out.set(Math.sin(az) * Math.cos(el), Math.sin(el), -Math.cos(az) * Math.cos(el));
+// Keyframe colours pre-parsed as raw display values (interpolated in sRGB, no colour management).
+for (const k of KEYS) {
+  for (const f of COLOR_KEYS) k[f] = new THREE.Color().setStyle(k[f], THREE.LinearSRGBColorSpace);
 }
-
-const _a = new THREE.Color();
-const _b = new THREE.Color();
 
 function lerpKey(el, field, out) {
   let i = 0;
@@ -63,10 +63,7 @@ function lerpKey(el, field, out) {
   const v0 = k0[field];
   const v1 = k1[field];
   if (typeof v0 === 'number') return v0 + (v1 - v0) * t;
-  // Interpolate display colours in sRGB, stored raw (no colour management).
-  _a.setStyle(v0, THREE.LinearSRGBColorSpace);
-  _b.setStyle(v1, THREE.LinearSRGBColorSpace);
-  return out.copy(_a).lerp(_b, t);
+  return out.copy(v0).lerp(v1, t);
 }
 
 export class Sky {
@@ -77,7 +74,7 @@ export class Sky {
     this.sunDirection = new THREE.Vector3(0, 1, 0);
     this.moonDirection = new THREE.Vector3();
     this.lightDirection = new THREE.Vector3(0, 1, 0);
-    this.palette = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color(), version: 0 };
+    this.palette = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color() };
     this._raw = { zenith: new THREE.Color(), horizon: new THREE.Color(), fog: new THREE.Color(), glow: new THREE.Color(), hemiSky: new THREE.Color(), hemiGround: new THREE.Color(), sun: new THREE.Color() };
     this._tween = null;
     this._focus = new THREE.Vector3();
@@ -120,11 +117,8 @@ export class Sky {
   setTimeOfDay(hours) {
     const h = ((hours % 24) + 24) % 24;
     this.timeOfDay = h;
-    const sunPos = celestial(h, SUN_DECL, SOLAR_NOON);
-    const moonPos = celestial(h, MOON_DECL, MOON_TRANSIT);
-    dirFrom(sunPos, this.sunDirection);
-    dirFrom(moonPos, this.moonDirection);
-    const el = THREE.MathUtils.radToDeg(sunPos.el);
+    const el = THREE.MathUtils.radToDeg(celestial(h, SUN_DECL, SOLAR_NOON, this.sunDirection));
+    celestial(h, MOON_DECL, MOON_TRANSIT, this.moonDirection);
     const raw = this._raw;
     for (const k of COLOR_KEYS) lerpKey(el, k, raw[k]);
     const hemiI = lerpKey(el, 'hemi');
@@ -159,6 +153,7 @@ export class Sky {
     scene.fog.far = this.drawDistance * THREE.MathUtils.lerp(1, 0.7, this.nightFactor);
     this.game.renderer.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.25, this.nightFactor);
 
+    this._placeLight();
     this.dome.setState(this.sunDirection, this.moonDirection, raw, this.nightFactor, moonUp);
     this.stars.material.uniforms.uAlpha.value = THREE.MathUtils.smoothstep(this.nightFactor, 0.55, 1);
 
@@ -166,12 +161,11 @@ export class Sky {
     pal.zenith.setRGB(raw.zenith.r, raw.zenith.g, raw.zenith.b, THREE.SRGBColorSpace).multiplyScalar(1.15);
     pal.horizon.setRGB(raw.horizon.r, raw.horizon.g, raw.horizon.b, THREE.SRGBColorSpace).multiplyScalar(1.1);
     pal.ground.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace).multiplyScalar(0.6);
-    pal.version++;
     this.game.city?.setNight?.(this.nightFactor);
   }
 
   _cycle() {
-    const now = this._tween ? this._tween.to : this.timeOfDay;
+    const now = (this._tween ? this._tween.to : this.timeOfDay) % 24;
     const next = CYCLE.find(([h]) => h > now + 0.01) || CYCLE[0];
     const from = this.timeOfDay;
     let to = next[0];
@@ -196,10 +190,14 @@ export class Sky {
     const cam = game.camera;
     this.dome.mesh.position.copy(cam.position);
     this.stars.mesh.position.copy(cam.position);
+    this._placeLight();
+  }
 
-    // Shadow frustum centred a little ahead of the player (where the camera looks), snapped to
-    // shadow-map texels so the shadows don't swim.
-    const focus = this._focus.copy(game.player?.position || cam.position);
+  // Centres the key light's shadow frustum a little ahead of the player (where the camera looks),
+  // snapped to shadow-map texels so the shadows don't swim.
+  _placeLight() {
+    const cam = this.game.camera;
+    const focus = this._focus.copy(this.game.player?.position || cam.position);
     const fwd = cam.getWorldDirection(this._r);
     const flat = Math.hypot(fwd.x, fwd.z);
     if (flat > 1e-3) focus.addScaledVector(fwd.set(fwd.x / flat, 0, fwd.z / flat), this.shadowSize * 0.4);

@@ -57,7 +57,8 @@ export class Player {
     this.controller = new Controller(this, game);
     this.animator = new Animator(this.rig, this.object);
     this._spawnOnRBZ(game.data);
-    this._syncVisual(0);
+    // A long first step settles the rig into the perch crouch instead of blending there on screen.
+    this._syncVisual(1);
   }
 
   // Start crouched on the Reserve Bank's roof edge looking out over the CBD (like a perch shot).
@@ -72,6 +73,11 @@ export class Player {
   }
 
   teleport(x, y, z) {
+    // A NaN here (e.g. a malformed ?spawn=) would poison the camera and every system that follows it.
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+      console.warn('[player] teleport ignored: non-finite position', x, y, z);
+      return;
+    }
     this.position.set(x, y, z);
     this.velocity.set(0, 0, 0);
     this.state = 'air';

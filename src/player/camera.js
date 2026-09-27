@@ -80,7 +80,8 @@ export class CameraRig {
   }
 
   fovKick(amount) {
-    this._kick += amount;
+    // Bounded so mashing zip / dive can't stack the kicks into a fisheye.
+    this._kick = clamp(this._kick + amount, -6, 10);
   }
 
   update(dt, game) {

@@ -15,6 +15,8 @@ const POLE = tint('#8c9297');
 const DARK = tint('#3d4246');
 const CONCRETE = tint('#cfc9bd');
 const BIN_COLORS = ['#2e5d34', '#262626', '#c85a1a', '#2e5d34'].map((c) => tint(c));
+const SHELTER_GREY = tint('#5f6b73');
+const SHELTER_BLUE = tint('#365374');
 
 // Galvanised pole with a single outreach arm; newer ones carry a solar panel on top.
 function streetlight(gb, L, x, y, z, rot, lit, seed, solar, h = 9) {
@@ -100,22 +102,21 @@ function bollard(gb, L, x, z, seed) {
   gb.cylinder(x, 0, z, 0.15, 0.75, 6, 1, true, 0.13);
 }
 
-// Long steel shelter (kombi ranks): posts, sloped iron roof, bench.
-function shelter(gb, col, L, x, z, rot, len, seed) {
-  const d = 3;
+// Long steel shelter (kombi ranks, railway platforms): posts, sloped iron roof, bench.
+function shelter(gb, col, L, x, z, rot, len, d, frame) {
   const h = 3.1;
   gb.setTransform(x, 0, z, rot);
-  gb.brush(tint('#5f6b73'), L.metal, seed, 2);
+  gb.brush(frame, L.metal, 11, 2);
   const n = Math.max(2, Math.round(len / 3.5) + 1);
   for (let i = 0; i < n; i++) {
     const px = -len / 2 + (i * len) / (n - 1);
     gb.box(px, 0, -d / 2 + 0.2, 0.12, h, 0.12, 1);
     gb.box(px, 0, d / 2 - 0.2, 0.12, h - 0.3, 0.12, 1);
   }
-  gb.brush(tint('#c0c4c4'), L.corrugated, seed, 2);
+  gb.brush(frame === SHELTER_BLUE ? frame : tint('#c0c4c4'), L.corrugated, 11, 2);
   gb.quad(-len / 2 - 0.2, h + 0.05, -d / 2, len / 2 + 0.2, h + 0.05, -d / 2, len / 2 + 0.2, h - 0.25, d / 2, -len / 2 - 0.2, h - 0.25, d / 2, 0, 0.995, 0.1, 0, 0, len / 3, 1);
   gb.quad(-len / 2 - 0.2, h - 0.25, d / 2, len / 2 + 0.2, h - 0.25, d / 2, len / 2 + 0.2, h + 0.05, -d / 2, -len / 2 - 0.2, h + 0.05, -d / 2, 0, -1, 0, 0, 0, len / 3, 1);
-  gb.brush(CONCRETE, L.concrete, seed, 2);
+  gb.brush(CONCRETE, L.concrete, 11, 2);
   gb.box(0, 0, -d / 2 + 0.5, len - 0.6, 0.45, 0.4, 2);
   gb.clearTransform();
   col.setTransform(x, 0, z, rot);
@@ -298,22 +299,25 @@ export function buildProps(ctx) {
     }
   }
 
-  // Kombi ranks: shelters along the bays, bollards around the edge.
+  // Kombi ranks: shelters along the bays, bollards around the edge. Railway platforms: long blue
+  // steel canopies.
   for (const a of data.areas) {
-    if (a.kind !== 'rank' && a.kind !== 'platform') continue;
+    const rank = a.kind === 'rank' || (a.kind === 'platform' && /bus|terminus|square|rank/i.test(a.name || ''));
+    if (!rank && a.kind !== 'platform') continue;
     const ring = cleanRing(a.pts);
     const obb = orientedBox(ring);
     if (!obb || obb.len < 15) continue;
     const rot = -obb.angle;
-    const rows = Math.max(1, Math.floor(obb.wid / 26));
+    const rows = rank ? Math.max(1, Math.floor(obb.wid / 26)) : 1;
     for (let k = 0; k < rows; k++) {
-      const v = -obb.wid / 2 + 13 + k * 26;
-      const len = Math.min(obb.len - 8, 36);
+      const v = rank ? -obb.wid / 2 + 13 + k * 26 : 0;
+      const len = rank ? Math.min(obb.len - 8, 36) : Math.min(obb.len - 4, 120);
       const x = obb.cx - obb.uz * v;
       const z = obb.cz + obb.ux * v;
       if (!pointInRing(x, z, ring) || world.buildingAt(x, z)) continue;
-      shelter(chunks.detailAt(x, z), colliderFor(-5), L, x, z, rot, len, 11);
+      shelter(chunks.detailAt(x, z), colliderFor(-5), L, x, z, rot, len, Math.min(3, obb.wid - 0.5), rank ? SHELTER_GREY : SHELTER_BLUE);
     }
+    if (!rank) continue;
     for (let i = 0; i < ring.length; i += 2) {
       const j = (i + 2) % ring.length;
       const ax = ring[i];

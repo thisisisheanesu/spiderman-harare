@@ -345,8 +345,10 @@ export function poseWall(p, c) {
 }
 
 // Running straight up a wall: a sprint with the feet striking the wall ahead.
+const wallRunInputs = { runPhase: 0, run01: 1 };
 export function poseWallRun(p, c) {
-  poseRun(p, { runPhase: c.wallPhase, run01: 1 });
+  wallRunInputs.runPhase = c.wallPhase;
+  poseRun(p, wallRunInputs);
   rot(p, B.spine, 0.12);
   rot(p, B.chest, 0.05);
   rot(p, B.neck, 0.2);

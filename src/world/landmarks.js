@@ -32,12 +32,13 @@ const STYLE = {
   pearl_house: { upper: 'grid', tint: '#c29a4e', letters: ['PEARL', '#b08a45', '#f3ead2'] },
   social_security_centre: { upper: 'grid', tint: '#a9a497', glass: 1 },
   zanu_pf_hq: { upper: 'grid', tint: '#a09a8c', clutter: 0 },
-  rainbow_towers: { upper: 'curtain', glass: 5, tint: '#d6c48c' },
+  rainbow_towers: { upper: 'blank', ground: 'lobby', tint: '#dad19e', clutter: 0.3 },
+  rainbow_towers_hotel: { upper: 'curtain', glass: 5, tint: '#d6c48c' },
   old_mutual_centre: { glass: 3 },
   national_gallery: { upper: 'blank', tint: '#d9d4ca', clutter: 0 },
 };
 
-const PALM_KEYS = new Set(['town_house', 'parliament_house', 'meikles', 'rainbow_towers', 'harare_station', 'monomotapa', 'rbz', 'national_gallery']);
+const PALM_KEYS = new Set(['town_house', 'parliament_house', 'meikles', 'rainbow_towers', 'rainbow_towers_hotel', 'harare_station', 'monomotapa', 'rbz', 'national_gallery']);
 
 export class Landmarks {
   constructor(data, signs) {
@@ -113,6 +114,9 @@ export class Landmarks {
         break;
       case 'harare_station':
         cupola(gb, col, L, obb, spec.ridgeY ?? b.h, seed);
+        break;
+      case 'parliament_house':
+        colonnade(gb, col, L, streetFace(fp, world, /Mandela/), spec, seed);
         break;
       case 'national_gallery':
         this._mural(gb, fp, b, world);
@@ -212,7 +216,7 @@ export class Landmarks {
         c.x + ux * hl - uz * hw, c.z + uz * hl + ux * hw,
         c.x - ux * hl - uz * hw, c.z - uz * hl + ux * hw,
       ];
-      emit({ id: -7, oid: 'rainbow-towers-hotel', fp, h: 75, fl: 19, core: 1, lm: 'rainbow_towers', cx: c.x, cz: c.z }, { fullCollider: true });
+      emit({ id: -7, oid: 'rainbow-towers-hotel', fp, h: 75, fl: 19, core: 1, lm: 'rainbow_towers_hotel', cx: c.x, cz: c.z }, { fullCollider: true });
     }
     const statue = data.features.find((f) => f.key === 'mbuya_nehanda_statue');
     if (statue) nehanda(chunks.detailAt(statue.x, statue.z), colliderFor(-8), L, statue.x, statue.z);
@@ -648,6 +652,34 @@ function pearlSculpture(gb, col, L, obb, h, seed) {
   gb.cylinder(x, h + 9.35, z, 0.85, 0.9, 10, 1, false, 0.85);
   gb.cylinder(x, h + 10.25, z, 0.85, 0.3, 10, 1, true, 0.3);
   col.box(x, h, z, 1.2, 10.6, 1.2, 1);
+}
+
+// Arcaded front: a row of cream columns carrying a first-floor balcony slab with a balustrade,
+// standing just off the street face (Parliament House).
+function colonnade(gb, col, L, face, spec, seed) {
+  if (!face) return;
+  const depth = 2.6;
+  const h = Math.min(spec.fh, 4.2);
+  const w = face.len - 1;
+  const rot = Math.atan2(face.nx, face.nz);
+  gb.setTransform(face.x, 0, face.z, rot);
+  gb.brush(tint('#f1ead6'), L.concrete, seed, 2);
+  const n = Math.max(3, Math.round(w / 3.2) + 1);
+  for (let k = 0; k < n; k++) {
+    const x = -w / 2 + (k * w) / (n - 1);
+    gb.cylinder(x, 0, depth - 0.3, 0.28, h, 8, 2, false, 0.24);
+    gb.box(x, 0, depth - 0.3, 0.8, 0.4, 0.8, 1);
+    gb.box(x, h - 0.3, depth - 0.3, 0.7, 0.3, 0.7, 1);
+  }
+  gb.box(0, h, depth / 2, w + 0.6, 0.45, depth + 0.2, 3, true);
+  gb.brush(tint('#e6ddc4'), L.concrete, seed, 2);
+  gb.box(0, h + 0.45, depth - 0.05, w + 0.6, 0.12, 0.3, 2);
+  for (let x = -w / 2; x <= w / 2; x += 0.45) gb.box(x, h + 0.57, depth - 0.05, 0.1, 0.75, 0.1, 1);
+  gb.box(0, h + 1.3, depth - 0.05, w + 0.6, 0.1, 0.3, 2);
+  gb.clearTransform();
+  col.setTransform(face.x, 0, face.z, rot);
+  col.box(0, h, depth / 2, w + 0.6, 1.4, depth + 0.2, 1);
+  col.clearTransform();
 }
 
 // Harare station: red cupola with white columns on a brick drum, straddling the roof ridge.

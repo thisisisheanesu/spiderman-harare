@@ -602,7 +602,7 @@ export const GLASS_PRESETS = [
   [0.72, 1.12, 1.0], // green
   [1.25, 0.95, 0.7], // bronze
   [0.5, 0.56, 0.62], // dark
-  [2.1, 1.55, 0.6], // gold (Rainbow Towers)
+  [3.4, 2.2, 0.45], // gold (Rainbow Towers)
   [0.62, 1.1, 1.2], // teal
   [1.25, 1.25, 1.28], // pale
 ];

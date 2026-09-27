@@ -349,13 +349,21 @@ export class Controller {
     }
     v.y = -4;
     p.position.addScaledVector(v, h);
+    const x = p.position.x;
+    const y = p.position.y;
+    const z = p.position.z;
     const res = this.collide();
+    // Standing on a slope: lift straight up instead of along its normal, which would slide an idle
+    // player downhill (the Kopje, pitched landmark roofs).
+    const d = res.delta;
+    if (res.ground && !res.wall && d.y > 0.6 * d.length()) p.position.set(x, y + d.lengthSq() / d.y, z);
     if (!res.ground) {
       // Stepped off something small: stick to the surface below, otherwise start falling.
       _a.set(p.position.x, p.position.y + 0.3, p.position.z);
       const g = this.world.raycast(_a, _down, 0.8);
       if (g && g.normal.y > 0.6) {
         p.position.y = g.point.y;
+        v.y = 0;
       } else {
         p.state = 'air';
         v.y = 0;

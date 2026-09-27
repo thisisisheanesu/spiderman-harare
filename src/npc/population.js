@@ -64,6 +64,7 @@ export class Population {
     this.candFocus = { x: 1e9, z: 1e9 };
     this.candT = 0;
     this.targetWalkers = 0;
+    this.mixT = 0;
     this.focus = new THREE.Vector3(1e9, 0, 1e9);
     this.frustum = new THREE.Frustum();
     this._pm = new THREE.Matrix4();
@@ -158,9 +159,34 @@ export class Population {
         if (t > a.timer) this._startWalking(a);
       }
     }
-    for (const g of this.groups) groupsN += g.members.length;
-    const room = this.free.length;
+    let chatN = 0; // members of street groups (rank knots and park loungers are kept elsewhere)
+    for (const g of this.groups) {
+      groupsN += g.members.length;
+      if (g.edge >= 0) chatN += g.members.length;
+    }
     const target = this.targetWalkers;
+    // Chatting groups and loiterers drift off into the walking crowd over time: when they run short,
+    // swap a few far, unseen walkers for a new group or loiterer now and then, so a long stay keeps its mix.
+    if (!jumped && (this.mixT -= dt) <= 0) {
+      this.mixT = 1.5;
+      const group = chatN < target * 0.07;
+      if (group || idlers < target * 0.03) {
+        let k = group ? 4 : 1;
+        for (let i = this.list.length - 1; i >= 0 && k > 0; i--) {
+          const a = this.list[i];
+          if (a.kind !== 'walker' || this._inView(a.position.x, a.position.z)) continue;
+          if (a.position.distanceToSquared(ctx.focus) < (R * 0.6) ** 2) continue;
+          this.release(a);
+          walkers--;
+          k--;
+        }
+        if (!k) {
+          if (group) groupsN += this._spawnGroup(ctx, false);
+          else idlers += this._spawnIdler(ctx, false) ? 1 : 0;
+        }
+      }
+    }
+    const room = this.free.length;
     let budget = jumped ? room : Math.min(room, 3);
     const anywhere = jumped;
     while (budget > 0 && walkers + groupsN + idlers < target) {

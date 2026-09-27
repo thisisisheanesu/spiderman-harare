@@ -143,7 +143,7 @@ export class KombiLife {
       const inside = pointInPoly(rank.x, rank.z, a.pts);
       const d = inside ? 0 : Math.hypot(cx - rank.x, cz - rank.z);
       if (d > 80) continue;
-      const score = d - (a.name && rank.name.startsWith(a.name.split(' ')[0]) ? 50 : 0);
+      const score = d - (a.name && rank.name?.startsWith(a.name.split(' ')[0]) ? 50 : 0);
       if (score < bestScore) {
         bestScore = score;
         best = a;
