@@ -70,6 +70,23 @@ def r1(v):
     return round(v, 1)
 
 
+def flat_line(pts):
+    """flat() for polylines: drops consecutive points that coincide after rounding (keeps both ends)."""
+    out = []
+    last = None
+    n = len(pts)
+    for i, (x, z) in enumerate(pts):
+        q = (r1(x), r1(z))
+        if q == last and i != n - 1:
+            continue
+        if q == last and len(out) > 2:
+            out.pop()
+            out.pop()
+        out.extend(q)
+        last = q
+    return out
+
+
 def flat(pts):
     out = []
     for x, z in pts:
@@ -379,8 +396,12 @@ def build_roads(rows):
                 "a": ia,
                 "b": ib,
                 "len": r1(piece.length),
-                "pts": flat(coords),
+                "pts": flat_line(coords),
             }
+            # Snap the ends onto the shared graph nodes (connectors can differ by rounding noise).
+            e["pts"][0:2] = node_list[ia]
+            e["pts"][-2:] = node_list[ib]
+            e["pts"] = flat_line(list(zip(e["pts"][0::2], e["pts"][1::2])))
             if name:
                 e["name"] = name
             if "is_link" in flags:

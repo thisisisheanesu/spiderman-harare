@@ -101,25 +101,35 @@ Other systems may be placeholders while you work — **always guard cross-system
 
 **world** (`CollisionWorld`): `raycast(origin, dir, maxDist) → {point, normal, distance, buildingId}|null`,
 `collideCapsule(start, end, radius)`, `sweep(from, to, radius)`, `buildingAt(x,z)`, `roofHeightAt(x,z)`,
-`buildingsNear(x,z,r)`, `nearestRoad(x,z,maxDist)`, `streetNameAt(x,z)`, `addCollider(geometry, id)`, `bounds`, `data`.
+`buildingsNear(x,z,r)`, `nearestRoad(x,z,maxDist)`, `streetNameAt(x,z)`, `addCollider(geometry, id)`,
+`addBuilding(record)` (index an extra volume such as a synthetic tower for the lookups), `bounds`, `data`.
+`collideCapsule` classifies contacts by push direction (ground if the push points up, ceiling if down, otherwise a wall
+whose `wallNormal` is the horizontal push) and returns an object from a ring of 4 reused results.
 
 **sky**: `sun` (DirectionalLight, follows the player), `hemi`, `setTimeOfDay(hours)`, `timeOfDay`,
-`isNight` (bool), `sunDirection` (Vector3).
+`isNight` (bool), `nightFactor` (0..1), `sunDirection` (true sun direction; below the horizon at night),
+`moonDirection`, `lightDirection` (current key light: sun by day, moon at night), `palette` {zenith, horizon, ground, version}.
 
-**city**: `group` (Object3D), `update(dt)` (LOD / night lights), `sidewalkPaths` (optional helper for NPCs, see below),
-`setNight(t)` (0..1 night factor; called by sky).
+**city**: `group` (Object3D), `update(dt)` (LOD / night lights), `setNight(t)` (0..1 night factor; called by sky),
+`sidewalkPaths` [{pts:[x,z,…], width, road (index into data.roads), side (+1 left / -1 right of a→b)}],
+`heightAt(x, z)` (visual + physical ground height: 0 except on the Kopje hill), `crossingNodes` (Set of road-node indices
+with zebra crossings / stop lines).
 
 **player**: `position` (feet, Vector3), `velocity`, `state` ('ground'|'air'|'swing'|'zip'|'wall'|'perch'|'dive'),
 `heading` (rad, 0 = facing north/-z, CCW positive, i.e. forward = (-sin h, 0, -cos h)), `object`, `suit`,
-`radius`, `height`, `teleport(x,y,z)`, `speed` (m/s getter).
+`radius`, `height`, `teleport(x,y,z)`, `speed` (m/s getter), `setSuit(name)`, `hands` (world positions of both palms),
+`controller` (read-only traversal state, e.g. current swing anchor / wall normal).
 
-**cameraRig**: `yaw`, `pitch`, `shake(amount)`, `fovKick(amount)`.
+**cameraRig**: `yaw` (same convention as heading: the camera looks along (-sin yaw, 0, -cos yaw)), `pitch`,
+`shake(amount)`, `fovKick(amount)`, `preset` ('close'|'far', V toggles), `snap()` (jump to the target pose).
 
 **traffic**: `vehicles` [{position: Vector3, heading (rad, same convention), speed, type:'kombi'|'hatch'|'sedan'|'pickup'|'suv'|'bus'|…,
-length, width, height}], `vehiclesNear(x, z, r)`, `signalAt(nodeIndex) → 'green'|'amber'|'red'|null` (for the direction
-of travel given by `signalAt(nodeIndex, fromNodeIndex)`), `honk(vehicle)`.
+length, width, height, parked}] (position = body centre at road level; roof at position.y + height; parked rank kombis
+included), `vehiclesNear(x, z, r)` (any vehicle whose footprint reaches within r), `signalAt(nodeIndex, fromNodeIndex?)`
+→ 'green'|'amber'|'red'|null (without fromNodeIndex: the main road's state), `honk(vehicle)`.
 
-**npcs**: `list` [{position, heading, gender:'female'|'male', state}], `npcsNear(x, z, r)`.
+**npcs**: `list` [{position, heading, gender:'female'|'male', state, name, role}] (state ∈ walk wait cross idle chat vendor
+react flee), `npcsNear(x, z, r)`.
 
 **audio**: `unlock()`, `playVoice(clipId, position|null, {volume, onEnd}) → {stop(), duration, setPosition(v)}|null`, `setBusVolume('voices'|'sfx'|'ambience', v)`,
 `voiceClips(filter)` (manifest clips), `playSfx(name, position|null, {volume, pitch})` where name ∈

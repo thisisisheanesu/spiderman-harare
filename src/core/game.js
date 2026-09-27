@@ -34,7 +34,7 @@ export class Game {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.shadowMap.enabled = quality.shadows;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     container.appendChild(renderer.domElement);
     renderer.domElement.classList.add('game-canvas');
     this.renderer = renderer;
@@ -45,7 +45,8 @@ export class Game {
     this.scene.add(this.camera);
 
     this.input = new Input(renderer.domElement);
-    this.clock = new THREE.Clock(false);
+    this.timer = new THREE.Timer();
+    this.timer.connect(document);
     this.fps = 60;
     this._fpsAcc = 0;
     this._fpsFrames = 0;
@@ -87,7 +88,7 @@ export class Game {
   }
 
   start() {
-    this.clock.start();
+    this.timer.reset();
     const loop = () => {
       this._raf = requestAnimationFrame(loop);
       this.step();
@@ -96,7 +97,11 @@ export class Game {
   }
 
   step(forcedDt) {
-    const raw = forcedDt ?? this.clock.getDelta();
+    let raw = forcedDt;
+    if (raw === undefined) {
+      this.timer.update();
+      raw = this.timer.getDelta();
+    }
     const dt = Math.min(raw, 1 / 20);
     this._fpsAcc += raw;
     this._fpsFrames++;

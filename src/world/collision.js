@@ -10,7 +10,8 @@ import { pointInPoly, closestOnSegment, polyCentroid } from '../core/geo.js';
 //   raycast(origin, dir, maxDist)            -> {point, normal, distance, buildingId} | null
 //   collideCapsule(start, end, radius)       -> {hit, delta, normal, ground, groundNormal, wall, wallNormal}
 //                                               (start/end are the capsule segment endpoints; they are
-//                                               moved in place out of the geometry)
+//                                               moved in place out of the geometry; the result object is
+//                                               reused after 4 further calls)
 //   sweep(from, to, radius)                  -> clamps a fast move so it can't tunnel through walls
 //   buildingAt(x, z)                         -> building record containing the point, or null
 //   roofHeightAt(x, z)                       -> roof height (m) of the building at x,z, or 0
@@ -18,6 +19,7 @@ import { pointInPoly, closestOnSegment, polyCentroid } from '../core/geo.js';
 //   nearestRoad(x, z, maxDist=80)            -> {road, x, z, dist, t, seg, name} | null
 //   streetNameAt(x, z)                       -> best street name near a point ('' if none)
 //   addCollider(geometry, id=-2)             -> merge an extra BufferGeometry (world space) into physics
+//   addBuilding(record)                      -> index an extra building volume for the lookups below
 //   bounds                                   -> {minX,maxX,minZ,maxZ}
 //   data                                     -> the raw map JSON
 // Building records are the entries of data.buildings, augmented with: cx, cz (centroid),
@@ -32,6 +34,21 @@ const _capPoint = new THREE.Vector3();
 const _dir = new THREE.Vector3();
 const _n = new THREE.Vector3();
 const _v = new THREE.Vector3();
+const _wallAcc = new THREE.Vector3();
+const _groundAcc = new THREE.Vector3();
+
+function makeCapsuleResult() {
+  return {
+    hit: false,
+    delta: new THREE.Vector3(),
+    normal: new THREE.Vector3(),
+    ground: false,
+    groundNormal: new THREE.Vector3(0, 1, 0),
+    wall: false,
+    wallNormal: new THREE.Vector3(),
+    ceiling: false,
+  };
+}
 
 export class CollisionWorld {
   constructor(data) {
@@ -40,6 +57,9 @@ export class CollisionWorld {
     this.buildings = data.buildings;
     this.roads = data.roads;
     this.extra = [];
+    this.extraBuildings = [];
+    this._results = [makeCapsuleResult(), makeCapsuleResult(), makeCapsuleResult(), makeCapsuleResult()];
+    this._resultIndex = 0;
     this._prepBuildings();
     this._prepRoads();
     this._build();
@@ -47,28 +67,38 @@ export class CollisionWorld {
 
   _prepBuildings() {
     this.bGrid = new Map();
-    for (const b of this.buildings) {
-      const fp = b.fp;
-      let minX = Infinity;
-      let maxX = -Infinity;
-      let minZ = Infinity;
-      let maxZ = -Infinity;
-      for (let i = 0; i < fp.length; i += 2) {
-        minX = Math.min(minX, fp[i]);
-        maxX = Math.max(maxX, fp[i]);
-        minZ = Math.min(minZ, fp[i + 1]);
-        maxZ = Math.max(maxZ, fp[i + 1]);
-      }
-      const c = polyCentroid(fp);
-      Object.assign(b, { minX, maxX, minZ, maxZ, cx: c.x, cz: c.z });
-      for (let gx = Math.floor(minX / GRID); gx <= Math.floor(maxX / GRID); gx++) {
-        for (let gz = Math.floor(minZ / GRID); gz <= Math.floor(maxZ / GRID); gz++) {
-          const k = gx * 100003 + gz;
-          if (!this.bGrid.has(k)) this.bGrid.set(k, []);
-          this.bGrid.get(k).push(b);
-        }
+    for (const b of this.buildings) this._indexBuilding(b);
+  }
+
+  _indexBuilding(b) {
+    const fp = b.fp;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < fp.length; i += 2) {
+      minX = Math.min(minX, fp[i]);
+      maxX = Math.max(maxX, fp[i]);
+      minZ = Math.min(minZ, fp[i + 1]);
+      maxZ = Math.max(maxZ, fp[i + 1]);
+    }
+    const c = polyCentroid(fp);
+    Object.assign(b, { minX, maxX, minZ, maxZ, cx: c.x, cz: c.z });
+    for (let gx = Math.floor(minX / GRID); gx <= Math.floor(maxX / GRID); gx++) {
+      for (let gz = Math.floor(minZ / GRID); gz <= Math.floor(maxZ / GRID); gz++) {
+        const k = gx * 100003 + gz;
+        if (!this.bGrid.has(k)) this.bGrid.set(k, []);
+        this.bGrid.get(k).push(b);
       }
     }
+  }
+
+  // Index an extra building volume (e.g. a synthetic landmark tower) for buildingAt / roofHeightAt /
+  // buildingsNear. Physics still comes from addCollider. record: {id, fp:[x,z,...], h, name?, lm?}.
+  addBuilding(record) {
+    this._indexBuilding(record);
+    this.extraBuildings.push(record);
+    return record;
   }
 
   _prepRoads() {
@@ -165,7 +195,7 @@ export class CollisionWorld {
     geom.setIndex(new THREE.BufferAttribute(index, 1));
     this.vertexBuilding = Int32Array.from(bid);
     this.geometry = geom;
-    this.bvh = new MeshBVH(geom, { maxLeafSize: 8 });
+    this.bvh = new MeshBVH(geom, { targetLeafSize: 8 });
     this.triCount = index.length / 3;
     this._dirty = false;
   }
@@ -201,22 +231,24 @@ export class CollisionWorld {
   }
 
   // Push a capsule (segment start/end + radius) out of the static geometry. start/end are modified.
+  // Contacts are classified by push direction (not triangle normal) so that rolling over a convex
+  // roof edge reads as ground rather than as an inward-facing wall. Results come from a small ring
+  // of reused objects: read them before calling collideCapsule four more times.
   collideCapsule(start, end, radius) {
     this._ensure();
-    const res = {
-      hit: false,
-      delta: new THREE.Vector3(),
-      normal: new THREE.Vector3(),
-      ground: false,
-      groundNormal: new THREE.Vector3(0, 1, 0),
-      wall: false,
-      wallNormal: new THREE.Vector3(),
-      ceiling: false,
-    };
+    const res = this._results[(this._resultIndex = (this._resultIndex + 1) % this._results.length)];
+    res.hit = false;
+    res.ground = false;
+    res.wall = false;
+    res.ceiling = false;
+    res.delta.set(0, 0, 0);
+    res.normal.set(0, 0, 0);
+    res.groundNormal.set(0, 1, 0);
+    res.wallNormal.set(0, 0, 0);
     _seg.start.copy(start);
     _seg.end.copy(end);
-    const wallAcc = new THREE.Vector3();
-    const groundAcc = new THREE.Vector3();
+    _wallAcc.set(0, 0, 0);
+    _groundAcc.set(0, 0, 0);
     let wallCount = 0;
     let groundCount = 0;
     for (let iter = 0; iter < 3; iter++) {
@@ -240,15 +272,14 @@ export class CollisionWorld {
             }
             _seg.start.addScaledVector(_dir, depth);
             _seg.end.addScaledVector(_dir, depth);
-            tri.getNormal(_n);
-            if (_n.dot(_dir) < 0) _n.negate();
-            if (_n.y > 0.6) {
-              groundAcc.add(_n);
+            if (_dir.y > 0.6) {
+              _groundAcc.add(_dir);
               groundCount++;
-            } else if (_n.y < -0.6) {
+            } else if (_dir.y < -0.6) {
               res.ceiling = true;
             } else {
-              wallAcc.add(_n);
+              _wallAcc.x += _dir.x;
+              _wallAcc.z += _dir.z;
               wallCount++;
             }
             moved = true;
@@ -261,19 +292,17 @@ export class CollisionWorld {
     }
     res.delta.subVectors(_seg.start, start);
     if (res.hit) {
-      res.normal.copy(res.delta).normalize();
+      if (res.delta.lengthSq() > 1e-12) res.normal.copy(res.delta).normalize();
       start.copy(_seg.start);
       end.copy(_seg.end);
     }
     if (groundCount) {
       res.ground = true;
-      res.groundNormal.copy(groundAcc).normalize();
+      res.groundNormal.copy(_groundAcc).normalize();
     }
-    if (wallCount) {
+    if (wallCount && _wallAcc.lengthSq() > 1e-8) {
       res.wall = true;
-      wallAcc.y = 0;
-      if (wallAcc.lengthSq() > 1e-8) res.wallNormal.copy(wallAcc).normalize();
-      else res.wall = false;
+      res.wallNormal.copy(_wallAcc).normalize();
     }
     return res;
   }
