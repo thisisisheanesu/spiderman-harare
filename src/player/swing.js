@@ -12,7 +12,8 @@ const STEER = 7;
 const MAX_SPEED = 45;
 const REEL = 24;
 const CLEARANCE = 3.2; // lowest the body centre gets above the street/roof below the pivot (clears kombis)
-const PLANAR = 0.72; // how far the pivot moves from the anchor towards the line of travel
+const PLANAR = 0.85; // how far the pivot moves from the anchor towards the line of travel
+const TURN_RATE = 1.4; // rad/s the swing bends towards the stick / camera direction
 const HAND_UP = 1.1;
 
 const _a = new THREE.Vector3();
@@ -117,7 +118,9 @@ export class SwingMove {
       const vtl = vt.length();
       if (vtl > 0.5) v.addScaledVector(vt, (Math.max(0, c.wish.dot(vt) / vtl) * PUMP * h) / vtl);
       v.addScaledVector(_c.copy(c.wish).addScaledVector(rope, -c.wish.dot(rope)), STEER * h);
-      if (this.ropeLen > this.ropeTarget) this.ropeLen = Math.max(this.ropeTarget, this.ropeLen - REEL * h);
+      c.steerTowardsWish(h, TURN_RATE);
+      const excess = this.ropeLen - this.ropeTarget;
+      if (excess > 0) this.ropeLen -= Math.min(excess, Math.max(REEL, excess * 10) * h);
     }
     p.position.addScaledVector(v, h);
     if (this.delay <= 0) {
@@ -165,8 +168,8 @@ export class SwingMove {
         c.jumpHeld = true;
         c.emit('player:jump', { pos: p.position.clone() });
       } else if (v.y > 0 && sp > 14) {
-        v.multiplyScalar(1.06);
-        v.y += 3.5;
+        v.multiplyScalar(1.05);
+        v.y += 2 + 0.12 * sp;
         if (sp > 24 && Math.random() < 0.55) c.startTrick(Math.random() < 0.5 ? 'twirl' : 'flip');
       }
     }

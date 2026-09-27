@@ -22,6 +22,7 @@ const JUMP_V = 15.5;
 const JUMP_HOLD_GRAVITY = 0.62;
 const AIR_ACCEL = 11;
 const AIR_DRAG = G / (38 * 38);
+const AIR_TURN = 1.2;
 const DIVE_G = G * 1.5;
 const DIVE_DRAG = DIVE_G / (56 * 56);
 const DIVE_GLIDE = 16;
@@ -220,6 +221,22 @@ export class Controller {
     this.game.cameraRig?.fovKick?.(6);
   }
 
+  // Rotate the horizontal velocity towards the input direction (keeps speed): swings and jumps go
+  // where the stick / camera points instead of drifting.
+  steerTowardsWish(h, rate) {
+    const wl = this.wish.length();
+    if (wl < 0.2) return;
+    const v = this.p.velocity;
+    const hs = Math.hypot(v.x, v.z);
+    if (hs < 2) return;
+    const cur = Math.atan2(v.x, v.z);
+    let d = Math.atan2(this.wish.x, this.wish.z) - cur;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    const a = cur + clamp(d, -rate * wl * h, rate * wl * h);
+    v.x = Math.sin(a) * hs;
+    v.z = Math.cos(a) * hs;
+  }
+
   startTrick(type) {
     this.trick = type;
     this.trickT = 0;
@@ -344,6 +361,7 @@ export class Controller {
     const accel = dive ? 14 : AIR_ACCEL;
     v.x += this.wish.x * accel * h;
     v.z += this.wish.z * accel * h;
+    if (hs0 > 10) this.steerTowardsWish(h, AIR_TURN);
     const hs1 = Math.hypot(v.x, v.z);
     const cap = Math.max(hs0, dive ? 22 : 10);
     if (hs1 > cap) {

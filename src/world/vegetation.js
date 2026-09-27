@@ -328,7 +328,7 @@ class InstanceLOD {
 // Planting plan: street trees along the built pavements, parks, woods, school grounds and
 // suburban gardens, avoiding buildings, carriageways and paths.
 export function planTrees(ctx) {
-  const { data, world, sidewalkPaths, quality, urbanAt, skipArea, heightAt } = ctx;
+  const { data, world, sidewalkPaths, quality, urbanAt, heightAt } = ctx;
   const rng = makeRng(2026);
   const trees = [];
   const density = quality.trees;
@@ -442,7 +442,6 @@ export function planTrees(ctx) {
     }
   };
   for (const a of data.areas) {
-    if (skipArea(a)) continue;
     const ring = cleanRing(a.pts);
     if (ring.length < 6) continue;
     if (a.name === 'Africa Unity Square') {

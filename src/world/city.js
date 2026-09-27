@@ -99,7 +99,7 @@ export class City {
       emitSign(chunks.at(f.ax, f.az), L, pl);
     }
     const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
-    const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, skipArea, heightAt: this.heightAt });
+    const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, heightAt: this.heightAt });
     this.vegetation = createVegetation(this.group, trees, landmarks.palms, this.uniforms, quality, !!game.quality.shadows);
     tick('props+trees');
 
