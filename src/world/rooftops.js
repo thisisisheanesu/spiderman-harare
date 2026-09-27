@@ -79,9 +79,10 @@ function acUnit(gb, L, x, y, z, rot, seed) {
   gb.clearTransform();
 }
 
-function hvac(gb, L, x, y, z, rot, seed) {
+function hvac(gb, col, L, x, y, z, rot, seed) {
   gb.brush(tint('#c9ccce'), L.metal, seed, 2);
   rbox(gb, x, y, z, 3.2, 1.5, 1.8, rot, 2);
+  rbox(col, x, y, z, 3.2, 1.5, 1.8, rot, 1);
   const [u0, v0, u1, v1] = miscUV(MISC_CELLS.vent);
   gb.brush([255, 255, 255], L.misc, seed, 2);
   gb.setTransform(x, y, z, rot);
@@ -239,7 +240,7 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
   }
   if (area > 700 && rng() < 0.7 * opts.clutter) {
     const p = sample(2.0);
-    if (p) hvac(gb, L, p.x, y, p.z, rot, seed);
+    if (p) hvac(gb, col, L, p.x, y, p.z, rot, seed);
   }
   if (opts.solar) {
     const n = rng.int(1, 3);

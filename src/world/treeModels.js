@@ -185,6 +185,13 @@ function canopyGeometry(def, h, r, rng, blobs, detail, cards, blobScale = 1) {
   return geo;
 }
 
+// Approximate crown-top height (m) of a species' model at scale 1 (web anchors on tree tops).
+export function treeHeight(name) {
+  if (name === 'palm') return 11.5;
+  const def = SPECIES[name];
+  return def ? (def.height[0] + def.height[1]) / 2 : 9;
+}
+
 // Geometry for any species (palms included) at a LOD level.
 export function modelFor(name, lod) {
   if (name === 'palm') return palmGeometry(Math.min(lod, 1));

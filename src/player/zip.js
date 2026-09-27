@@ -8,6 +8,7 @@ import { findZipTarget, groundBelow } from './anchors.js';
 const MAX_SPEED = 42;
 const ACCEL = 150;
 const SHOT_SPEED = 520;
+const ZIP_TOUCHDOWN = 4.5; // landing speed reported on flat arrivals (soft 'land' sound + knee dip)
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
@@ -149,7 +150,9 @@ export class ZipMove {
       c.wall.enter(this.normal);
     } else {
       p.velocity.copy(this.dir).multiplyScalar(6).setY(0);
-      p.state = this.normal.y > 0.7 ? 'ground' : 'air';
+      // Flat arrival: a soft touchdown (knee dip + a quiet landing sound), not a silent snap.
+      if (this.normal.y > 0.7) c.land(ZIP_TOUCHDOWN);
+      else p.state = 'air';
     }
   }
 

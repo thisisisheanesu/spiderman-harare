@@ -4,7 +4,7 @@ import { paintFacadeLayers } from './facades.js';
 import { paintGroundLayers, buildUrbanMask } from './groundTextures.js';
 import { createCityUniforms, createFacadeMaterial, createGroundMaterial } from './materials.js';
 import { ChunkGrid, CHUNK, planBuilding, emitBuilding } from './buildings.js';
-import { buildStreets, StreetIndex } from './roads.js';
+import { buildStreets, StreetIndex, CarriagewayIndex } from './roads.js';
 import { buildGround } from './ground.js';
 import { GeoBuffer } from './geoBuffer.js';
 import { planTrees, createVegetation } from './vegetation.js';
@@ -13,6 +13,8 @@ import { buildProps } from './props.js';
 import { Landmarks } from './landmarks.js';
 import { Kopje } from './terrain.js';
 import { createFlame, createFountainJets } from './effects.js';
+import { treeHeight } from './treeModels.js';
+import { PointGrid } from './pointGrid.js';
 
 const QUALITY = {
   low: { tex: 256, props: 0.5, trees: 0.4, signs: 48 },
@@ -20,18 +22,38 @@ const QUALITY = {
   high: { tex: 384, props: 1, trees: 1, signs: 112 },
 };
 
+const NONE = [];
+
 // City renderer: buildings, streets, parks, trees, street furniture and landmarks, built from the
 // map data at load time.
 // Public: group, update(dt), setNight(t), sidewalkPaths
 //   ([{pts: [x,z,...], width, road (index into data.roads), side (+1 left / -1 right of a->b)}]),
 //   heightAt(x, z) (visual ground height: 0 except on the Kopje), crossingNodes (Set of node
-//   indices with zebra crossings + stop lines).
+//   indices with zebra crossings + stop lines),
+//   obstacles ([{x, z, r}] street-level solids: lamp posts, street trees, benches, bins, bollards,
+//   planters, shelter posts/benches, verandah posts, billboard legs, statue, fountain),
+//   obstaclesNear(x, z, r) / anchorsNear(x, z, r) (shared result arrays, see below).
 export class City {
   constructor() {
     this.uniforms = createCityUniforms();
     this.sidewalkPaths = [];
     this.crossingNodes = new Set();
+    this.obstacles = [];
+    this.anchors = [];
     this.heightAt = () => 0;
+  }
+
+  // Obstacles whose circle reaches within r of (x, z). The returned array is shared and
+  // overwritten by the next call (copy what you keep); no allocation per call.
+  obstaclesNear(x, z, r) {
+    return this._obstacleGrid ? this._obstacleGrid.near(x, z, r) : NONE;
+  }
+
+  // Web anchor points {x, y, z} within r (horizontal) of (x, z): tops of tall trees (crown,
+  // >= 7 m) and streetlight pole tops (9-10 m), for swinging where there are no tall buildings.
+  // Shared result array, overwritten by the next call.
+  anchorsNear(x, z, r) {
+    return this._anchorGrid ? this._anchorGrid.near(x, z, r) : NONE;
   }
 
   async init(game) {
@@ -70,7 +92,10 @@ export class City {
     // Buildings (+ landmark details).
     const landmarks = new Landmarks(data, signs);
     const landmarkStyles = new Map((data.meta.landmarks || []).map((l) => [l.key, l.style || {}]));
-    const ctx = { game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, streets: new StreetIndex(data) };
+    const ctx = {
+      game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks,
+      streets: new StreetIndex(data), carriageways: new CarriagewayIndex(data.roads), obstacles: [],
+    };
     const frontages = [];
     const emit = (b, extra) => {
       const spec = planBuilding(b, ctx);
@@ -88,7 +113,7 @@ export class City {
     const hill = new GeoBuffer(1 << 15);
     const summit = kopje.summit();
     world.addCollider(kopje.build(hill, G, groundScale, chunks.at(summit.x, summit.z), L, quality), -3);
-    landmarks.extras(chunks, colliderFor, L, emit, grounds.paths, G);
+    landmarks.extras(chunks, colliderFor, L, emit, grounds.paths, G, world);
 
     // Signs, street furniture, trees.
     for (const pl of signs.assign(frontages, data.pois)) {
@@ -97,7 +122,21 @@ export class City {
     }
     const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, medians: streets.medians, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
     const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, heightAt: this.heightAt });
-    this.vegetation = createVegetation(this.group, trees.concat(landmarks.palms, props.palms), this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
+    const allTrees = trees.concat(landmarks.palms, props.palms);
+    this.vegetation = createVegetation(this.group, allTrees, this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
+
+    // Pedestrian obstacles and low-rise web anchors (spatial grids built once).
+    const obstacles = ctx.obstacles.concat(landmarks.obstacles, props.obstacles);
+    const anchors = props.anchors;
+    for (const t of allTrees) {
+      if (!t.planted) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s });
+      const h = treeHeight(t.species) * t.s;
+      if (h >= 7) anchors.push({ x: t.x, y: t.y + h - 0.5, z: t.z });
+    }
+    this.obstacles = obstacles;
+    this.anchors = anchors;
+    this._obstacleGrid = new PointGrid(obstacles, 24);
+    this._anchorGrid = new PointGrid(anchors, 32);
 
     // Physics for everything that sticks out of the plain footprint extrusions.
     for (const [id, col] of colliders) {

@@ -55,6 +55,33 @@ export class StreetIndex {
   }
 }
 
+// Point-on-asphalt test against every carriageway (service lanes included), for things that must
+// stay off the road: parking-bay paint, rank bollards and shelters.
+export class CarriagewayIndex {
+  constructor(roads) {
+    this.roads = roads;
+    this.grid = new SegmentGrid(32);
+    this.maxHalf = 0;
+    roads.forEach((r, ri) => {
+      this.grid.addPolyline(r.pts, ri);
+      this.maxHalf = Math.max(this.maxHalf, kerbOffset(r));
+    });
+    this._hit = false;
+    this._margin = 0;
+    this._test = (seg, d) => {
+      if (d < kerbOffset(this.roads[seg.ref]) + this._margin) this._hit = true;
+    };
+  }
+
+  // True if (x, z) lies on a carriageway (or within `margin` metres of its kerb line).
+  contains(x, z, margin = 0) {
+    this._hit = false;
+    this._margin = margin;
+    this.grid.query(x, z, this.maxHalf + margin, this._test);
+    return this._hit;
+  }
+}
+
 export function buildStreets(ctx) {
   const { data, G, heightAt, crossingPoints, densify } = ctx;
   const roads = data.roads;

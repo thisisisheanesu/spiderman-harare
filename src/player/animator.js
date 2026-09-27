@@ -198,7 +198,8 @@ export class Animator {
     obj.position.y += PIVOT_Y;
     switch (player.state) {
       case 'swing':
-        up.subVectors(ctrl.swing.anchor, obj.position).normalize();
+        // Hang from the rope's physics pivot (the web can meet a low anchor at a flatter angle).
+        up.subVectors(ctrl.swing.pivot, obj.position).normalize();
         fwd.copy(v).addScaledVector(up, -v.dot(up));
         if (fwd.lengthSq() < 0.25) fwd.set(-Math.sin(player.heading), 0, -Math.cos(player.heading));
         fwd.normalize();

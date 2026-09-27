@@ -147,6 +147,19 @@ export class WallMove {
     c.p.state = 'air';
   }
 
+  // Swing held on a tall wall: spring off it sideways (the way the view leans along the wall) and
+  // up, so the next web carries on instead of climbing the whole tower.
+  launchOff() {
+    const c = this.c;
+    const n = this.normal;
+    const t = _a.copy(c.camFwd).addScaledVector(n, -c.camFwd.dot(n)).setY(0);
+    if (t.lengthSq() < 0.04) t.crossVectors(UP, n);
+    t.normalize();
+    this.lastNormal.copy(n);
+    this.cooldown = 0.35;
+    c.launch(n.x * 10 + t.x * 10, 11, n.z * 10 + t.z * 10);
+  }
+
   // Kick off the wall: away from it, or towards where the camera looks if that is away from it.
   jump() {
     const c = this.c;

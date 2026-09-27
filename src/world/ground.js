@@ -50,7 +50,7 @@ export function buildGround(ctx) {
     const gb = group === 'landuse' ? landuse : areas;
     gb.brush(tint(color), G[layer], 0, 0);
     gb.polygon(ring, null, 0, groundScale[layer]);
-    if (a.kind === 'parking' || a.kind === 'rank') paintBays(marks, G, ring, a.kind === 'rank');
+    if (a.kind === 'parking' || a.kind === 'rank') paintBays(marks, G, ring, a.kind === 'rank', ctx.carriageways);
   }
 
   for (const p of data.paths) {
@@ -138,8 +138,10 @@ function clipPolyline(p, x0, x1, z0, z1) {
   return out;
 }
 
-// Parking / kombi bays: double rows of bay lines across the lot's long axis.
-function paintBays(gb, G, ring, rank) {
+// Parking / kombi bays: double rows of bay lines across the lot's long axis. The area polygons
+// themselves draw under the asphalt (polygon offset), but paint is drawn over everything, so bay
+// lines are clipped wherever a carriageway (street or service aisle) crosses the lot.
+function paintBays(gb, G, ring, rank, carriageways) {
   const obb = orientedBox(ring);
   if (!obb || obb.wid < 10) return;
   const bayW = rank ? 3.2 : 2.6;
@@ -154,11 +156,34 @@ function paintBays(gb, G, ring, rank) {
       const [ax, az] = at(u, v0);
       const [bx, bz] = at(u, v0 + 2 * depth);
       if (!pointInRing(ax, az, ring) || !pointInRing(bx, bz, ring)) continue;
-      line(gb, ax, az, bx, bz, 0.12);
+      offRoadLine(gb, ax, az, bx, bz, 0.12, carriageways);
     }
     const [cx0, cz0] = at(-obb.len / 2 + 1, v0 + depth);
     const [cx1, cz1] = at(obb.len / 2 - 1, v0 + depth);
-    if (pointInRing(cx0, cz0, ring) && pointInRing(cx1, cz1, ring)) line(gb, cx0, cz0, cx1, cz1, 0.12);
+    if (pointInRing(cx0, cz0, ring) && pointInRing(cx1, cz1, ring)) offRoadLine(gb, cx0, cz0, cx1, cz1, 0.12, carriageways);
+  }
+}
+
+// A paint line sampled every ~1 m; only the runs of samples that are off the carriageways are drawn.
+function offRoadLine(gb, ax, az, bx, bz, w, carriageways) {
+  if (!carriageways) {
+    line(gb, ax, az, bx, bz, w);
+    return;
+  }
+  const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az)));
+  let start = -1;
+  for (let k = 0; k <= n + 1; k++) {
+    const off = k <= n && !carriageways.contains(ax + ((bx - ax) * k) / n, az + ((bz - az) * k) / n, 0.15);
+    if (off) {
+      if (start < 0) start = k;
+      continue;
+    }
+    if (start >= 0 && k - 1 > start) {
+      const t0 = start / n;
+      const t1 = (k - 1) / n;
+      line(gb, ax + (bx - ax) * t0, az + (bz - az) * t0, ax + (bx - ax) * t1, az + (bz - az) * t1, w);
+    }
+    start = -1;
   }
 }
 

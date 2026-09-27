@@ -13,7 +13,7 @@ import { GeoBuffer } from './geoBuffer.js';
 const STYLE = {
   rbz: { upper: 'curtain', ground: 'lobby', glass: 6, tint: '#aeb0ac', parapet: false, clutter: 0.3 },
   rbz_podium: { upper: 'bands', ground: 'lobby', glass: 6, tint: '#a3a8a6' },
-  joina_city: { upper: 'bands', ground: 'lobby', glass: 1, tint: '#b9bab6', parapet: false, clutter: 0, topDrum: 10.5 },
+  joina_city: { upper: 'bands', ground: 'lobby', glass: 1, tint: '#b9bab6', parapet: false, clutter: 0 },
   joina_city_podium: { ground: 'shop', letters: ['JOINA CITY', '#b9bab6', '#1d3d6b'] },
   karigamombe: { upper: 'curtain', ground: 'lobby', glass: 1, tint: '#b8b5b3', clutter: 0 },
   livingstone_house: { upper: 'grid', tint: '#dfdfda', glass: 4 },
@@ -45,6 +45,8 @@ export class Landmarks {
     this.data = data;
     this.signs = signs;
     this.palms = [];
+    // Street-level solids for pedestrian avoidance ({x, z, r}; merged into city.obstacles).
+    this.obstacles = [];
     this.jets = new GeoBuffer(512);
   }
 
@@ -65,7 +67,6 @@ export class Landmarks {
       spec.roofTint = tint('#9c5a40');
       spec.parapet = false;
     }
-    if (st.topDrum) spec.roofY = b.h - st.topDrum;
     if (st.thicken) {
       // Monomotapa: the mapped footprint is a thin curved sliver; extrude a proper crescent slab.
       const fp = cleanRing(b.fp);
@@ -80,6 +81,11 @@ export class Landmarks {
     const obb = orientedBox(fp);
     const seed = b.seed;
     const st = STYLE[b.lm];
+    // A volume that is not the mapped footprint (Monomotapa's thickened slab) is indexed for
+    // buildingAt / roofHeightAt / buildingsNear too (its physics is the copied visual geometry).
+    if (spec.fp && spec.fullCollider && b.id >= 0) {
+      registerVolume(world, { id: b.id, oid: b.oid, fp: fp.slice(), h: b.h, name: b.name, lm: b.lm, core: b.core, synthetic: 1 });
+    }
     switch (b.lm) {
       case 'rbz':
         rbzTower(gb, col, L, fp, b, seed);
@@ -115,9 +121,14 @@ export class Landmarks {
       case 'harare_station':
         cupola(gb, col, L, obb, spec.ridgeY ?? b.h, seed);
         break;
-      case 'parliament_house':
-        colonnade(gb, col, L, streetFace(fp, world, /Mandela/), spec, seed);
+      case 'parliament_house': {
+        const c = colonnade(gb, col, L, streetFace(fp, world, /Mandela/), spec, seed);
+        for (let k = 0; c && k < c.n; k++) {
+          const u = -c.w / 2 + (k * c.w) / (c.n - 1);
+          this.obstacles.push({ x: c.x + c.ex * u + c.nx * (c.depth - 0.3), z: c.z + c.ez * u + c.nz * (c.depth - 0.3), r: 0.35 });
+        }
         break;
+      }
       case 'national_gallery':
         this._mural(gb, fp, b, world);
         break;
@@ -169,8 +180,10 @@ export class Landmarks {
     gb.brush(tint('#4a4f53'), L.metal, 3, 2);
     for (const t of [-0.4, 0, 0.4]) gb.beam(x - nz * w * t, h, z + nx * w * t, x - nz * w * t, h + hh + 0.8, z + nx * w * t, 0.25, 2);
     wallBoard(gb, { x, z, nx, nz, ex: -nz, ez: nx }, h + 0.8, w, hh, sign, 0.2);
+    // Physics: the board and the three posts under it (open between them, as drawn).
     col.setTransform(x, h, z, Math.atan2(nx, nz));
-    col.box(0, 0, 0, w, hh + 0.8, 0.4, 1);
+    col.box(0, 0.8, 0, w, hh, 0.4, 1, true);
+    for (const t of [-0.4, 0, 0.4]) col.box(w * t, 0, 0, 0.3, 0.8, 0.3, 1);
     col.clearTransform();
   }
 
@@ -199,9 +212,9 @@ export class Landmarks {
   }
 
   // One-off pieces that are not buildings: the Rainbow Towers hotel tower (synthetic, it is not in
-  // the footprint data), the Mbuya Nehanda statue and the Africa Unity Square fountain (its water
-  // jets go to this.jets).
-  extras(chunks, colliderFor, L, emit, paths, G) {
+  // the footprint data, so it is also registered with world.addBuilding), the Mbuya Nehanda statue
+  // and the Africa Unity Square fountain (its water jets go to this.jets).
+  extras(chunks, colliderFor, L, emit, paths, G, world) {
     const data = this.data;
     if ((data.meta.landmarks || []).some((l) => l.key === 'rainbow_towers')) {
       const c = lonLatToXZ(31.0359, -17.8314);
@@ -216,12 +229,37 @@ export class Landmarks {
         c.x + ux * hl - uz * hw, c.z + uz * hl + ux * hw,
         c.x - ux * hl - uz * hw, c.z - uz * hl + ux * hw,
       ];
-      emit({ id: -7, oid: 'rainbow-towers-hotel', fp, h: 75, fl: 19, core: 1, lm: 'rainbow_towers_hotel', cx: c.x, cz: c.z }, { fullCollider: true });
+      const rec = { id: -7, oid: 'rainbow-towers-hotel', fp, h: 75, fl: 19, core: 1, lm: 'rainbow_towers_hotel', name: 'Rainbow Towers Hotel', synthetic: 1, cx: c.x, cz: c.z };
+      emit(rec, { fullCollider: true });
+      registerVolume(world, rec);
     }
     const statue = data.features.find((f) => f.key === 'mbuya_nehanda_statue');
-    if (statue) nehanda(chunks.detailAt(statue.x, statue.z), colliderFor(-8), L, statue.x, statue.z);
+    if (statue) {
+      nehanda(chunks.detailAt(statue.x, statue.z), colliderFor(-8), L, statue.x, statue.z);
+      this.obstacles.push({ x: statue.x, z: statue.z, r: 2.2 });
+    }
     const fountain = data.features.find((f) => f.kind === 'fountain');
-    if (fountain) fountainAt(chunks.detailAt(fountain.x, fountain.z), colliderFor(-9), this.jets, L, fountain.x, fountain.z, paths, G);
+    if (fountain) {
+      fountainAt(chunks.detailAt(fountain.x, fountain.z), colliderFor(-9), this.jets, L, fountain.x, fountain.z, paths, G);
+      this.obstacles.push({ x: fountain.x, z: fountain.z, r: 8.2 });
+    }
+  }
+}
+
+// Index an extra volume with world.addBuilding. buildingAt() returns the first footprint that
+// contains the point, and a synthetic volume can stand on a mapped one (the hotel tower rises
+// out of the HICC podium's footprint), so the new record is moved to the front of its grid cells
+// to win there. (Relies on CollisionWorld.bGrid; without it the record is still indexed.)
+function registerVolume(world, rec) {
+  if (!world?.addBuilding) return;
+  world.addBuilding(rec);
+  if (!(world.bGrid instanceof Map)) return;
+  for (const arr of world.bGrid.values()) {
+    const i = arr.indexOf(rec);
+    if (i > 0) {
+      arr.splice(i, 1);
+      arr.unshift(rec);
+    }
   }
 }
 
@@ -300,6 +338,8 @@ function drawMosaic(ctx, x, y, w, h) {
 }
 
 // Wall band on `ring` between y0..y1 (v 0..1 across the band) with top/bottom caps back to `inner`.
+// The collider gets the same closed shape (outer wall + both caps), so a band standing proud of
+// its wall is a solid ledge, never an open slot to fall into.
 function band(gb, col, ring, inner, y0, y1, layer, tintBytes, seed, tileW) {
   const normals = edgeNormals(ring, true);
   const n = ring.length / 2;
@@ -317,6 +357,7 @@ function band(gb, col, ring, inner, y0, y1, layer, tintBytes, seed, tileW) {
     for (const [y, ny] of [[y1, 1], [y0, -1]]) {
       const q = [ax, y, az, bx, y, bz, inner[j * 2], y, inner[j * 2 + 1], inner[i * 2], y, inner[i * 2 + 1]];
       gb.quad(...q, 0, ny, 0, 0, 0, 1, 0.1);
+      col.quad(...q, 0, ny, 0, 0, 0, 1, 1);
     }
   }
 }
@@ -349,10 +390,13 @@ function rbzTower(gb, col, L, fp, b, seed) {
     gb.clearTransform();
     gb.beam(x, frieze + 1, z, x + vx * 4.5, podium, z + vz * 4.5, 1.1, 3);
     col.setTransform(x, 0, z, Math.atan2(vx, vz));
-    col.box(0, podium, 0, 1.1, b.h - podium, 1.1, 1);
+    col.box(0, frieze, 0, 0.9, b.h - frieze, 0.9, 1);
     col.clearTransform();
+    col.beam(x, frieze + 1, z, x + vx * 4.5, podium, z + vz * 4.5, 1.1, 1);
   }
-  const lobby = offsetRing(fp, normals, -0.8);
+  // The lobby glass sits only a little inside the footprint: the physics extrusion is the
+  // footprint itself, so a deep recess would leave an invisible wall in front of the glass.
+  const lobby = offsetRing(fp, normals, -0.3);
   gb.brush(tint('#ffffff'), L.lobby, seed, 0, 0, 4);
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
@@ -362,26 +406,43 @@ function rbzTower(gb, col, L, fp, b, seed) {
   const skin = offsetRing(fp, normals, 0.35);
   band(gb, col, skin, fp, frieze, frieze + 3.5, L.frieze, granite, seed, 3);
   band(gb, col, skin, fp, b.h - 4.2, b.h - 0.6, L.frieze, granite, seed, 3);
+  // Crown: a solid cornice ring (top face at b.h + 0.9) with its inner lip wall down to the roof.
   const lip = offsetRing(fp, normals, -0.4);
   band(gb, col, offsetRing(fp, normals, 0.9), lip, b.h - 0.6, b.h + 0.9, L.concrete, granite, seed, 4);
   gb.brush(granite, L.concrete, seed, 2);
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
     gb.wall(lip[i * 2], lip[i * 2 + 1], lip[j * 2], lip[j * 2 + 1], b.h, b.h + 0.9, -normals[i * 2], -normals[i * 2 + 1], 0, 1, 0, 0.2);
+    col.wall(lip[i * 2], lip[i * 2 + 1], lip[j * 2], lip[j * 2 + 1], b.h, b.h + 0.9, -normals[i * 2], -normals[i * 2 + 1], 0, 1, 0, 1);
   }
 }
 
 // Joina City: the top storeys wrap into a full-width blue-grey glass drum, then a narrower ribbed
-// silver drum capped by a thin overhanging disc, with two antenna masts.
+// silver drum capped by a thin overhanging disc, with two antenna masts. The mapped footprint is
+// not round (its corners reach well past the drum), and physics extrudes that footprint up to the
+// roof, so the shaft's walls run up to the roof too and the drum bulges out of them wherever it is
+// wider: what you see is footprint extrusion + drum, which is exactly what the colliders are.
 function joinaCrown(gb, col, L, obb, h, seed) {
   if (!obb) return;
-  const R = Math.max(obb.len, obb.wid) / 2 + 0.3;
+  const R = Math.max(obb.len, obb.wid) / 2 + 0.6;
   const y0 = h - 10.5;
+  const circle = (r, segs) => {
+    const out = [];
+    for (let k = 0; k < segs; k++) {
+      const a = (k / segs) * Math.PI * 2;
+      out.push(obb.cx + Math.cos(a) * r, obb.cz + Math.sin(a) * r);
+    }
+    return out;
+  };
   gb.brush(tint('#b9bab6'), L.bands, seed, 0, 0, 1);
   gb.cylinder(obb.cx, y0, obb.cz, R, h - y0, 32, 3.4, false);
   gb.brush(tint('#c9cac6'), L.concrete, seed, 2);
+  // Soffit under the drum where it overhangs the facade.
+  gb.polygon(circle(R, 32), null, y0, 4, false);
   gb.cylinder(obb.cx, h, obb.cz, R + 0.4, 0.6, 32, 4, true);
-  col.cylinder(obb.cx, y0, obb.cz, R + 0.4, h - y0 + 0.6, 16, 1, true);
+  col.cylinder(obb.cx, y0, obb.cz, R, h - y0, 32, 1, false);
+  col.polygon(circle(R, 32), null, y0, 1, false);
+  col.cylinder(obb.cx, h, obb.cz, R + 0.4, 0.6, 32, 1, true);
   const r2 = R * 0.6;
   gb.brush(tint('#b5c4d2'), L.metal, seed, 2);
   gb.cylinder(obb.cx, h + 0.6, obb.cz, r2, 6, 24, 1.2, false);
@@ -391,18 +452,21 @@ function joinaCrown(gb, col, L, obb, h, seed) {
     const z = obb.cz + Math.sin(a) * r2;
     gb.beam(x, h + 0.6, z, x, h + 6.6, z, 0.25, 2);
   }
+  col.cylinder(obb.cx, h + 0.6, obb.cz, r2 + 0.1, 6, 24, 1, false);
   const r3 = r2 * 1.4;
+  const disc = circle(r3, 32);
   gb.brush(tint('#d2d4d2'), L.metal, seed, 2);
   gb.cylinder(obb.cx, h + 6.6, obb.cz, r3, 1.0, 32, 2, true);
-  const disc = [];
-  for (let k = 0; k < 32; k++) {
-    const a = (k / 32) * Math.PI * 2;
-    disc.push(obb.cx + Math.cos(a) * r3, obb.cz + Math.sin(a) * r3);
-  }
   gb.polygon(disc, null, h + 6.6, 4, false);
-  col.cylinder(obb.cx, h + 0.6, obb.cz, r3, 7, 16, 1, true);
+  col.cylinder(obb.cx, h + 6.6, obb.cz, r3, 1.0, 32, 1, true);
+  col.polygon(disc, null, h + 6.6, 1, false);
   gb.brush(tint('#9aa0a4'), L.metal, seed, 2);
-  for (const s of [-0.35, 0.35]) gb.cylinder(obb.cx + obb.ux * r3 * s, h + 7.6, obb.cz + obb.uz * r3 * s, 0.18, 12, 6, 2, false, 0.06);
+  for (const s of [-0.35, 0.35]) {
+    const x = obb.cx + obb.ux * r3 * s;
+    const z = obb.cz + obb.uz * r3 * s;
+    gb.cylinder(x, h + 7.6, z, 0.18, 12, 6, 2, false, 0.06);
+    col.cylinder(x, h + 7.6, z, 0.18, 12, 6, 1, false, 0.06);
+  }
 }
 
 // Karigamombe: blue glass tower with wide light-grey corner piers, a set-back glass lantern and a
@@ -517,7 +581,8 @@ function clockTower(gb, col, L, fp, spec, world, seed, prefer, H) {
   pyramid(gb, 0, H + 0.5, 0, w / 2 + 0.3, 4.5);
   gb.clearTransform();
   col.setTransform(x, 0, z, rot);
-  col.box(0, 0, 0, w + 0.6, H + 0.5, w + 0.6, 1);
+  col.box(0, 0, 0, w, H, w, 1);
+  col.box(0, H, 0, w + 0.6, 0.5, w + 0.6, 1, true);
   pyramid(col, 0, H + 0.5, 0, w / 2 + 0.3, 4.5);
   col.clearTransform();
 }
@@ -572,7 +637,8 @@ function churchTowers(gb, col, L, obb, spec, world, seed, copper) {
     gb.setTransform(x, 0, z, rot);
     gb.box(0, 0, 0, size, H, size, 4);
     col.setTransform(x, 0, z, rot);
-    col.box(0, 0, 0, size + 0.5, H + 0.6, size + 0.5, 1);
+    col.box(0, 0, 0, size, H, size, 1);
+    col.box(0, H, 0, size + 0.5, 0.6, size + 0.5, 1, true);
     gb.brush(spec.tint, L.concrete, seed, 2);
     gb.box(0, H, 0, size + 0.5, 0.6, size + 0.5, 4);
     if (copper) {
@@ -586,11 +652,18 @@ function churchTowers(gb, col, L, obb, spec, world, seed, copper) {
     } else {
       gb.brush(spec.tint, L.stone, seed, 0, 3, 0);
       const r = size / 2 + 0.25;
+      // Merlons and corner pinnacles are solid too: perched feet stand between them, not in them.
       for (const k of [-2, 0, 2]) {
         const o = k * r * 0.4;
-        for (const [dx, dz] of [[o, r - 0.2], [o, -r + 0.2], [r - 0.2, o], [-r + 0.2, o]]) gb.box(dx, H + 0.6, dz, 0.5, 0.8, 0.5, 2);
+        for (const [dx, dz] of [[o, r - 0.2], [o, -r + 0.2], [r - 0.2, o], [-r + 0.2, o]]) {
+          gb.box(dx, H + 0.6, dz, 0.5, 0.8, 0.5, 2);
+          col.box(dx, H + 0.6, dz, 0.5, 0.8, 0.5, 1);
+        }
       }
-      for (const [dx, dz] of [[r, r], [-r, r], [r, -r], [-r, -r]]) gb.cylinder(dx, H + 0.6, dz, 0.35, 2.4, 6, 2, true, 0.02);
+      for (const [dx, dz] of [[r, r], [-r, r], [r, -r], [-r, -r]]) {
+        gb.cylinder(dx, H + 0.6, dz, 0.35, 2.4, 6, 2, true, 0.02);
+        col.cylinder(dx, H + 0.6, dz, 0.35, 2.4, 6, 1, true, 0.02);
+      }
     }
     gb.clearTransform();
     col.clearTransform();
@@ -651,7 +724,13 @@ function pearlSculpture(gb, col, L, obb, h, seed) {
   gb.cylinder(x, h + 9.1, z, 0.35, 0.25, 10, 1, true, 0.85);
   gb.cylinder(x, h + 9.35, z, 0.85, 0.9, 10, 1, false, 0.85);
   gb.cylinder(x, h + 10.25, z, 0.85, 0.3, 10, 1, true, 0.3);
-  col.box(x, h, z, 1.2, 10.6, 1.2, 1);
+  // Collider follows the figure: splayed legs, body, raised arms and the sphere.
+  for (const s of [-1, 1]) {
+    col.beam(x + sx * 2.2 * s, h, z + sz * 2.2 * s, x, hip, z, 0.3, 1);
+    col.beam(x, neck - 0.3, z, x + sx * 0.9 * s, h + 9.1, z + sz * 0.9 * s, 0.22, 1);
+  }
+  col.beam(x, hip, z, x, neck + 0.6, z, 0.4, 1);
+  col.cylinder(x, h + 9.1, z, 0.85, 1.45, 8, 1, true);
 }
 
 // Arcaded front: a row of cream columns carrying a first-floor balcony slab with a balustrade,
@@ -677,9 +756,13 @@ function colonnade(gb, col, L, face, spec, seed) {
   for (let x = -w / 2; x <= w / 2; x += 0.45) gb.box(x, h + 0.57, depth - 0.05, 0.1, 0.75, 0.1, 1);
   gb.box(0, h + 1.3, depth - 0.05, w + 0.6, 0.1, 0.3, 2);
   gb.clearTransform();
+  // Physics: the columns, the balcony slab (with its underside) and the balustrade along its edge.
   col.setTransform(face.x, 0, face.z, rot);
-  col.box(0, h, depth / 2, w + 0.6, 1.4, depth + 0.2, 1);
+  for (let k = 0; k < n; k++) col.cylinder(-w / 2 + (k * w) / (n - 1), 0, depth - 0.3, 0.3, h, 6, 1, false);
+  col.box(0, h, depth / 2, w + 0.6, 0.45, depth + 0.2, 1, true);
+  col.box(0, h + 0.45, depth - 0.05, w + 0.6, 0.95, 0.3, 1);
   col.clearTransform();
+  return { x: face.x, z: face.z, ex: face.nz, ez: -face.nx, nx: face.nx, nz: face.nz, w, n, depth };
 }
 
 // Harare station: red cupola with white columns on a brick drum, straddling the roof ridge.
@@ -695,7 +778,8 @@ function cupola(gb, col, L, obb, y, seed) {
   gb.brush(tint('#8a3a34'), L.metal, seed, 2);
   gb.cylinder(obb.cx, y + 3.4, obb.cz, 2.3, 0.9, 12, 2, false, 2.0);
   gb.cylinder(obb.cx, y + 4.3, obb.cz, 2.0, 1.4, 12, 2, true, 0.3);
-  col.cylinder(obb.cx, y - 1, obb.cz, 2.3, 6.7, 8, 1, true);
+  col.cylinder(obb.cx, y - 1, obb.cz, 2.3, 5.3, 8, 1, true);
+  col.cylinder(obb.cx, y + 4.3, obb.cz, 2.0, 1.4, 8, 1, true, 0.3);
 }
 
 // Mbuya Nehanda: bronze figure with a raised arm on a granite pedestal.
@@ -733,7 +817,23 @@ function fountainAt(gb, col, jets, L, x, z, paths, G) {
   gb.cylinder(x, 0.3, z, R, 0.05, 32, 3, true);
   gb.brush(tint('#d8d0c2'), L.concrete, 6, 2);
   gb.cylinder(x, 0.3, z, 1.0, 1.1, 12, 2, true, 0.7);
-  col.cylinder(x, 0, z, R + 0.35, 0.68, 16, 1, true);
+  // Physics: the knee wall (outer face, inner face, top), the water as a floor, the jet pedestal.
+  const R0 = R + 0.35;
+  col.cylinder(x, 0, z, R0, 0.68, 16, 1, false);
+  col.cylinder(x, 0, z, R, 0.68, 16, 1, false);
+  const pool = [];
+  for (let i = 0; i < 16; i++) {
+    const a0 = (i / 16) * Math.PI * 2;
+    const a1 = ((i + 1) / 16) * Math.PI * 2;
+    const c0 = Math.cos(a0);
+    const s0 = Math.sin(a0);
+    const c1 = Math.cos(a1);
+    const s1 = Math.sin(a1);
+    col.quad(x + c0 * R0, 0.68, z + s0 * R0, x + c1 * R0, 0.68, z + s1 * R0, x + c1 * R, 0.68, z + s1 * R, x + c0 * R, 0.68, z + s0 * R, 0, 1, 0, 0, 0, 1, 1);
+    pool.push(x + c0 * R, z + s0 * R);
+  }
+  col.polygon(pool, null, 0.35, 1);
+  col.cylinder(x, 0.3, z, 1.0, 1.1, 8, 1, true, 0.7);
   // Water jets (drawn translucent by the city, see createFountainJets).
   jets.brush(tint('#ffffff'), 0, 0, 0);
   jets.cylinder(x, 1.4, z, 0.45, 15, 10, 1, false, 0.12);

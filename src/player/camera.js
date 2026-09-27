@@ -21,6 +21,13 @@ const MANUAL_HOLD = 1.5;
 const BASE_FOV = 68;
 const PITCH_MIN = -1.35;
 const PITCH_MAX = 0.95;
+// Plunging down a tower face (controller.plunge): a cinematic three-quarter view from outside,
+// looking back at the facade and down past the player at the street; when the web catches, the rig
+// whips round behind the swing.
+const PLUNGE_YAW = Math.PI - 0.55; // from the dive direction
+const PLUNGE_PITCH = -0.9;
+const PLUNGE_DIST = 3.2; // extra boom length
+const WHIP_TIME = 1.4; // s of faster re-alignment after a plunge
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));
@@ -54,6 +61,8 @@ export class CameraRig {
     this._lastManual = -10;
     this._lastYaw = 0;
     this._diveK = 0;
+    this._plungeK = 0;
+    this._whip = 0;
   }
 
   async init(game) {
@@ -119,7 +128,9 @@ export class CameraRig {
     const lag = _v.length();
     if (lag > 4) this.follow.addScaledVector(_v, (lag - 4) / lag);
 
-    let want = preset.dist + speedK * (p.state === 'dive' ? 0.5 : 3.4);
+    const plunging = p.state === 'dive' && !!p.controller?.plunge;
+    this._plungeK = damp(this._plungeK, plunging ? 1 : 0, 2.5, dt);
+    let want = preset.dist + speedK * (p.state === 'dive' ? 0.5 : 3.4) + PLUNGE_DIST * this._plungeK;
     if (p.state === 'perch') want += 1.0;
     this.distance = damp(this.distance, want, 3, dt);
 
@@ -183,10 +194,19 @@ export class CameraRig {
   }
 
   _autoAlign(dt, p) {
+    this._whip = Math.max(0, this._whip - dt);
     if (this._time - this._lastManual < MANUAL_HOLD) return;
     const v = p.velocity;
     const hs = Math.hypot(v.x, v.z);
     const st = p.state;
+    const ctrl = p.controller;
+    if (st === 'dive' && ctrl?.plunge) {
+      const out = ctrl.perchOut;
+      this.yaw = dampAngle(this.yaw, Math.atan2(-out.x, -out.z) + PLUNGE_YAW, 2.6, dt);
+      this.pitch = damp(this.pitch, PLUNGE_PITCH, 2.6, dt);
+      this._whip = WHIP_TIME;
+      return;
+    }
     if (st === 'perch') {
       // Settle into a wide look out over the city, like a perch shot.
       this.yaw = dampAngle(this.yaw, p.heading, 0.8, dt);
@@ -201,7 +221,7 @@ export class CameraRig {
     }
     if (hs < 3) return;
     const k = clamp(hs / 20, 0.3, 1);
-    const yawRate = st === 'air' ? 1.0 : st === 'dive' ? 2.6 : 1.7;
+    const yawRate = (st === 'air' ? 1.0 : st === 'dive' ? 2.6 : 1.7) * (1 + 2 * (this._whip / WHIP_TIME));
     this.yaw = dampAngle(this.yaw, Math.atan2(-v.x, -v.z), yawRate * k, dt);
     let pitch = -0.2;
     if (st === 'swing') pitch = -0.2 - 0.12 * clamp(v.length() / 45, 0, 1);

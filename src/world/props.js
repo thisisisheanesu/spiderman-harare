@@ -9,7 +9,9 @@ import { makeCanvas } from './atlas.js';
 
 // Street furniture merged into the city chunks: streetlights (about 40% are dead, as in the real
 // CBD), litter bins, benches, bollards, kombi-rank shelters and billboards. Lit lamps also get an
-// additive light pool on the ground at night (one instanced mesh).
+// additive light pool on the ground at night (one instanced mesh). Everything solid at street
+// level is also reported as {x, z, r} obstacles (pedestrian avoidance) and every streetlight pole
+// top as a web anchor {x, y, z} (swinging where there are no tall buildings).
 
 const POLE = tint('#8c9297');
 const DARK = tint('#3d4246');
@@ -156,13 +158,31 @@ function poolTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+// Local (lx, lz) in a frame at (x, z) rotated by rot about Y (same convention as GeoBuffer).
+function local(x, z, rot, lx, lz, out) {
+  const c = Math.cos(rot);
+  const sn = Math.sin(rot);
+  out.x = x + c * lx + sn * lz;
+  out.z = z - sn * lx + c * lz;
+  return out;
+}
+
 export function buildProps(ctx) {
-  const { data, chunks, colliderFor, L, sidewalkPaths, medians, urbanAt, quality, world, frontages, signs, heightAt } = ctx;
+  const { data, chunks, colliderFor, L, sidewalkPaths, medians, urbanAt, quality, world, frontages, signs, heightAt, carriageways } = ctx;
   const rng = makeRng(4242);
   const density = quality.props;
   const roads = data.roads;
   const pools = [];
   const palms = [];
+  const obstacles = [];
+  const anchors = [];
+  const tmp = { x: 0, z: 0 };
+  const obstacle = (x, z, r) => obstacles.push({ x, z, r });
+  const localObstacle = (x, z, rot, lx, lz, r) => {
+    local(x, z, rot, lx, lz, tmp);
+    obstacles.push({ x: tmp.x, z: tmp.z, r });
+  };
+  const offRoad = (x, z, margin) => !carriageways || !carriageways.contains(x, z, margin);
 
   // Streetlights and bins along the built pavements.
   for (const sp of sidewalkPaths) {
@@ -190,12 +210,18 @@ export function buildProps(ctx) {
         if (world.buildingAt(px, pz)) continue;
         const on = rng() < 0.6;
         const seed = Math.floor(rng() * 255);
-        streetlight(chunks.detailAt(px, pz), L, px, heightAt(px, pz) + 0.15, pz, Math.atan2(tx, tz), on, seed, isMajor(r) && rng() < 0.45);
+        const py = heightAt(px, pz) + 0.15;
+        streetlight(chunks.detailAt(px, pz), L, px, py, pz, Math.atan2(tx, tz), on, seed, isMajor(r) && rng() < 0.45);
+        obstacle(px, pz, 0.22);
+        anchors.push({ x: px, y: py + 9, z: pz });
         if (on) pools.push(px + tx * 2.05, pz + tz * 2.05);
         if (urban > 0.5 && rng() < 0.35 * density) {
           const bx = px + (dx / len) * 3;
           const bz = pz + (dz / len) * 3;
-          if (!world.buildingAt(bx, bz)) bin(chunks.detailAt(bx, bz), L, bx, heightAt(bx, bz) + 0.15, bz, rng.pick(BIN_COLORS), seed);
+          if (!world.buildingAt(bx, bz)) {
+            bin(chunks.detailAt(bx, bz), L, bx, heightAt(bx, bz) + 0.15, bz, rng.pick(BIN_COLORS), seed);
+            obstacle(bx, bz, 0.32);
+          }
         }
       }
       acc = (acc - len) % spacing;
@@ -233,7 +259,10 @@ export function buildProps(ctx) {
         const k = count++ % 2;
         if (k === 0 && claim(x, z, 16)) {
           const on = rng() < 0.6;
-          doubleLight(chunks.detailAt(x, z), L, x, heightAt(x, z) + 0.15, z, Math.atan2(dz, -dx), on, 5, rng() < 0.7);
+          const y = heightAt(x, z) + 0.15;
+          doubleLight(chunks.detailAt(x, z), L, x, y, z, Math.atan2(dz, -dx), on, 5, rng() < 0.7);
+          obstacle(x, z, 0.26);
+          anchors.push({ x, y: y + 10, z });
           if (on) {
             for (const s of [1, -1]) pools.push(x + (dz / len) * 2.1 * s, z - (dx / len) * 2.1 * s);
           }
@@ -262,6 +291,7 @@ export function buildProps(ctx) {
           const x = pts[end] + (dx / len) * 1.5 + nx * k;
           const z = pts[end + 1] + (dz / len) * 1.5 + nz * k;
           bollard(chunks.detailAt(x, z), L, x, z, 7);
+          obstacle(x, z, 0.16);
         }
       }
     }
@@ -282,25 +312,31 @@ export function buildProps(ctx) {
           // Mall: a raised brick planter with a Washingtonia palm, benches either side.
           if (world.buildingAt(cx, cz)) continue;
           planter(chunks.detailAt(cx, cz), colliderFor(-10), L, cx, cz, Math.atan2(dx, dz));
-          palms.push({ species: 'palm', x: cx, y: 0.55, z: cz, s: 0.9 + rng() * 0.3, rot: rng() * 6.28, c: [1, 1, 1] });
+          obstacle(cx, cz, 1.85);
+          palms.push({ species: 'palm', x: cx, y: 0.55, z: cz, s: 0.9 + rng() * 0.3, rot: rng() * 6.28, c: [1, 1, 1], planted: true });
           for (const sgn of [1, -1]) {
             const x = cx + nx * 2.3 * sgn;
             const z = cz + nz * 2.3 * sgn;
-            bench(chunks.detailAt(x, z), L, x, z, Math.atan2(nx * sgn, nz * sgn), 3);
+            const rot = Math.atan2(nx * sgn, nz * sgn);
+            bench(chunks.detailAt(x, z), L, x, z, rot, 3);
+            for (const u of [-0.5, 0.5]) localObstacle(x, z, rot, u, 0, 0.45);
           }
         } else {
           const sgn = rng() < 0.5 ? 1 : -1;
           const x = cx + nx * (p.w / 2 + 1.1) * sgn;
           const z = cz + nz * (p.w / 2 + 1.1) * sgn;
           if (world.buildingAt(x, z)) continue;
-          bench(chunks.detailAt(x, z), L, x, z, Math.atan2(-nx * sgn, -nz * sgn), 3);
+          const rot = Math.atan2(-nx * sgn, -nz * sgn);
+          bench(chunks.detailAt(x, z), L, x, z, rot, 3);
+          for (const u of [-0.5, 0.5]) localObstacle(x, z, rot, u, 0, 0.45);
         }
       }
     }
   }
 
   // Kombi ranks: shelters along the bays, bollards around the edge. Railway platforms: long blue
-  // steel canopies.
+  // steel canopies. Mapped rank / platform outlines often spill over the streets around them, so
+  // shelters and bollards that would stand on a carriageway are left out.
   for (const a of data.areas) {
     const rank = a.kind === 'rank' || (a.kind === 'platform' && /bus|terminus|square|rank/i.test(a.name || ''));
     if (!rank && a.kind !== 'platform') continue;
@@ -315,7 +351,24 @@ export function buildProps(ctx) {
       const x = obb.cx - obb.uz * v;
       const z = obb.cz + obb.ux * v;
       if (!pointInRing(x, z, ring) || world.buildingAt(x, z)) continue;
-      shelter(chunks.detailAt(x, z), colliderFor(-5), L, x, z, rot, len, Math.min(3, obb.wid - 0.5), rank ? SHELTER_GREY : SHELTER_BLUE);
+      const d = Math.min(3, obb.wid - 0.5);
+      let clear = true;
+      for (let u = -len / 2; u <= len / 2 + 0.01 && clear; u += Math.max(1, len / Math.ceil(len / 3))) {
+        for (const w of [-d / 2, d / 2]) {
+          local(x, z, rot, u, w, tmp);
+          if (!offRoad(tmp.x, tmp.z, 0.3)) clear = false;
+        }
+      }
+      if (!clear) continue;
+      shelter(chunks.detailAt(x, z), colliderFor(-5), L, x, z, rot, len, d, rank ? SHELTER_GREY : SHELTER_BLUE);
+      // Posts on both long sides and the bench along the back.
+      const np = Math.max(2, Math.round(len / 3.5) + 1);
+      for (let i = 0; i < np; i++) {
+        const px = -len / 2 + (i * len) / (np - 1);
+        localObstacle(x, z, rot, px, -d / 2 + 0.2, 0.12);
+        localObstacle(x, z, rot, px, d / 2 - 0.2, 0.12);
+      }
+      for (let u = -len / 2 + 0.6; u <= len / 2 - 0.6; u += 0.6) localObstacle(x, z, rot, u, -d / 2 + 0.5, 0.3);
     }
     if (!rank) continue;
     for (let i = 0; i < ring.length; i += 2) {
@@ -326,7 +379,9 @@ export function buildProps(ctx) {
       for (let t = 1; t < len - 1; t += 3 / density) {
         const x = ax + ((ring[j] - ax) / len) * t;
         const z = az + ((ring[j + 1] - az) / len) * t;
-        if (!world.buildingAt(x, z)) bollard(chunks.detailAt(x, z), L, x, z, 5);
+        if (world.buildingAt(x, z) || !offRoad(x, z, 0.4)) continue;
+        bollard(chunks.detailAt(x, z), L, x, z, 5);
+        obstacle(x, z, 0.16);
       }
     }
   }
@@ -354,7 +409,9 @@ export function buildProps(ctx) {
     if (!clear) continue;
     placed.push([x, z]);
     // Face the road, angled a little so passing traffic sees it.
-    billboard(chunks.at(x, z), colliderFor(-6), L, x, 0, z, Math.atan2(-ox, -oz) + 0.35 * (rng() - 0.5), ad++ % 8, signs.adLayers, 21, 4.5);
+    const rot = Math.atan2(-ox, -oz) + 0.35 * (rng() - 0.5);
+    billboard(chunks.at(x, z), colliderFor(-6), L, x, 0, z, rot, ad++ % 8, signs.adLayers, 21, 4.5);
+    for (const px of [-6.4 / 3, 6.4 / 3]) localObstacle(x, z, rot, px, -0.15, 0.25);
   }
   for (const f of frontages) {
     const b = f.b;
@@ -382,5 +439,5 @@ export function buildProps(ctx) {
   lightPools.count = n;
   lightPools.visible = false;
   lightPools.renderOrder = 2;
-  return { lightPools, palms };
+  return { lightPools, palms, obstacles, anchors };
 }

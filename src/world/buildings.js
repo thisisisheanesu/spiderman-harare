@@ -154,11 +154,19 @@ export function planBuilding(b, ctx) {
   spec.solar = spec.cls === 1 ? rng() < 0.6 : rng() < 0.2;
 
   // Hip roofs: ridge a little above the physics roof (b.h), eaves below, so the average matches.
+  // Landmarks (Parliament House, the station) get the exact shape instead: eaves at b.h, where
+  // the physics extrusion ends, and the roof faces themselves in the collider (solidRoof).
   if (spec.roof === 'hip') {
     const pitch = spec.roofLayer === 'tiles' ? 0.52 : 0.38;
     const rise = Math.min(2.4, Math.max(0.6, (obb.wid / 2 + 0.4) * Math.tan(pitch)), b.h + 0.5 - 2.4);
-    spec.ridgeY = b.h + 0.5;
-    spec.eaveY = spec.ridgeY - Math.max(0.5, rise);
+    if (b.lm) {
+      spec.eaveY = b.h;
+      spec.ridgeY = b.h + Math.max(0.5, rise);
+      spec.solidRoof = true;
+    } else {
+      spec.ridgeY = b.h + 0.5;
+      spec.eaveY = spec.ridgeY - Math.max(0.5, rise);
+    }
     spec.wallTop = spec.eaveY;
   } else {
     spec.wallTop = b.h;
@@ -199,7 +207,8 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
   const frontages = [];
   const { fh, wallTop } = spec;
   const flat = spec.roof === 'flat';
-  // Landmarks may end their standard walls below b.h and build their own top (Joina City's drum).
+  // spec.roofY could end the standard walls below b.h, but physics extrudes every footprint up to
+  // b.h, so anything built that way must fill the gap itself (no landmark does this now).
   const roofY = spec.roofY ?? b.h;
   const parapetTop = flat && spec.parapet ? roofY + PARAPET : Math.min(wallTop, roofY);
   const bandTint = tint('#ffffff', 0.93).map((v, i) => Math.round((v * spec.tint[i]) / 255));
@@ -246,8 +255,11 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
         gb.wall(ax, az, bx, bz, top, parapetTop, nx, nz, 0, len / tileW.concrete, top / 4, parapetTop / 4);
       }
     }
-    // Parapet: inner face + cap (detail: only visible up close).
+    // Parapet: inner face + cap (detail: only visible up close). In the CBD core the parapet is
+    // solid as well (cap + outer face above the physics roof; the extrusion stops at b.h), so
+    // feet perched on a roof edge stand on the lip instead of sinking behind it.
     if (flat && spec.parapet) {
+      const solid = !!b.core;
       const inner = offsetRing(ring, normals, -0.28);
       detail.brush(bandTint, L.concrete, seed, 2);
       for (let i = 0; i < n; i++) {
@@ -266,6 +278,11 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
         const dz = inner[j * 2 + 1];
         detail.wall(cx, cz, dx, dz, roofY, parapetTop, -nx, -nz, 0, len / 4, 0, PARAPET / 4);
         detail.quad(ax, parapetTop, az, bx, parapetTop, bz, dx, parapetTop, dz, cx, parapetTop, cz, 0, 1, 0, 0, 0, len / 4, 0.07);
+        if (solid) {
+          col.quad(ax, parapetTop, az, bx, parapetTop, bz, dx, parapetTop, dz, cx, parapetTop, cz, 0, 1, 0, 0, 0, 1, 1);
+          // (a fullCollider copy of the base buffer already holds the outer face)
+          if (!spec.fullCollider) col.wall(ax, az, bx, bz, roofY, parapetTop, nx, nz, 0, 1, 0, 1);
+        }
       }
     }
   });
@@ -275,7 +292,7 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
     gb.brush(spec.roofTint, L[layer], seed, spec.roofKind ?? 2, spec.cls, spec.glass);
     gb.polygon(fp, holes, roofY, tileW[layer]);
   } else {
-    emitHipRoof(fp, spec, gb, L, tileW, seed);
+    emitHipRoof(fp, spec, gb, L, tileW, seed, spec.solidRoof ? col : null);
   }
   if (base > 0) {
     gb.brush(bandTint, L.concrete, seed, 2);
@@ -286,7 +303,7 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
   for (const f of frontages) {
     const { street } = f;
     if (spec.verandah && street.avail > 1.6) {
-      f.canopy = emitVerandah(f, spec, detail, col, L, rng, Math.min(3.2, street.avail - 0.35));
+      f.canopy = emitVerandah(f, spec, detail, col, L, rng, Math.min(3.2, street.avail - 0.35), ctx.obstacles);
     } else if (spec.canopy && street.avail > 1.9 && rng() < spec.canopy) {
       f.canopy = emitCanopy(f, spec, detail, col, L, rng, Math.min(3.0, street.avail - 0.5));
     }
@@ -327,7 +344,7 @@ function copyTriangles(gb, i0, col) {
 
 // Hip roof from the oriented box: every footprint vertex (pushed out for the eaves overhang)
 // climbs to the nearest point of a ridge segment along the long axis.
-function emitHipRoof(fp, spec, gb, L, tileW, seed) {
+function emitHipRoof(fp, spec, gb, L, tileW, seed, col) {
   const { obb, eaveY, ridgeY } = spec;
   const over = 0.45;
   const normals = edgeNormals(fp, true);
@@ -387,6 +404,13 @@ function emitHipRoof(fp, spec, gb, L, tileW, seed) {
       if (up(a, rb, ra)) gb.tri(a, rb, ra);
       else gb.tri(a, ra, rb);
     }
+    if (col) {
+      const ca = col.vertex(ax, eave, az, 0, 1, 0, 0, 0);
+      const cb = col.vertex(bx, eave, bz, 0, 1, 0, 0, 0);
+      const cr = col.vertex(rbx, ridgeY, rbz, 0, 1, 0, 0, 0);
+      col.tri(ca, cb, cr);
+      if (!same) col.tri(ca, cr, col.vertex(rax, ridgeY, raz, 0, 1, 0, 0, 0));
+    }
     // Fascia board under the eave edge.
     gb.setLayer(L.concrete);
     gb.wall(ax, az, bx, bz, eave - 0.18, eave, -ix, -iz, 0, len / 4, 0, 0.05);
@@ -427,14 +451,17 @@ function emitCanopy(f, spec, gb, col, L, rng, depth) {
     gb.quad(x - 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 + 0.2, x - 0.2, y - 0.01, depth * 0.55 + 0.2, 0, -1, 0, u0, v0, u1, v1);
   }
   gb.clearTransform();
+  // Physics: the slab plus the upstand along its front edge (a face, not a box: 2 triangles).
   col.setTransform(mx, 0, mz, rot);
-  col.box(0, y, depth / 2, w, t + 0.45, depth, 1);
+  col.box(0, y, depth / 2, w, t, depth, 1);
+  col.quad(-w / 2, y + t, depth - 0.1, w / 2, y + t, depth - 0.1, w / 2, y + t + 0.45, depth - 0.1, -w / 2, y + t + 0.45, depth - 0.1, 0, 0, 1, 0, 0, 1, 1);
   col.clearTransform();
   return { depth, top: y + t, front: depth - 0.1, rot, mx, mz };
 }
 
-// Colonial verandah: light sloping iron roof on slender posts along the kerb.
-function emitVerandah(f, spec, gb, col, L, rng, depth) {
+// Colonial verandah: light sloping iron roof on slender posts along the kerb. The posts are
+// pushed to `obstacles` (pedestrian avoidance) when given.
+function emitVerandah(f, spec, gb, col, L, rng, depth, obstacles) {
   const { ax, az, bx, bz, nx, nz, len } = f;
   const mx = (ax + bx) / 2;
   const mz = (az + bz) / 2;
@@ -457,10 +484,13 @@ function emitVerandah(f, spec, gb, col, L, rng, depth) {
     const x = -w / 2 + 0.15 + (k * (w - 0.3)) / (nPosts - 1);
     gb.cylinder(x, 0, depth - 0.1, 0.07, y1 - 0.3, 6, 1, false);
     gb.box(x, 0, depth - 0.1, 0.2, 0.25, 0.2, 1);
+    obstacles?.push({ x: mx + nz * x + nx * (depth - 0.1), z: mz - nx * x + nz * (depth - 0.1), r: 0.2 });
   }
   gb.clearTransform();
+  // Physics: the sloping sheet itself (standing on it you are on the iron, not above it) + fascia.
   col.setTransform(mx, 0, mz, rot);
-  col.box(0, y1 - 0.3, depth / 2, w, y - y1 + 0.3, depth, 1);
+  col.quad(-w / 2, y, 0, w / 2, y, 0, w / 2, y1, depth, -w / 2, y1, depth, 0, 1, 0, 0, 0, 1, 1);
+  col.box(0, y1 - 0.3, depth - 0.05, w, 0.3, 0.08, 1);
   col.clearTransform();
   return { depth, top: y1, front: depth - 0.05, rot, mx, mz, verandah: true };
 }

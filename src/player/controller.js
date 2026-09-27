@@ -30,7 +30,15 @@ const DIVE_GLIDE = 16;
 const CENTER_Y = 0.95;
 const VAULT_MAX = 1.25;
 const MAX_STEP = 0.3;
+const EDGE_FOOTING = 0.45; // contact pushes at least this much upwards (sine) count as ground
 const BOUNDS_MARGIN = 150;
+// Leaving a perch with a big drop below (the RBZ crown) turns into a head-first plunge down the
+// facade: little horizontal drift, no forward carve, until close to what is below or a web catches.
+const PLUNGE_DROP = 45;
+const PLUNGE_OUT = 4.5; // m/s outward hop when diving off
+const PLUNGE_HS = 5.5; // max horizontal drift while plunging
+const PLUNGE_DRIFT = 3.5; // ...and the least
+const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, x) => {
@@ -83,11 +91,24 @@ export class Controller {
     this.trickT = 0;
     this.trickDur = 0;
     this.runTime = 0;
+    this.standTime = 0;
+    this.wallTime = 0;
     this.coyote = 0;
     this.jumpHeld = false;
     this.airTime = 0;
     this.impactVy = 0;
     this.wallImpact = 0;
+    this.plunge = false;
+    this.plungeArmed = false;
+    this.contact = {
+      hit: false,
+      ground: false,
+      wall: false,
+      ceiling: false,
+      delta: new THREE.Vector3(),
+      groundNormal: new THREE.Vector3(0, 1, 0),
+      wallNormal: new THREE.Vector3(),
+    };
   }
 
   get center() {
@@ -99,11 +120,14 @@ export class Controller {
     this.vault.active = false;
     this.clearActions();
     this.airTime = 0;
+    this.swing.lateBoost = 0;
   }
 
   clearActions() {
     this.landMode = null;
     this.trick = null;
+    this.plunge = false;
+    this.plungeArmed = false;
   }
 
   emit(type, payload) {
@@ -115,10 +139,13 @@ export class Controller {
     this._readInput(this.game.input);
     this.wall.cooldown -= dt;
     this.swing.retry -= dt;
+    this.swing.lateBoost -= dt;
     this.coyote -= dt;
     if (this.landMode && (this.landT += dt) >= this.landDur) this.landMode = null;
     if (this.trick && (this.trickT += dt) >= this.trickDur) this.trick = null;
     this.airTime = p.state === 'air' || p.state === 'dive' ? this.airTime + dt : 0;
+    this.standTime = p.state === 'ground' || p.state === 'perch' ? this.standTime + dt : 0;
+    this.wallTime = p.state === 'wall' ? this.wallTime + dt : 0;
 
     this._buttons(this.game.input);
 
@@ -178,11 +205,13 @@ export class Controller {
         if (this.landMode !== 'hard' || this.landT > 0.3) this.launch(v.x, JUMP_V, v.z);
         break;
       case 'air':
-        if (this.coyote > 0) this.launch(v.x, JUMP_V, v.z);
+        // Tapped just after a swing let go by itself: still the boosted release.
+        if (this.swing.lateBoost > 0) this.swing.boost();
+        else if (this.coyote > 0) this.launch(v.x, JUMP_V, v.z);
         break;
       case 'perch':
         _a.copy(this.perchOut).multiplyScalar(5).addScaledVector(this.camFwd, 3);
-        this.launch(_a.x, JUMP_V * 0.85, _a.z);
+        this.leaveHighPerch(_a.x, JUMP_V * 0.85, _a.z);
         break;
       case 'wall':
         this.wall.jump();
@@ -204,7 +233,37 @@ export class Controller {
     this.coyote = 0;
     this.jumpHeld = true;
     this.landMode = null;
+    this.plunge = false;
+    this.plungeArmed = false;
     this.emit('player:jump', { pos: p.position.clone() });
+  }
+
+  // Leap / step off a perch; over a big drop the fall turns into a head-first plunge.
+  leaveHighPerch(vx, vy, vz) {
+    const high = this.p.state === 'perch' && this._perchDrop() > PLUNGE_DROP;
+    this.launch(vx, vy, vz);
+    this.plungeArmed = high;
+  }
+
+  _perchDrop() {
+    const p = this.p;
+    const x = p.position.x + this.perchOut.x * 2.5;
+    const z = p.position.z + this.perchOut.z * 2.5;
+    return p.position.y - this.floorAt(x, z);
+  }
+
+  // Roof / terrain height under x, z (lookups only, no ray cast).
+  floorAt(x, z) {
+    const g = this.game.city?.heightAt?.(x, z);
+    return Math.max(this.world.roofHeightAt(x, z), Number.isFinite(g) ? g : 0);
+  }
+
+  _startPlunge() {
+    this.p.state = 'dive';
+    this.plunge = true;
+    this.plungeArmed = false;
+    this.trick = null;
+    this.game.cameraRig?.fovKick?.(6);
   }
 
   _divePressed() {
@@ -212,13 +271,19 @@ export class Controller {
     const v = p.velocity;
     if (p.state === 'dive') {
       p.state = 'air';
+      this.plunge = false;
       return;
     }
     if (p.state === 'perch') {
-      // Swan dive off the ledge: a small hop out, then head-first.
-      v.copy(this.perchOut).multiplyScalar(8);
+      // Swan dive off the ledge: a small hop out, then head-first (straight down a tall facade).
+      const high = this._perchDrop() > PLUNGE_DROP;
+      v.copy(this.perchOut).multiplyScalar(high ? PLUNGE_OUT : 8);
       v.y = 4;
       this.emit('player:jump', { pos: p.position.clone() });
+      if (high) {
+        this._startPlunge();
+        return;
+      }
     } else {
       if (p.state === 'wall') this.wall.leave(4);
       else if (p.state !== 'air') return;
@@ -234,14 +299,15 @@ export class Controller {
 
   // Rotate the horizontal velocity towards the input direction (keeps speed): swings and jumps go
   // where the stick / camera points instead of drifting.
-  steerTowardsWish(h, rate) {
+  // (`toward`: steer towards this direction instead, at the input's strength.)
+  steerTowardsWish(h, rate, toward = this.wish) {
     const wl = this.wish.length();
     if (wl < 0.2) return;
     const v = this.p.velocity;
     const hs = Math.hypot(v.x, v.z);
     if (hs < 2) return;
     const cur = Math.atan2(v.x, v.z);
-    let d = Math.atan2(this.wish.x, this.wish.z) - cur;
+    let d = Math.atan2(toward.x, toward.z) - cur;
     d = Math.atan2(Math.sin(d), Math.cos(d));
     const a = cur + clamp(d, -rate * wl * h, rate * wl * h);
     v.x = Math.sin(a) * hs;
@@ -262,21 +328,35 @@ export class Controller {
   // ---------------------------------------------------------------- collision
 
   // Push the capsule out of the city; records impact speeds and removes velocity into contacts.
+  // The result is the controller's own copy (world.collideCapsule recycles its result objects), so
+  // callers may hold it until the next collide().
   collide() {
     const p = this.p;
     const r = p.radius;
     _segA.set(p.position.x, p.position.y + r, p.position.z);
     _segB.set(p.position.x, p.position.y + p.height - r, p.position.z);
-    const res = this.world.collideCapsule(_segA, _segB, r);
+    const hit = this.world.collideCapsule(_segA, _segB, r);
+    const res = this.contact;
+    res.hit = hit.hit;
+    res.ground = hit.ground;
+    res.wall = hit.wall;
+    res.ceiling = !!hit.ceiling;
+    res.delta.copy(hit.delta);
+    res.groundNormal.copy(hit.groundNormal);
+    res.wallNormal.copy(hit.wallNormal);
     if (!res.hit) return res;
     p.position.set(_segA.x, _segA.y - r, _segA.z);
     const v = p.velocity;
     this.impactVy = -v.y;
+    // Feet on a convex edge (an eave, a kerb-like step, a roof lip) push out diagonally, which the
+    // world reads as a wall below 53 degrees; mostly-upwards pushes while coming down are footing.
+    if (!res.ground && v.y <= 0 && res.delta.y > EDGE_FOOTING * res.delta.length()) res.ground = true;
     if (res.ground && v.y < 0) v.y = 0;
     if (res.ceiling && v.y > 0) v.y = 0;
     this.wallImpact = 0;
-    // Rolling over a roof edge also reports a (bogus, inward-facing) wall: only trust walls that are
-    // really there at knee height.
+    // A wall contact from something below the knee (a step's edge) is not a wall to stop at: the
+    // capsule rides up over it. (Still needed with push-direction contacts: the edge of a 0.2-0.3 m
+    // step pushes out at ~30 degrees, which would otherwise stop a run dead.)
     if (res.wall && !this._wallAtKnee(res.wallNormal)) res.wall = false;
     if (res.wall) {
       const into = v.dot(res.wallNormal);
@@ -381,23 +461,37 @@ export class Controller {
   _air(h, dive) {
     const p = this.p;
     const v = p.velocity;
+    if (this.plungeArmed && v.y < -1) {
+      this._startPlunge();
+      dive = true;
+    }
     let g = dive ? DIVE_G : G;
     if (!dive && this.jumpHeld && v.y > 0) g *= JUMP_HOLD_GRAVITY;
     v.y -= g * h;
     v.multiplyScalar(1 - (dive ? DIVE_DRAG : AIR_DRAG) * v.length() * h);
     // Air control steers but never adds speed beyond what you already carry.
     const hs0 = Math.hypot(v.x, v.z);
-    const accel = dive ? 14 : AIR_ACCEL;
+    // (A plunge is cinematic: the drift stays straight out from the facade whatever the stick says.)
+    const accel = this.plunge ? 0 : dive ? 14 : AIR_ACCEL;
     v.x += this.wish.x * accel * h;
     v.z += this.wish.z * accel * h;
-    if (hs0 > 10) this.steerTowardsWish(h, AIR_TURN);
+    if (hs0 > 10 && !this.plunge) this.steerTowardsWish(h, AIR_TURN);
     const hs1 = Math.hypot(v.x, v.z);
     const cap = Math.max(hs0, dive ? 22 : 10);
     if (hs1 > cap) {
       v.x *= cap / hs1;
       v.z *= cap / hs1;
     }
-    if (dive && hs1 < DIVE_GLIDE) {
+    if (dive && this.plunge) {
+      // Plunging down a facade: a steady drift out from it (air drag would stall it against the
+      // piers); near the bottom the normal carve takes over.
+      const drift = clamp(hs1, PLUNGE_DRIFT, PLUNGE_HS);
+      if (hs1 > 0.1 && drift !== hs1) {
+        v.x *= drift / hs1;
+        v.z *= drift / hs1;
+      }
+      if (p.position.y - this.floorAt(p.position.x, p.position.z) < PLUNGE_END) this.plunge = false;
+    } else if (dive && hs1 < DIVE_GLIDE) {
       // Head-first dives carve forward instead of dropping straight down the building face.
       const k = (DIVE_GLIDE - hs1) * (1 - Math.exp(-1.6 * h));
       v.x -= Math.sin(p.heading) * k;
@@ -421,6 +515,8 @@ export class Controller {
     const hs = Math.hypot(v.x, v.z);
     p.state = 'ground';
     this.trick = null;
+    this.plunge = false;
+    this.plungeArmed = false;
     this.landT = 0;
     if (vy > 26 || (wasDive && vy > 16)) {
       this.landMode = 'hard';
@@ -491,7 +587,7 @@ export class Controller {
     const wl = this.wish.length();
     if (wl < 0.3) return;
     if (this.wish.dot(this.perchOut) > 0.4 * wl) {
-      this.launch(this.perchOut.x * 5, 5.5, this.perchOut.z * 5);
+      this.leaveHighPerch(this.perchOut.x * 5, 5.5, this.perchOut.z * 5);
     } else {
       p.state = 'ground';
       p.position.addScaledVector(this.perchOut, -0.3);

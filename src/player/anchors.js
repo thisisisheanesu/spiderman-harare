@@ -96,9 +96,10 @@ function visible(world, a, b, slack = 1.2) {
 
 const bump = (x, c, w) => Math.max(0, 1 - Math.abs(x - c) / w);
 const TOP_K = 6;
-const _best = Array.from({ length: TOP_K }, () => ({ score: -Infinity, x: 0, y: 0, z: 0, nx: 0, nz: 0, side: 1, id: -1 }));
+const _best = Array.from({ length: TOP_K }, () => ({ score: -Infinity, x: 0, y: 0, z: 0, nx: 0, nz: 0, side: 1, id: -1, kind: 0 }));
+const KINDS = ['roof', 'facade', 'prop'];
 
-function pushCandidate(score, x, y, z, nx, nz, side, id) {
+function pushCandidate(score, x, y, z, nx, nz, side, id, kind) {
   if (score <= _best[TOP_K - 1].score) return;
   let i = TOP_K - 1;
   const slot = _best[i];
@@ -107,65 +108,193 @@ function pushCandidate(score, x, y, z, nx, nz, side, id) {
     i--;
   }
   _best[i] = slot;
-  Object.assign(slot, { score, x, y, z, nx, nz, side, id });
+  slot.score = score;
+  slot.x = x;
+  slot.y = y;
+  slot.z = z;
+  slot.nx = nx;
+  slot.nz = nz;
+  slot.side = side;
+  slot.id = id;
+  slot.kind = kind;
 }
 
-// Best swing anchor on a roof edge ahead of `dir` (horizontal unit vector) and above `from` (the hand).
-// opts: {speed, fall (downward speed), side (+1 right / -1 left, gently alternates hands)}.
-// Falling fast, level anchors still catch you, so the elevation limits relax.
-// Writes {point, normal, side, buildingId} into out.
+// Swing-anchor search state for one query (module scratch, so scoring allocates nothing).
+const Q = { world: null, fx: 0, fy: 0, fz: 0, dx: 0, dz: 0, minRise: 0, minElev: 0, idealElev: 0, prefSide: 1, alt: 0, minRope: 0, rise: 0, liftMax: 0, planar: 0 };
+const FACADE_BELOW_ROOF = 1.5; // facade anchors stay this far under the roof edge
+export const SIDE_CLEAR = 3; // the swing pivot stays at least this far to the side of its anchor
+const MAX_REACH = 82;
+
+// Score one candidate anchor at (x, y, z) whose surface faces (nx, nz) (0, 0: no facing, e.g. a
+// lamp post); corner = 0..1 bonus; kind indexes KINDS; kept in the top-K list if good enough.
+function scoreAnchor(x, y, z, nx, nz, corner, id, kind) {
+  const rx = x - Q.fx;
+  const rz = z - Q.fz;
+  const ry = y - Q.fy;
+  if (ry < Q.minRise) return;
+  const hd = Math.hypot(rx, rz);
+  if (hd < 2) return;
+  const d = Math.hypot(hd, ry);
+  if (d < 9 || d > MAX_REACH) return;
+  const elev = Math.atan2(ry, hd);
+  if (elev < Q.minElev || elev > 1.35) return;
+  const fwd = (rx * Q.dx + rz * Q.dz) / hd;
+  if (fwd < 0.15) return;
+  const lat = (rx * -Q.dz + rz * Q.dx) / hd;
+  const facing = Math.max(0, -(nx * rx + nz * rz) / hd);
+  // Altitude: a rope of about this length (to the pivot, lifted over low anchors) would bottom out
+  // at pivot - d. Anchors that would drag the swing below the comfortable street clearance, or need
+  // a long reel-in to avoid it, score lower.
+  const lift = ry >= -1 ? Math.min(Q.liftMax, Math.max(0, Q.fy + Q.rise - y)) : 0;
+  const rope = Math.max(Q.minRope, y + lift - Q.alt);
+  let score =
+    1.3 * fwd -
+    ((elev - Q.idealElev) / 0.45) ** 2 -
+    ((d - 32) / 26) ** 2 +
+    0.25 * corner +
+    0.35 * facing +
+    Math.min(0.5, ry / 50) +
+    0.35 * bump(Math.abs(lat), 0.45, 0.35) +
+    (lat * Q.prefSide > 0.1 ? 0.15 : 0) -
+    0.8 * Math.min(2, Math.max(0, d - rope) / 16);
+  if (score <= _best[TOP_K - 1].score) return;
+  // The swing bottoms out under the pivot (the anchor slid towards the line of travel) and rises
+  // beyond it: a building standing there, taller than the arc, means swinging into its wall.
+  // (Checked a body's width towards the anchor's side, where its building is.)
+  const la = Math.abs(lat * hd);
+  const slide = Math.min(la, Math.max(la * Q.planar, SIDE_CLEAR));
+  const off = Math.sign(lat) * Math.max(0, slide - 1.2);
+  const px = x + Q.dz * off;
+  const pz = z - Q.dx * off;
+  const low = Math.min(y + lift - rope, Q.fy - 1.5) + 1;
+  if (blockedAt(px + Q.dx * 2, pz + Q.dz * 2, low) || blockedAt(px + Q.dx * rope * 0.7, pz + Q.dz * rope * 0.7, low + 3)) {
+    score -= 1.6;
+  }
+  pushCandidate(score, x, y, z, nx, nz, lat >= 0 ? 1 : -1, id, kind);
+}
+
+function blockedAt(x, z, y) {
+  const b = Q.world.buildingAt(x, z);
+  return !!b && b.h > y && (b.minH || 0) < y;
+}
+
+// Best swing anchor ahead of `dir` (horizontal unit vector) and above `from` (the hand).
+// Candidates: roof-edge points (corners preferred); on buildings that tower over the hand, points on
+// the facade at the ideal elevation (the web sticks to the wall there), so tall buildings carry
+// swings at any height; and, only when no building qualifies, the street furniture / trees that
+// opts.fallback(x, z, r) returns (see readFallback). Falling fast, level anchors still catch you,
+// so the elevation limits relax.
+// opts: {speed, fall (downward speed), side (+1 right / -1 left, gently alternates hands),
+//        street (ground height under the hand), alt (preferred lowest swing height above the street),
+//        minRope, pivotRise / liftMax (how the swing lifts its pivot over low anchors), planar (how far
+//        the pivot slides from the anchor to the line of travel), fallback?, accept? (point => bool:
+//        prefer candidates it approves of, e.g. a clear swing arc)}.
+// Writes {point, normal, side, buildingId, kind: 'roof'|'facade'|'prop', clear (accept() approved)}
+// into out.
 export function findSwingAnchor(world, from, dir, opts, out) {
   for (const c of _best) c.score = -Infinity;
   const speed = opts.speed;
-  const catchK = Math.min(1, Math.max(0, (opts.fall - 10) / 30));
-  const minRise = 3.5 - 5.5 * catchK;
-  const minElev = 0.28 - 0.4 * catchK;
-  const idealElev = 0.85 - 0.6 * catchK;
-  const preferSide = opts.side;
+  const catchK = Math.min(1, Math.max(0, (opts.fall - 4) / 22));
+  Q.fx = from.x;
+  Q.fy = from.y;
+  Q.fz = from.z;
+  Q.dx = dir.x;
+  Q.dz = dir.z;
+  Q.minRise = 3.5 - 5.5 * catchK;
+  Q.minElev = 0.28 - 0.4 * catchK;
+  Q.idealElev = 0.85 - 0.6 * catchK;
+  Q.prefSide = opts.side;
+  Q.alt = (opts.street || 0) + (opts.alt || 0);
+  Q.world = world;
+  Q.planar = opts.planar || 0;
+  Q.minRope = opts.minRope || 8;
+  // Hand -> body centre is ~1 m, so the pivot rise over the body is measured from about the hand.
+  Q.rise = (opts.pivotRise || 0) - 1;
+  Q.liftMax = opts.liftMax || 0;
+  const tanIdeal = Math.tan(Math.max(0.2, Q.idealElev));
   const ahead = 16 + Math.min(speed, 40) * 0.5;
-  const buildings = world.buildingsNear(from.x + dir.x * ahead, from.z + dir.z * ahead, 62);
-  const rightX = -dir.z;
-  const rightZ = dir.x;
-  for (const b of buildings) {
+  const cx = from.x + dir.x * ahead;
+  const cz = from.z + dir.z * ahead;
+  const buildings = world.buildingsNear(cx, cz, 62);
+  for (let k = 0; k < buildings.length; k++) {
+    const b = buildings[k];
     const ry = b.h - from.y;
-    if (b.h < 6 || ry < minRise) continue;
+    if (b.h < 6 || ry < Q.minRise) continue;
     const pts = edgePoints(b);
+    const top = b.h - FACADE_BELOW_ROOF;
+    const low = Math.max(from.y + Q.minRise, (b.minH || 0) + 1);
     for (let i = 0; i < pts.length; i += 5) {
-      const rx = pts[i] - from.x;
-      const rz = pts[i + 1] - from.z;
-      const hd = Math.hypot(rx, rz);
-      if (hd < 2) continue;
-      const d = Math.hypot(hd, ry);
-      if (d < 9 || d > 82) continue;
-      const elev = Math.atan2(ry, hd);
-      if (elev < minElev || elev > 1.35) continue;
-      const fwd = (rx * dir.x + rz * dir.z) / hd;
-      if (fwd < 0.15) continue;
-      const lat = (rx * rightX + rz * rightZ) / hd;
-      const facing = Math.max(0, -(pts[i + 2] * rx + pts[i + 3] * rz) / hd);
-      const score =
-        1.3 * fwd -
-        ((elev - idealElev) / 0.45) ** 2 -
-        ((d - 32) / 26) ** 2 +
-        0.25 * pts[i + 4] +
-        0.35 * facing +
-        Math.min(0.5, ry / 50) +
-        0.35 * bump(Math.abs(lat), 0.45, 0.35) +
-        (lat * preferSide > 0.1 ? 0.15 : 0);
-      pushCandidate(score, pts[i], b.h, pts[i + 1], pts[i + 2], pts[i + 3], lat >= 0 ? 1 : -1, b.id);
+      const x = pts[i];
+      const z = pts[i + 1];
+      scoreAnchor(x, b.h, z, pts[i + 2], pts[i + 3], pts[i + 4] ? 1 : 0, b.id, 0);
+      // The same spot lower down the wall, at the height that gives the ideal web angle.
+      const fy = from.y + Math.hypot(x - from.x, z - from.z) * tanIdeal;
+      if (fy < top && fy >= low) scoreAnchor(x, fy, z, pts[i + 2], pts[i + 3], 0.4, b.id, 1);
     }
   }
+  const found = pickVisible(world, from, out, opts.accept);
+  if (found || !opts.fallback) return found;
+  // No building anchor qualifies (low-rise streets): street lights and trees.
+  for (const c of _best) c.score = -Infinity;
+  if (!readFallback(opts.fallback(cx, cz, 62))) return null;
+  return pickVisible(world, from, out, opts.accept);
+}
+
+// Feed fallback anchors into the candidate list. Accepts an array of points
+// ({x, y, z}, {position: Vector3}, {point: Vector3}) or a flat [x, y, z, ...] number array.
+function readFallback(list) {
+  if (!list) return false;
+  let any = false;
+  if (typeof list[0] === 'number') {
+    for (let i = 0; i + 2 < list.length; i += 3) {
+      scoreAnchor(list[i], list[i + 1], list[i + 2], 0, 0, 0, -1, 2);
+      any = true;
+    }
+    return any;
+  }
+  for (let i = 0; i < list.length; i++) {
+    const a = list[i];
+    const p = a && (a.position || a.point || a);
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
+    scoreAnchor(p.x, p.y, p.z, 0, 0, 0, -1, 2);
+    any = true;
+  }
+  return any;
+}
+
+// Best of the ranked candidates the hand can actually see and `accept` (optional) approves of;
+// failing approval, the best visible one. Written into out.
+function pickVisible(world, from, out, accept) {
+  let spare = null;
   for (const c of _best) {
     if (c.score === -Infinity) break;
-    _v.set(c.x + c.nx * 0.05, c.y - 0.05, c.z + c.nz * 0.05);
+    anchorPoint(c, _v);
     if (!visible(world, from, _v)) continue;
-    out.point.copy(_v);
-    out.normal.set(c.nx, 0, c.nz);
-    out.side = c.side;
-    out.buildingId = c.id;
-    return out;
+    if (accept && !accept(_v)) {
+      if (!spare) spare = c;
+      continue;
+    }
+    out.clear = true;
+    return writeAnchor(c, from, out);
   }
-  return null;
+  if (!spare) return null;
+  out.clear = false;
+  return writeAnchor(spare, from, out);
+}
+
+function anchorPoint(c, p) {
+  if (c.kind === 2) return p.set(c.x, c.y, c.z);
+  return p.set(c.x + c.nx * 0.05, c.kind === 1 ? c.y : c.y - 0.05, c.z + c.nz * 0.05);
+}
+
+function writeAnchor(c, from, out) {
+  anchorPoint(c, out.point);
+  if (c.kind === 2) out.normal.set(from.x - c.x, 0, from.z - c.z).normalize();
+  else out.normal.set(c.nx, 0, c.nz);
+  out.side = c.side;
+  out.buildingId = c.id;
+  out.kind = KINDS[c.kind];
+  return out;
 }
 
 // Height of the first surface below (x, y, z) within maxDist, else `fallback` (street level).
