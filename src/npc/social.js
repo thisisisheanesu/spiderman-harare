@@ -168,7 +168,7 @@ export class Social {
         return;
       }
     }
-    if (t > this.remarkAt) {
+    if (t > this.remarkAt && REMARKS.length) {
       this.remarkAt = t + 5 + Math.random() * 7;
       const near = this.crowd.near(ctx.px, ctx.pz, 10, this.near).filter((a) => (a.state === 'chat' || a.state === 'walk') && !this.bubbles.hasBubble(a));
       if (near.length) {

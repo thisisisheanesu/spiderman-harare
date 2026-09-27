@@ -79,6 +79,8 @@ export class Simulation {
   }
 
   update(dt) {
+    // A zero-length frame (first frame, forced step) would turn the hard-gap clamp's ds / dt into NaN.
+    if (!(dt > 0)) return;
     this.time += dt;
     const vs = this.vehicles;
     for (let i = 0; i < vs.length; i++) this._request(vs[i]);
@@ -274,25 +276,30 @@ export class Simulation {
     }
   }
 
-  // A car turning off ahead is still in the way until it is DIVERGE metres into its own connector.
+  // A car turning off ahead is still in the way until it is DIVERGE metres into its own connector
+  // and past the stretch where that connector runs alongside ours.
   _diverging(v) {
     const p = v.path;
     const g = this._g;
     let from;
     let base;
+    let mine;
     if (p.isLane) {
       if (!v.next || g.kind === GAP_LINE || (g.leader && g.leader.path === p)) return;
       from = p;
       base = p.length - v.s;
+      mine = v.next;
     } else {
       from = p.from;
       base = -v.s;
+      mine = p;
     }
     for (const oc of from.out) {
-      if (oc === p || oc === v.next) continue;
+      if (oc === mine) continue;
+      const clear = Math.max(DIVERGE, oc.alongside[mine.outIndex]);
       for (const u of oc.vehicles) {
         const rear = u.s - u.length;
-        if (rear > DIVERGE || (!p.isLane && u.s <= v.s)) continue;
+        if (rear > clear || (!p.isLane && u.s <= v.s)) continue;
         const gap = base + rear;
         if (gap < g.gap) this._setGap(gap, u.speed, GAP_LEADER, u);
       }

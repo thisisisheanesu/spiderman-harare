@@ -13,7 +13,8 @@ export const PALETTE = {
   roofFlat: ['#d4d0c8', '#c8c4bb', '#bdb9b0', '#d9d3c6', '#b5b0a6', '#c9c0b0', '#a9a49b'],
   corrugated: ['#c7cacc', '#a9704a', '#9e4535', '#587a55', '#5a7394', '#5d5f61', '#7a5442', '#b8bcbd', '#8f5b3c'],
   tiles: ['#b25e3e', '#8b4e38', '#555352', '#a4432f', '#c0714a', '#7d4a3a'],
-  tanks: ['#3f6b3a', '#2f3133', '#3f6b3a', '#d8cfb8', '#3f6b3a', '#6b7a8a'],
+  // Green plastic JoJo tanks dominate Harare roofs.
+  tanks: ['#3f7d5a', '#3f7d5a', '#2f5f47', '#3f7d5a', '#2f3133', '#d8cfb8'],
   shopCanopy: ['#d9d4c9', '#c9c3b6', '#b8b1a3', '#8a8f93', '#e2ddd2', '#6f7c6a'],
   verandahPost: ['#35503f', '#f0ece2', '#6b2f2a', '#2f3f55'],
 };

@@ -33,6 +33,9 @@ const PLAYER_RANGE = 60;
 const _a = { x: 0, z: 0, dx: 0, dz: 0 };
 const _b = { x: 0, z: 0, dx: 0, dz: 0 };
 
+const DENSITY = TRAFFIC?.densityByHour;
+const DENSITY_HOURS = DENSITY ? Object.keys(DENSITY).map(Number).sort((a, b) => a - b) : [];
+
 function sampleChain(v, d, out) {
   if (d >= 0 || !v.prev) return v.path.sample(d, out);
   const d1 = v.prev.length + d;
@@ -48,9 +51,8 @@ function wrapAngle(a) {
 
 // Traffic density factor for an hour of the day, from the researched curve (never quite empty).
 function densityAt(hour) {
-  const curve = TRAFFIC?.densityByHour;
-  if (!curve) return 1;
-  const keys = Object.keys(curve).map(Number).sort((a, b) => a - b);
+  const keys = DENSITY_HOURS;
+  if (!keys.length || !Number.isFinite(hour)) return 1;
   let lo = keys[keys.length - 1];
   let hi = keys[0];
   for (const k of keys) {
@@ -62,7 +64,7 @@ function densityAt(hour) {
   }
   const span = (hi - lo + 24) % 24 || 24;
   const t = ((hour - lo + 24) % 24) / span;
-  const d = curve[lo] + (curve[hi] - curve[lo]) * t;
+  const d = DENSITY[lo] + (DENSITY[hi] - DENSITY[lo]) * t;
   return 0.72 + 0.28 * d;
 }
 
@@ -111,7 +113,7 @@ export class Traffic {
     this._lastFocus.copy(this.focus);
     this._updateNight(dt);
     this.signals.update(this.sim.time);
-    this.signals.updateLamps();
+    this.signals.updateLamps(game.camera.position);
     if (teleported) this._repopulate();
     else {
       this._despawn();
@@ -160,8 +162,7 @@ export class Traffic {
   // ---- population ------------------------------------------------------------------------------
 
   _desired() {
-    const hour = this.game.sky?.timeOfDay;
-    return Math.round(this.target * (typeof hour === 'number' ? densityAt(hour) : 1));
+    return Math.round(this.target * densityAt(this.game.sky?.timeOfDay));
   }
 
   _spawn(initial) {
@@ -200,11 +201,9 @@ export class Traffic {
     for (let i = vs.length - 1; i >= 0; i--) {
       const v = vs[i];
       const d = Math.hypot(v.position.x - this.focus.x, v.position.z - this.focus.z);
-      const seen = d < 300 && this.renderer.inView(v.position.x, 1, v.position.z, v.length);
-      const far = d > DESPAWN_RADIUS && (!seen || d > DESPAWN_RADIUS + 120);
       // Gridlock breaker: a vehicle that has not moved for a long time is quietly recycled.
-      const stuck = (v.stuck > 70 && (!seen || d > 90)) || v.stuck > 130;
-      if (far || stuck) this._remove(v);
+      const stuck = v.stuck > 130 || (v.stuck > 70 && (d > 90 || !this.renderer.inView(v.position.x, 1, v.position.z, v.length)));
+      if (d > DESPAWN_RADIUS || stuck) this._remove(v);
     }
   }
 

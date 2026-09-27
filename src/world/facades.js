@@ -218,9 +218,9 @@ const FACADE_STYLES = {
   eastgate: {
     tileW: 3.2,
     draw(p) {
-      p.rect(0, 0, 1, 1, '#d9c2ac');
+      p.rect(0, 0, 1, 1, '#cbbcae');
       for (let r = 0; r < 12; r++) {
-        for (let c = 0; c < 8; c++) p.rect(c / 8 + 0.004, r / 12 + 0.004, (c + 1) / 8 - 0.004, (r + 1) / 12 - 0.004, r % 2 ? '#e2cbb5' : '#d6bda6');
+        for (let c = 0; c < 8; c++) p.rect(c / 8 + 0.004, r / 12 + 0.004, (c + 1) / 8 - 0.004, (r + 1) / 12 - 0.004, r % 2 ? '#d6c3b1' : '#c9b4a2');
       }
       p.grime(0.25, 1);
       for (const x0 of [0.08, 0.54]) {

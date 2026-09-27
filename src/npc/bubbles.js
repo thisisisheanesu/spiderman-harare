@@ -92,7 +92,11 @@ export class Bubbles {
         b.agent = null;
         continue;
       }
-      if (t < b.born) continue;
+      // Delayed bubble (possibly on an item that was still showing someone else's words).
+      if (t < b.born) {
+        this._hide(b);
+        continue;
+      }
       const v = this._v.set(a.position.x, a.position.y + 2.05 * a.look.scale, a.position.z);
       const dist = v.distanceTo(cam.position);
       if ((b.checkT -= dt) <= 0) {

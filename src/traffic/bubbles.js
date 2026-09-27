@@ -77,11 +77,6 @@ export class SpeechBubbles {
     return n;
   }
 
-  isTalking(vehicle) {
-    for (const b of this.pool) if (b.vehicle === vehicle) return true;
-    return false;
-  }
-
   show(vehicle, call) {
     let slot = this.pool.find((b) => !b.vehicle);
     if (!slot) slot = this.pool.reduce((a, b) => (b.age > a.age ? b : a));

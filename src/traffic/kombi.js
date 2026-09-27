@@ -183,8 +183,9 @@ export class KombiLife {
         }
       }
     } else {
-      for (let v = -box.wid / 2 + 2; v < box.wid / 2 - 2; v += 2.7) {
-        for (let u = -box.len / 2 + 3; u < box.len / 2 - 3; u += 6.4) tryBay(u, v, rng() < 0.5 ? 1 : -1);
+      // tryBay parks along v: kombis stand side by side along u, rows one kombi length apart along v.
+      for (let v = -box.wid / 2 + 3; v < box.wid / 2 - 3; v += 6.4) {
+        for (let u = -box.len / 2 + 2; u < box.len / 2 - 2; u += 2.7) tryBay(u, v, rng() < 0.5 ? 1 : -1);
       }
     }
     // Best bays last: the caller pops from the end.

@@ -17,6 +17,9 @@ export const NONE = -1;
 const STATE_NAMES = ['green', 'amber', 'red'];
 const CLUSTER_DIST = 36;
 const MAJOR_RANK = ROAD_CLASSES.tertiary.rank;
+// Robots are only drawn within DRAW_DIST of the camera, re-packed every REPACK_MOVE metres it travels.
+const DRAW_DIST = 450;
+const REPACK_MOVE = 30;
 
 const LAMP_ON = [new THREE.Color(0.1, 1.0, 0.45).multiplyScalar(2.2), new THREE.Color(1.0, 0.55, 0.05).multiplyScalar(2.2), new THREE.Color(1.0, 0.07, 0.04).multiplyScalar(2.2)];
 const LAMP_OFF = [new THREE.Color(0.02, 0.07, 0.04), new THREE.Color(0.08, 0.05, 0.01), new THREE.Color(0.08, 0.015, 0.01)];
@@ -87,8 +90,9 @@ export class Signals {
     this.graph = graph;
     this.controllers = [];
     this.byNode = new Map();
-    this.heads = [];
-    this._first = true;
+    this.poses = [];
+    this._packedAt = new THREE.Vector3(Infinity, 0, 0);
+    this._dirty = true;
     this._find(data, rng);
   }
 
@@ -171,7 +175,10 @@ export class Signals {
   }
 
   update(time) {
-    for (const c of this.controllers) c.update(time);
+    for (const c of this.controllers) {
+      c.update(time);
+      if (c.changed) this._dirty = true;
+    }
   }
 
   // GREEN | AMBER | RED for a lane approaching a working robot, NONE otherwise.
@@ -201,9 +208,10 @@ export class Signals {
   }
 
   // Poles + back-to-back heads at the left kerb of every approach (plus the median side of one-way
-  // carriageways), merged into one static mesh; the lamps are one instanced mesh recoloured by phase.
+  // carriageways). Poles and lamps are two instanced meshes holding the robots near the camera
+  // (see updateLamps); the lamps are recoloured by phase.
   buildMeshes(scene) {
-    const poses = [];
+    const poses = this.poses;
     const seen = new Set();
     for (const lane of this.graph.lanes) {
       if (!lane.signal || lane.internal || lane.laneIndex !== 0) continue;
@@ -230,7 +238,8 @@ export class Signals {
       }
     }
 
-    const parts = [];
+    if (!poses.length) return;
+
     const color = new THREE.Color();
     const paint = (g, hex) => {
       const nv = g.attributes.position.count;
@@ -261,60 +270,72 @@ export class Signals {
       }
     }
     const unit = mergeGeometries(base.map((g) => g.toNonIndexed()), false);
-    const m = new THREE.Matrix4();
+
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
-    for (const pose of poses) {
-      q.setFromAxisAngle(up, Math.atan2(-pose.fx, -pose.fz));
-      m.compose(new THREE.Vector3(pose.x, 0, pose.z), q, new THREE.Vector3(1, 1, 1));
-      parts.push(unit.clone().applyMatrix4(m));
-    }
-    if (!parts.length) return;
-    const merged = mergeGeometries(parts, false);
-    const mesh = new THREE.Mesh(merged, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }));
-    mesh.name = 'robots';
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    scene.add(mesh);
-    this.poleMesh = mesh;
-
-    const lampGeo = new THREE.CircleGeometry(0.1, 10);
-    const lamps = new THREE.InstancedMesh(lampGeo, new THREE.MeshBasicMaterial({ toneMapped: false }), poses.length * 6);
-    lamps.name = 'robot-lamps';
+    const one = new THREE.Vector3(1, 1, 1);
     const pos = new THREE.Vector3();
     for (const pose of poses) {
+      q.setFromAxisAngle(up, Math.atan2(-pose.fx, -pose.fz));
+      pose.matrix = new THREE.Matrix4().compose(pos.set(pose.x, 0, pose.z), q, one);
+      pose.lamps = [];
       for (const side of [1, -1]) {
         // side 1 faces approaching drivers (-f); side -1 faces the far side.
-        const facing = Math.atan2(-pose.fx * side, -pose.fz * side);
-        q.setFromAxisAngle(up, facing);
+        q.setFromAxisAngle(up, Math.atan2(-pose.fx * side, -pose.fz * side));
         for (let k = 0; k < 3; k++) {
           pos.set(pose.x - pose.fx * side * 0.365, 2.95 + (1 - k) * 0.3, pose.z - pose.fz * side * 0.365);
-          m.compose(pos, q, new THREE.Vector3(1, 1, 1));
-          const i = this.heads.length;
-          lamps.setMatrixAt(i, m);
-          lamps.setColorAt(i, LAMP_OFF[2 - k]);
-          this.heads.push({ c: pose.c, g: pose.g, lamp: 2 - k });
+          pose.lamps.push({ matrix: new THREE.Matrix4().compose(pos, q, one), lamp: 2 - k });
         }
       }
     }
-    lamps.instanceMatrix.needsUpdate = true;
-    lamps.computeBoundingSphere();
-    scene.add(lamps);
+
+    const poles = new THREE.InstancedMesh(unit, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 }), poses.length);
+    poles.name = 'robots';
+    poles.castShadow = true;
+    poles.receiveShadow = true;
+    const lamps = new THREE.InstancedMesh(new THREE.CircleGeometry(0.1, 10), new THREE.MeshBasicMaterial({ toneMapped: false }), poses.length * 6);
+    lamps.name = 'robot-lamps';
+    lamps.setColorAt(0, LAMP_OFF[0]);
+    for (const mesh of [poles, lamps]) {
+      mesh.count = 0;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+    }
+    this.poles = poles;
     this.lamps = lamps;
   }
 
-  // Recolour lamps whose controller changed phase this frame.
-  updateLamps() {
+  // Re-packs the robots near the camera when it has moved far enough, and recolours their lamps
+  // whenever a controller changed phase.
+  updateLamps(camPos) {
     if (!this.lamps) return;
-    let dirty = false;
-    for (let i = 0; i < this.heads.length; i++) {
-      const h = this.heads[i];
-      if (!h.c.changed && !this._first) continue;
-      const on = !h.c.dead && h.c.state[h.g] === h.lamp;
-      this.lamps.setColorAt(i, on ? LAMP_ON[h.lamp] : LAMP_OFF[h.lamp]);
-      dirty = true;
+    const moved = this._packedAt.distanceToSquared(camPos) > REPACK_MOVE * REPACK_MOVE;
+    if (!moved && !this._dirty) return;
+    this._dirty = false;
+    if (moved) this._packedAt.copy(camPos);
+    const { poles, lamps } = this;
+    const cx = this._packedAt.x;
+    const cz = this._packedAt.z;
+    let n = 0;
+    let k = 0;
+    for (const pose of this.poses) {
+      const dx = pose.x - cx;
+      const dz = pose.z - cz;
+      if (dx * dx + dz * dz > DRAW_DIST * DRAW_DIST) continue;
+      if (moved) poles.setMatrixAt(n, pose.matrix);
+      n++;
+      const c = pose.c;
+      for (const l of pose.lamps) {
+        if (moved) lamps.setMatrixAt(k, l.matrix);
+        lamps.setColorAt(k++, !c.dead && c.state[pose.g] === l.lamp ? LAMP_ON[l.lamp] : LAMP_OFF[l.lamp]);
+      }
     }
-    this._first = false;
-    if (dirty) this.lamps.instanceColor.needsUpdate = true;
+    poles.count = n;
+    lamps.count = k;
+    lamps.instanceColor.needsUpdate = true;
+    if (moved) {
+      poles.instanceMatrix.needsUpdate = true;
+      lamps.instanceMatrix.needsUpdate = true;
+    }
   }
 }

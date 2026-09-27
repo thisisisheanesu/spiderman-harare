@@ -208,6 +208,22 @@ export function polylineDistance(a, b, limit) {
   return best;
 }
 
+// Arc length along `path` up to which it still passes within `limit` of the polyline `pts`.
+export function closeUntil(path, pts, limit) {
+  const p = path.pts;
+  const l2 = limit * limit;
+  let last = 0;
+  for (let i = 0; i < p.length; i += 2) {
+    for (let j = 0; j + 3 < pts.length; j += 2) {
+      if (pointSegD2(p[i], p[i + 1], pts[j], pts[j + 1], pts[j + 2], pts[j + 3]) < l2) {
+        last = path.cum[i >> 1];
+        break;
+      }
+    }
+  }
+  return last;
+}
+
 function pointSegD2(px, pz, ax, az, bx, bz) {
   const ex = bx - ax;
   const ez = bz - az;

@@ -92,7 +92,9 @@ float isFacade = 1.0 - step(0.5, fKind);
 float fGlass = isFacade * smoothstep(0.44, 0.6, fTex.a);
 float fLocalV = clamp((fTex.a - 0.5) * 2.0, 0.0, 1.0);
 float fBlindAmt = fR2 < 0.3 ? fR1 * 0.85 : 0.0;
-float fBlind = fGlass * step(1.0 - fBlindAmt, fLocalV) * (1.0 - step(1.5, fCls) * step(fCls, 2.5));
+// Blinds show through clear glass only (not tinted/reflective curtain glass), and not in shops.
+float fClearGlass = 1.0 - step(0.5, vFac.w) * (1.0 - step(6.5, vFac.w));
+float fBlind = fGlass * step(1.0 - fBlindAmt, fLocalV) * (1.0 - step(1.5, fCls) * step(fCls, 2.5)) * fClearGlass;
 vec3 fGlassTint = uGlass[int(vFac.w + 0.5)];
 vec3 fGlassCol = fTex.rgb * fGlassTint * (0.7 + 0.55 * fR1);
 vec3 fBlindCol = mix(vec3(0.72, 0.68, 0.6), vec3(0.6, 0.63, 0.66), step(0.5, fR1));

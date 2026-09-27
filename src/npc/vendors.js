@@ -383,9 +383,4 @@ export class Vendors {
     }
     this.game.scene.add(this.group);
   }
-
-  // Vendor call-outs for a stall (Shona + English), if the research lists any.
-  calloutsFor(stall) {
-    return stall.def.callouts || [];
-  }
 }

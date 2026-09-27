@@ -505,7 +505,7 @@ export class Crowd {
   _wait(a, dt, ctx) {
     const e = this.walk.edges[a.edge];
     a.speed = approach(a.speed, 0, 4 * dt);
-    a.s = Math.min(Math.min(0.35, e.kerb - 0.3), a.s + a.speed * dt);
+    a.s = Math.min(Math.min(0.35, Math.max(0, e.kerb - 0.3)), a.s + a.speed * dt);
     a.lat = approach(a.lat, Math.max(-e.spread, Math.min(e.spread, a.latGoal)), 0.8 * dt);
     this._place(a);
     a.vx = 0;
@@ -621,9 +621,11 @@ export class Crowd {
       this.startReaction(a, 'cover', dur, 0.1);
       return;
     }
-    // Running toward Spider-Man, or about to bolt into the road from the kerb? Turn around first.
+    // Running toward Spider-Man, or about to bolt into the road from the kerb (also while turned to
+    // watch him)? Turn around first.
     const toward = this._ux(a) * (px - a.position.x) + this._uz(a) * (pz - a.position.z) > 0;
-    if (toward || a.state === 'wait') this._turnAround(a);
+    const atKerb = a.state === 'wait' || (a.state === 'react' && a.resume === 'wait');
+    if (toward || atKerb) this._turnAround(a);
     if (a.state === 'react') a.state = 'walk';
     a.state = 'flee';
     a.timer = dur;

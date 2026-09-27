@@ -16,17 +16,52 @@ const DARK = tint('#3d4246');
 const CONCRETE = tint('#cfc9bd');
 const BIN_COLORS = ['#2e5d34', '#262626', '#c85a1a', '#2e5d34'].map((c) => tint(c));
 
-function streetlight(gb, L, x, y, z, rot, lit, seed, h = 9) {
+// Galvanised pole with a single outreach arm; newer ones carry a solar panel on top.
+function streetlight(gb, L, x, y, z, rot, lit, seed, solar, h = 9) {
   gb.setTransform(x, y, z, rot);
   gb.brush(POLE, L.metal, seed, 2);
   gb.box(0, 0, 0, 0.32, 0.6, 0.32, 1);
   gb.cylinder(0, 0, 0, 0.1, h, 6, 2, false, 0.065);
+  if (solar) {
+    // Tilted to face north (the sun's side in Harare).
+    gb.clearTransform();
+    gb.brush([255, 255, 255], L.solar, seed, 0, 4, 1);
+    const top = y + h + 0.35;
+    gb.quad(x - 0.6, top - 0.25, z - 0.45, x + 0.6, top - 0.25, z - 0.45, x + 0.6, top + 0.25, z + 0.45, x - 0.6, top + 0.25, z + 0.45, 0, 0.87, -0.49, 0, 0, 1, 1);
+    gb.brush(POLE, L.metal, seed, 2);
+    gb.quad(x - 0.6, top - 0.25, z - 0.45, x - 0.6, top + 0.25, z + 0.45, x + 0.6, top + 0.25, z + 0.45, x + 0.6, top - 0.25, z - 0.45, 0, -0.87, 0.49, 0, 0, 1, 1);
+    gb.setTransform(x, y, z, rot);
+    gb.box(0, h, 0, 0.08, 0.35, 0.08, 1);
+  }
   gb.box(0, h - 0.25, 0.95, 0.07, 0.07, 1.9, 1);
   gb.brush(DARK, L.metal, seed, 2);
   gb.box(0, h - 0.42, 2.05, 0.34, 0.2, 0.72, 1, true);
   const [u0, v0, u1, v1] = miscUV(MISC_CELLS.lamp);
   gb.brush([255, 255, 255], L.misc, seed, lit ? 3 : 2);
   gb.quad(-0.14, h - 0.43, 1.75, 0.14, h - 0.43, 1.75, 0.14, h - 0.43, 2.35, -0.14, h - 0.43, 2.35, 0, -1, 0, u0, v0, u1, v1);
+  gb.clearTransform();
+}
+
+// Tall grey median pole with two outreach arms, one over each carriageway.
+function doubleLight(gb, L, x, y, z, rot, lit, seed, solar) {
+  const h = 10;
+  gb.setTransform(x, y, z, rot);
+  gb.brush(POLE, L.metal, seed, 2);
+  gb.box(0, 0, 0, 0.36, 0.6, 0.36, 1);
+  gb.cylinder(0, 0, 0, 0.12, h, 6, 2, false, 0.08);
+  const [u0, v0, u1, v1] = miscUV(MISC_CELLS.lamp);
+  for (const s of [1, -1]) {
+    gb.brush(POLE, L.metal, seed, 2);
+    gb.box(0, h - 0.25, 1.0 * s, 0.07, 0.07, 2.0, 1);
+    gb.brush(DARK, L.metal, seed, 2);
+    gb.box(0, h - 0.42, 2.1 * s, 0.34, 0.2, 0.72, 1, true);
+    gb.brush([255, 255, 255], L.misc, seed, lit ? 3 : 2);
+    gb.quad(-0.14, h - 0.43, 2.1 * s - 0.3, 0.14, h - 0.43, 2.1 * s - 0.3, 0.14, h - 0.43, 2.1 * s + 0.3, -0.14, h - 0.43, 2.1 * s + 0.3, 0, -1, 0, u0, v0, u1, v1);
+  }
+  if (solar) {
+    gb.brush([255, 255, 255], L.solar, seed, 0, 4, 1);
+    gb.quad(-0.7, h + 0.3, -0.5, 0.7, h + 0.3, -0.5, 0.7, h + 0.7, 0.5, -0.7, h + 0.7, 0.5, 0, 0.93, -0.37, 0, 0, 1, 1);
+  }
   gb.clearTransform();
 }
 
@@ -46,6 +81,18 @@ function bench(gb, L, x, z, rot, seed) {
   gb.box(-0.75, 0, 0, 0.14, 0.42, 0.45, 1);
   gb.box(0.75, 0, 0, 0.14, 0.42, 0.45, 1);
   gb.clearTransform();
+}
+
+function planter(gb, col, L, x, z, rot) {
+  gb.setTransform(x, 0, z, rot);
+  gb.brush(tint('#ffffff'), L.brick, 4, 2);
+  gb.box(0, 0, 0, 2.6, 0.55, 2.6, 3);
+  gb.brush(tint('#4a3a2c'), L.concrete, 4, 2);
+  gb.box(0, 0.55, 0, 2.3, 0.02, 2.3, 2);
+  gb.clearTransform();
+  col.setTransform(x, 0, z, rot);
+  col.box(0, 0, 0, 2.6, 0.55, 2.6, 1);
+  col.clearTransform();
 }
 
 function bollard(gb, L, x, z, seed) {
@@ -109,11 +156,12 @@ function poolTexture() {
 }
 
 export function buildProps(ctx) {
-  const { data, chunks, colliderFor, L, sidewalkPaths, urbanAt, quality, world, frontages, signs, heightAt } = ctx;
+  const { data, chunks, colliderFor, L, sidewalkPaths, medians, urbanAt, quality, world, frontages, signs, heightAt } = ctx;
   const rng = makeRng(4242);
   const density = quality.props;
   const roads = data.roads;
   const pools = [];
+  const palms = [];
 
   // Streetlights and bins along the built pavements.
   for (const sp of sidewalkPaths) {
@@ -141,7 +189,7 @@ export function buildProps(ctx) {
         if (world.buildingAt(px, pz)) continue;
         const on = rng() < 0.6;
         const seed = Math.floor(rng() * 255);
-        streetlight(chunks.detailAt(px, pz), L, px, heightAt(px, pz) + 0.15, pz, Math.atan2(tx, tz), on, seed);
+        streetlight(chunks.detailAt(px, pz), L, px, heightAt(px, pz) + 0.15, pz, Math.atan2(tx, tz), on, seed, isMajor(r) && rng() < 0.45);
         if (on) pools.push(px + tx * 2.05, pz + tz * 2.05);
         if (urban > 0.5 && rng() < 0.35 * density) {
           const bx = px + (dx / len) * 3;
@@ -154,7 +202,50 @@ export function buildProps(ctx) {
     }
   }
 
-  // First Street Mall and other pedestrian streets: benches down the middle, bollards at the ends.
+  // Dual-carriageway medians: double-arm lights (many solar-powered now) and small palms. Both
+  // halves of a median report it, so placements are de-duplicated on a coarse grid.
+  const taken = new Set();
+  const claim = (x, z, cell) => {
+    const k = `${Math.round(x / cell)},${Math.round(z / cell)}`;
+    if (taken.has(k)) return false;
+    taken.add(k);
+    return true;
+  };
+  for (const md of medians) {
+    const pts = md.pts;
+    let acc = 12;
+    let count = 0;
+    for (let i = 0; i + 3 < pts.length; i += 2) {
+      const ax = pts[i];
+      const az = pts[i + 1];
+      const dx = pts[i + 2] - ax;
+      const dz = pts[i + 3] - az;
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-3) continue;
+      // Midline of the median: the outer edge of this half.
+      const ox = ((md.side * dz) / len) * (md.width / 2);
+      const oz = ((-md.side * dx) / len) * (md.width / 2);
+      let t = acc;
+      for (; t < len; t += 18) {
+        const x = ax + (dx / len) * t + ox;
+        const z = az + (dz / len) * t + oz;
+        const k = count++ % 2;
+        if (k === 0 && claim(x, z, 16)) {
+          const on = rng() < 0.6;
+          doubleLight(chunks.detailAt(x, z), L, x, heightAt(x, z) + 0.15, z, Math.atan2(dz, -dx), on, 5, rng() < 0.7);
+          if (on) {
+            for (const s of [1, -1]) pools.push(x + (dz / len) * 2.1 * s, z - (dx / len) * 2.1 * s);
+          }
+        } else if (k === 1 && md.width > 0.7 && claim(x, z, 16)) {
+          palms.push({ species: 'palm', x, y: heightAt(x, z) + 0.15, z, s: 0.55 + rng() * 0.2, rot: rng() * 6.28, c: [1, 1, 1] });
+        }
+      }
+      acc = t - len;
+    }
+  }
+
+  // First Street Mall and other pedestrian streets: planters with palms and benches down the
+  // middle, bollards at the ends; benches beside park footpaths.
   for (const p of data.paths) {
     if (p.pts.length < 4) continue;
     const pts = p.pts;
@@ -173,25 +264,35 @@ export function buildProps(ctx) {
         }
       }
     }
-    const benchGap = p.cls === 'pedestrian' ? 22 : p.cls === 'footway' ? 30 : 0;
-    if (!benchGap) continue;
+    const gap = p.cls === 'pedestrian' ? 30 : p.cls === 'footway' ? 30 : 0;
+    if (!gap) continue;
     for (let i = 0; i + 3 < pts.length; i += 2) {
       const ax = pts[i];
       const az = pts[i + 1];
       const dx = pts[i + 2] - ax;
       const dz = pts[i + 3] - az;
       const len = Math.hypot(dx, dz);
-      for (let t = benchGap / 2; t < len - 3; t += benchGap / density) {
-        const off = p.cls === 'pedestrian' ? 0.6 : p.w / 2 + 1.1;
-        const nx = -dz / len;
-        const nz = dx / len;
-        for (const sgn of p.cls === 'pedestrian' ? [1, -1] : [rng() < 0.5 ? 1 : -1]) {
-          const x = ax + (dx / len) * t + nx * off * sgn;
-          const z = az + (dz / len) * t + nz * off * sgn;
+      const nx = -dz / len;
+      const nz = dx / len;
+      for (let t = gap / 2; t < len - 3; t += gap / density) {
+        const cx = ax + (dx / len) * t;
+        const cz = az + (dz / len) * t;
+        if (p.cls === 'pedestrian') {
+          // Mall: a raised brick planter with a Washingtonia palm, benches either side.
+          if (world.buildingAt(cx, cz)) continue;
+          planter(chunks.detailAt(cx, cz), colliderFor(-10), L, cx, cz, Math.atan2(dx, dz));
+          palms.push({ species: 'palm', x: cx, y: 0.55, z: cz, s: 0.9 + rng() * 0.3, rot: rng() * 6.28, c: [1, 1, 1] });
+          for (const sgn of [1, -1]) {
+            const x = cx + nx * 2.3 * sgn;
+            const z = cz + nz * 2.3 * sgn;
+            bench(chunks.detailAt(x, z), L, x, z, Math.atan2(nx * sgn, nz * sgn), 3);
+          }
+        } else {
+          const sgn = rng() < 0.5 ? 1 : -1;
+          const x = cx + nx * (p.w / 2 + 1.1) * sgn;
+          const z = cz + nz * (p.w / 2 + 1.1) * sgn;
           if (world.buildingAt(x, z)) continue;
-          // Mall benches sit back to back; park benches face their path.
-          const face = p.cls === 'pedestrian' ? sgn : -sgn;
-          bench(chunks.detailAt(x, z), L, x, z, Math.atan2(nx * face, nz * face), 3);
+          bench(chunks.detailAt(x, z), L, x, z, Math.atan2(-nx * sgn, -nz * sgn), 3);
         }
       }
     }
@@ -277,5 +378,5 @@ export function buildProps(ctx) {
   lightPools.count = n;
   lightPools.visible = false;
   lightPools.renderOrder = 2;
-  return { lightPools, lampCount: n };
+  return { lightPools, palms };
 }

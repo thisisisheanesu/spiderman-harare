@@ -35,6 +35,13 @@ function instancedAttr(geometry, name, capacity, size) {
   return attr;
 }
 
+// Instance buffers are sized for the worst case: upload only the instances written this frame.
+function upload(attr, count) {
+  attr.clearUpdateRanges();
+  attr.addUpdateRange(0, count * attr.itemSize);
+  attr.needsUpdate = true;
+}
+
 function shadowTexture() {
   const c = document.createElement('canvas');
   c.width = 64;
@@ -250,18 +257,18 @@ export class VehicleRenderer {
       const mesh = spec.mesh;
       mesh.visible = mesh.count > 0;
       if (!mesh.visible) continue;
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.instanceColor.needsUpdate = true;
-      spec.state.needsUpdate = true;
-      spec.color2.needsUpdate = true;
+      upload(mesh.instanceMatrix, mesh.count);
+      upload(mesh.instanceColor, mesh.count);
+      upload(spec.state, mesh.count);
+      upload(spec.color2, mesh.count);
     }
     for (const m of this._shared) {
       m.visible = m.count > 0;
-      if (m.visible) m.instanceMatrix.needsUpdate = true;
+      if (m.visible) upload(m.instanceMatrix, m.count);
     }
     if (this.hwindi.visible) {
-      this.hwindi.instanceColor.needsUpdate = true;
-      this.hwindiColor2.needsUpdate = true;
+      upload(this.hwindi.instanceColor, this.hwindi.count);
+      upload(this.hwindiColor2, this.hwindi.count);
     }
   }
 }

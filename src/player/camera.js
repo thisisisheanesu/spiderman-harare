@@ -7,6 +7,7 @@ import * as THREE from 'three';
 //   shake(amount)   add trauma (0..1); decays quickly
 //   fovKick(amount) add degrees of FOV that ease back out (dives, zips, boosted releases)
 //   preset          0 = close, 1 = far (V toggles)
+//   snap()          jump straight behind the player (used on teleports)
 // Orbit with mouse / right stick; while swinging, diving or zipping the rig swings in behind the motion
 // unless the player moved the camera in the last 1.5 s. Distance and FOV grow with speed, the camera
 // never clips into buildings, and it rolls gently into swings.

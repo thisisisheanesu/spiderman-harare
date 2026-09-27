@@ -1,4 +1,4 @@
-import { Path, deduped, reversed, offsetLeft, trimmed, bezier, polylineDistance } from './polyline.js';
+import { Path, deduped, reversed, offsetLeft, trimmed, bezier, polylineDistance, closeUntil } from './polyline.js';
 import { laneOffset, allowsDirection, kerbOffset } from '../world/streetMetrics.js';
 
 // Drivable road network built from data.nodes / data.roads: one Lane per lane and direction (keep left),
@@ -67,6 +67,10 @@ export class Connector extends Path {
     this.local = 0;
     this.speedLimit = 20;
     this.conflictFree = true;
+    // Index in from.out, and per sibling in from.out: metres along this connector still within
+    // CLEARANCE of it (forks at a shallow angle run side by side for a while).
+    this.outIndex = 0;
+    this.alongside = null;
   }
 }
 
@@ -334,6 +338,7 @@ export class RoadGraph {
     c.local = j.conns.length;
     c.index = this.connectors.length;
     j.conns.push(c);
+    c.outIndex = from.out.length;
     from.out.push(c);
     this.connectors.push(c);
   }
@@ -341,11 +346,16 @@ export class RoadGraph {
   _conflicts(j) {
     const n = j.conns.length;
     j.conflict = new Uint8Array(n * n);
+    for (const c of j.conns) c.alongside = new Float32Array(c.from.out.length);
     for (let a = 0; a < n; a++) {
       const ca = j.conns[a];
       for (let b = a + 1; b < n; b++) {
         const cb = j.conns[b];
-        if (ca.from === cb.from) continue;
+        if (ca.from === cb.from) {
+          ca.alongside[cb.outIndex] = closeUntil(ca, cb.pts, CLEARANCE);
+          cb.alongside[ca.outIndex] = closeUntil(cb, ca.pts, CLEARANCE);
+          continue;
+        }
         const hit = ca.to === cb.to || polylineDistance(ca.pts, cb.pts, CLEARANCE) < CLEARANCE;
         if (!hit) continue;
         j.conflict[a * n + b] = 1;

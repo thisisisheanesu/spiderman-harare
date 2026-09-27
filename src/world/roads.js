@@ -62,6 +62,7 @@ export function buildStreets(ctx) {
   const walks = new GeoBuffer(1 << 16);
   const marks = new GeoBuffer(1 << 16);
   const sidewalkPaths = [];
+  const medians = [];
 
   // Carriageway lookup for pavement clipping.
   const grid = new SegmentGrid(32);
@@ -133,10 +134,13 @@ export function buildStreets(ctx) {
       for (const side of [1, -1]) {
         const runs = sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW);
         for (const run of runs) {
-          emitSidewalk(walks, G, run, hw, side, heightAt);
+          const median = run[0].median;
+          emitSidewalk(walks, G, run, hw, side, heightAt, median);
           const path = [];
           for (const s of run) path.push(s.x + s.nx * side * (hw + s.w / 2), s.z + s.nz * side * (hw + s.w / 2));
-          sidewalkPaths.push({ pts: path, width: run.reduce((m, s) => Math.min(m, s.w), sw), road: ri, side });
+          const width = run.reduce((m, s) => Math.min(m, s.w), sw);
+          if (median) medians.push({ pts: path, width, road: ri, side });
+          else sidewalkPaths.push({ pts: path, width, road: ri, side });
         }
       }
     }
@@ -197,7 +201,7 @@ export function buildStreets(ctx) {
     }
   });
 
-  return { asphalt, walks, marks, sidewalkPaths, crossingNodes };
+  return { asphalt, walks, marks, sidewalkPaths, medians, crossingNodes };
 }
 
 // Quad strip between lateral offsets o0..o1 along a polyline (mitred), world-space UVs.
@@ -294,8 +298,9 @@ function convexHull(points) {
   return lower.concat(upper);
 }
 
-// Samples one side of a road and returns runs of pavement samples {x, z, nx, nz, w} that stay
-// clear of every other carriageway.
+// Samples one side of a road and returns runs of pavement samples {x, z, nx, nz, w, median} that
+// stay clear of every other carriageway. Where a parallel carriageway runs alongside (dual
+// carriageways such as Samora Machel Ave) the strip becomes half of a raised median instead.
 function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW) {
   const n = pts.length / 2;
   const samples = [];
@@ -307,64 +312,93 @@ function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW
     });
     return hit;
   };
-  const widthAt = (x, z, nx, nz) => {
+  // Kerb-to-kerb gap to a parallel carriageway abeam on this side, or Infinity.
+  const parallelGap = (x, z, nx, nz) => {
+    let gap = Infinity;
+    grid.query(x, z, hw + sw * 2 + maxHalfW + 4, (seg) => {
+      if (seg.ref === ri) return;
+      const dx = seg.bx - seg.ax;
+      const dz = seg.bz - seg.az;
+      const l = Math.hypot(dx, dz) || 1;
+      if (Math.abs((dx / l) * -nz + (dz / l) * nx) < 0.94) return;
+      const lat = ((seg.ax - x) * nx + (seg.az - z) * nz) * side;
+      const along = ((x - seg.ax) * dx + (z - seg.az) * dz) / (l * l);
+      if (lat <= hw || along < -0.1 || along > 1.1) return;
+      gap = Math.min(gap, lat - hw - roads[seg.ref].w / 2);
+    });
+    return gap;
+  };
+  const widthAt = (x, z, nx, nz, out) => {
+    out.median = false;
+    const gap = parallelGap(x, z, nx, nz);
+    if (gap < sw * 2 + 2) {
+      out.median = true;
+      return gap > 0.6 ? gap / 2 : 0;
+    }
     const o = side * hw;
-    if (!blocked(x + nx * (o + side * sw), z + nz * (o + side * sw)) && !blocked(x + nx * (o + side * sw * 0.5), z + nz * (o + side * sw * 0.5))) return sw;
-    if (!blocked(x + nx * (o + side * sw * 0.5), z + nz * (o + side * sw * 0.5))) return sw * 0.5;
+    const full = !blocked(x + nx * (o + side * sw), z + nz * (o + side * sw));
+    const half = !blocked(x + nx * (o + side * sw * 0.5), z + nz * (o + side * sw * 0.5));
+    if (full && half) return sw;
+    if (half) return sw * 0.5;
     if (!blocked(x + nx * (o + side * 0.5), z + nz * (o + side * 0.5))) return 0.8;
     return 0;
+  };
+  const sample = (x, z, nx, nz, s, ux, uz, vertex) => {
+    const smp = { x, z, nx, nz, s, w: 0, median: false, vertex };
+    smp.w = widthAt(x, z, ux, uz, smp);
+    return smp;
   };
   for (let i = 0; i < n; i++) {
     const x = pts[i * 2];
     const z = pts[i * 2 + 1];
     const k = nrm[i * 3 + 2];
-    const nx = nrm[i * 3] * k;
-    const nz = nrm[i * 3 + 1] * k;
-    samples.push({ x, z, nx, nz, s: lens[i], w: widthAt(x, z, nrm[i * 3], nrm[i * 3 + 1]), vertex: true });
+    samples.push(sample(x, z, nrm[i * 3] * k, nrm[i * 3 + 1] * k, lens[i], nrm[i * 3], nrm[i * 3 + 1], true));
     if (i === n - 1) break;
     const segLen = lens[i + 1] - lens[i];
     const steps = Math.floor(segLen / SIDE_STEP);
     const dx = (pts[i * 2 + 2] - x) / (segLen || 1);
     const dz = (pts[i * 2 + 3] - z) / (segLen || 1);
-    for (let s = 1; s <= steps; s++) {
-      const t = (s * segLen) / (steps + 1);
-      const sx = x + dx * t;
-      const szz = z + dz * t;
-      samples.push({ x: sx, z: szz, nx: dz, nz: -dx, s: lens[i] + t, w: widthAt(sx, szz, dz, -dx) });
+    for (let st = 1; st <= steps; st++) {
+      const t = (st * segLen) / (steps + 1);
+      samples.push(sample(x + dx * t, z + dz * t, dz, -dx, lens[i] + t, dz, -dx, false));
     }
   }
-  // Runs of usable samples; their ends are refined by bisection so pavements stop right at the
-  // kerb line of the crossing street (corners then overlap instead of leaving gaps).
+  // Runs of usable samples (split where pavement turns into median); their ends are refined by
+  // bisection so pavements stop right at the kerb line of the crossing street.
   const tmp = { x: 0, z: 0, dx: 0, dz: 0, i: 0 };
   const probe = (s) => {
     sampleAt(pts, lens, s, tmp);
-    return { x: tmp.x, z: tmp.z, nx: tmp.dz, nz: -tmp.dx, s, w: widthAt(tmp.x, tmp.z, tmp.dz, -tmp.dx) };
+    return sample(tmp.x, tmp.z, tmp.dz, -tmp.dx, s, tmp.dz, -tmp.dx, false);
   };
   const refine = (good, bad) => {
     let a = good.s;
     let b = bad.s;
     for (let k = 0; k < 5; k++) {
       const m = (a + b) / 2;
-      if (probe(m).w > 0) a = m;
+      const p = probe(m);
+      if (p.w > 0 && p.median === good.median) a = m;
       else b = m;
     }
     const p = probe(a);
     p.w = Math.min(good.w, p.w || good.w);
+    p.median = good.median;
     return p;
   };
   const runs = [];
   let cur = null;
   for (let k = 0; k < samples.length; k++) {
     const smp = samples[k];
+    const prev = samples[k - 1];
+    if (cur && (smp.w <= 0 || smp.median !== prev.median)) {
+      cur.push(refine(prev, smp));
+      cur = null;
+    }
     if (smp.w > 0) {
       if (!cur) {
         runs.push((cur = []));
-        if (k > 0) cur.push(refine(smp, samples[k - 1]));
+        if (k > 0) cur.push(refine(smp, prev));
       }
       cur.push(smp);
-    } else if (cur) {
-      cur.push(refine(samples[k - 1], smp));
-      cur = null;
     }
   }
   // Drop in-between samples on straight stretches where the width does not change.
@@ -373,7 +407,9 @@ function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW
     .map((run) => run.filter((p, k) => k === 0 || k === run.length - 1 || p.vertex || p.w !== run[k - 1].w || p.w !== run[k + 1].w));
 }
 
-function emitSidewalk(gb, G, run, hw, side, heightAt) {
+// Raised strip along the kerb: paving for pavements; dry grass with black-and-white painted kerbs
+// for medians.
+function emitSidewalk(gb, G, run, hw, side, heightAt, median) {
   const y = KERB_HEIGHT;
   const inner = [];
   const outer = [];
@@ -386,7 +422,9 @@ function emitSidewalk(gb, G, run, hw, side, heightAt) {
     outer.push(ox, oz, heightAt(ox, oz));
   }
   const m = run.length;
-  gb.brush(tint('#ffffff'), G.paving, 0, 0);
+  const top = median ? G.dryGrass : G.paving;
+  const topScale = median ? 9 : 3;
+  gb.brush(tint(median ? '#e6dcc8' : '#ffffff'), top, 0, 0);
   for (let i = 0; i < m - 1; i++) {
     const a = i * 3;
     const b = a + 3;
@@ -396,15 +434,15 @@ function emitSidewalk(gb, G, run, hw, side, heightAt) {
       0, 1, 0, inner[a] / 3, -inner[a + 1] / 3, inner[b] / 3, -outer[a + 1] / 3,
     );
   }
-  // Paving UVs: redo as world-space per vertex (quad() takes a rect; re-map the last quads).
+  // World-space UVs for the top (quad() takes a rect; re-map the quads just written).
   const P = gb.pos;
   const U = gb.uv;
   for (let v = gb.vCount - (m - 1) * 4; v < gb.vCount; v++) {
-    U[v * 2] = P[v * 3] / 3;
-    U[v * 2 + 1] = -P[v * 3 + 2] / 3;
+    U[v * 2] = P[v * 3] / topScale;
+    U[v * 2 + 1] = -P[v * 3 + 2] / topScale;
   }
   // Kerb face (towards the road) and outer edge.
-  gb.brush(tint('#ffffff'), G.kerb, 0, 0);
+  gb.brush(tint('#ffffff'), median ? G.kerbPaint : G.kerb, 0, 0);
   for (let i = 0; i < m - 1; i++) {
     const a = i * 3;
     const b = a + 3;

@@ -11,7 +11,8 @@ import { planTrees, createVegetation } from './vegetation.js';
 import { SignPainter, emitSign } from './signs.js';
 import { buildProps } from './props.js';
 import { Landmarks } from './landmarks.js';
-import { Kopje, createFlame } from './terrain.js';
+import { Kopje } from './terrain.js';
+import { createFlame, createFountainJets } from './effects.js';
 
 const QUALITY = {
   low: { tex: 256, props: 0.5, trees: 0.4, signs: 48 },
@@ -41,7 +42,6 @@ export class City {
     this.group.name = 'city';
     game.scene.add(this.group);
     const quality = (this.quality = QUALITY[game.quality.level] || QUALITY.high);
-    const T0 = performance.now(); const tick = (l) => console.info(`[city] ${l} ${Math.round(performance.now() - T0)}ms`);
 
     const kopje = new Kopje(data);
     this.heightAt = kopje.heightAt;
@@ -58,7 +58,6 @@ export class City {
     const L = facadeAtlas.index;
     const G = groundAtlas.index;
     const urban = buildUrbanMask(data.buildings, data.meta.bounds);
-    tick('textures');
 
     const chunks = new ChunkGrid();
     const colliders = new Map();
@@ -69,7 +68,7 @@ export class City {
     };
 
     // Buildings (+ landmark details).
-    const landmarks = new Landmarks(data);
+    const landmarks = new Landmarks(data, signs);
     const landmarkStyles = new Map((data.meta.landmarks || []).map((l) => [l.key, l.style || {}]));
     const ctx = { game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, streets: new StreetIndex(data) };
     const frontages = [];
@@ -79,7 +78,6 @@ export class City {
       for (const f of emitBuilding(b, spec, chunks.at(b.cx, b.cz), chunks.detailAt(b.cx, b.cz), colliderFor(b.id), ctx)) frontages.push(f);
     };
     for (const b of data.buildings) emit(b);
-    tick('buildings');
 
     // Streets, ground, the Kopje.
     const crossingPoints = data.features.filter((f) => f.kind === 'traffic_signals' || f.kind === 'crossing');
@@ -91,17 +89,15 @@ export class City {
     const summit = kopje.summit();
     world.addCollider(kopje.build(hill, G, groundScale, chunks.at(summit.x, summit.z), L, quality), -3);
     landmarks.extras(chunks, colliderFor, L, emit, grounds.paths, G);
-    tick('streets');
 
     // Signs, street furniture, trees.
     for (const pl of signs.assign(frontages, data.pois)) {
       const f = pl.frontage;
       emitSign(chunks.detailAt(f.ax, f.az), pl);
     }
-    const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
+    const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, medians: streets.medians, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
     const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, heightAt: this.heightAt });
-    this.vegetation = createVegetation(this.group, trees, landmarks.palms, this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
-    tick('props+trees');
+    this.vegetation = createVegetation(this.group, trees.concat(landmarks.palms, props.palms), this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
 
     // Physics for everything that sticks out of the plain footprint extrusions.
     for (const [id, col] of colliders) {
@@ -143,9 +139,10 @@ export class City {
 
     this.lightPools = props.lightPools;
     this.group.add(this.lightPools);
-    this.flame = createFlame(kopje.flamePos);
-    this.group.add(this.flame.mesh);
-    tick('meshes');
+    this.effects = [createFlame(kopje.flamePos)];
+    const fountain = data.features.find((f) => f.kind === 'fountain');
+    if (fountain && landmarks.jets.iCount) this.effects.push(createFountainJets(landmarks.jets.toGeometry(), fountain));
+    for (const fx of this.effects) this.group.add(fx.mesh);
 
     this.setNight(game.sky?.nightFactor ?? 0);
   }
@@ -183,7 +180,7 @@ export class City {
       if (c.base) c.base.visible = d < far;
       if (c.detail) c.detail.visible = d < this.detailRange;
     }
-    this.flame.update(this.uniforms.uTime.value);
+    for (const fx of this.effects) fx.update(this.uniforms.uTime.value);
     const pal = game.sky?.palette;
     if (pal && pal.version !== this._palVersion) {
       this._palVersion = pal.version;

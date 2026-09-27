@@ -427,8 +427,10 @@ export class Population {
     for (const rk of this.ranks) {
       const d = Math.hypot(rk.x - ctx.focus.x, rk.z - ctx.focus.z);
       if (d > R + 40) {
-        for (const a of rk.agents.slice()) this.release(a);
-        for (const s of rk.spots) s.used = null;
+        if (rk.agents.length) {
+          for (const a of rk.agents.slice()) this.release(a);
+          for (const s of rk.spots) s.used = null;
+        }
         continue;
       }
       const want = Math.min(rk.spots.length, Math.round((rk.kind === 'bus_stop' ? 10 : 55) * (this.game.quality.crowd ?? 1) * Math.max(0.35, tf)));
@@ -514,6 +516,8 @@ export class Population {
     for (const park of this.parks) {
       const near = Math.hypot(park.cx - ctx.focus.x, park.cz - ctx.focus.z) < R + park.r;
       for (const s of park.spots) {
+        // Loungers can also be despawned by a teleport: an emptied group frees the spot.
+        if (s.group && !s.group.members.length) s.group = null;
         const g = s.group;
         const d2 = (s.x - ctx.focus.x) ** 2 + (s.z - ctx.focus.z) ** 2;
         if (g && (!open || !near || d2 > (R * 1.1) ** 2)) {

@@ -8,9 +8,10 @@ import { makeCanvas } from './atlas.js';
 // parts are vertex-coloured; trunks and blobs sample the opaque white corner of the leaf texture.
 
 export const SPECIES = {
+  // In bloom the canopy reads pale lavender-blue rather than saturated purple (PHOTOS.md §22).
   jacaranda: {
-    trunk: '#5f5048', height: [8, 12], radius: [4.5, 6.5], blobs: 8, flat: 0.62, tile: 'flowers', cards: 64,
-    colors: ['#9a86c8', '#a996d6', '#8b78bb', '#b3a2de', '#8570ad', '#6f8f4a'],
+    trunk: '#5a4632', height: [8, 12], radius: [4.5, 6.5], blobs: 8, flat: 0.62, tile: 'flowers', cards: 64,
+    colors: ['#a498d0', '#b3a9df', '#9387c2', '#c0b8ea', '#8b7fb6', '#6f8f4a'],
     weights: [3, 3, 2, 2, 2, 0.6],
   },
   flame: {
@@ -20,13 +21,18 @@ export const SPECIES = {
   },
   msasa: {
     trunk: '#4c4038', height: [7, 11], radius: [4, 6], blobs: 7, flat: 0.55, tile: 'leaves', cards: 50,
-    colors: ['#7d3a33', '#94583e', '#a8764e', '#5f6f35', '#6b7d3a', '#8a6a40'],
-    weights: [2, 1.5, 1, 2, 2, 1],
+    colors: ['#9a3b3f', '#b5553f', '#c9804f', '#5f7a3a', '#6f8a3e', '#a5463f'],
+    weights: [1.6, 1.2, 0.8, 2.5, 2, 1],
   },
   green: {
     trunk: '#6a5d52', height: [7, 12], radius: [3, 5], blobs: 6, flat: 0.9, tile: 'leaves', cards: 46,
     colors: ['#4f6f35', '#5f7f3e', '#6e8a48', '#44612e', '#7a8f5a', '#8a9a68'],
     weights: [3, 3, 2, 2, 1, 1],
+  },
+  cypress: {
+    trunk: '#4a3d33', height: [18, 24], radius: [1.8, 2.4], blobs: 5, flat: 3.2, tile: 'leaves', cards: 30, column: true,
+    colors: ['#2f4a2a', '#36522e', '#2a4226', '#3d5a33'],
+    weights: [3, 3, 2, 2],
   },
   eucalyptus: {
     trunk: '#cfc6b6', height: [14, 22], radius: [3, 4.5], blobs: 6, flat: 1.25, tile: 'leaves', cards: 40,
@@ -52,14 +58,15 @@ export function leafTexture() {
       draw(x0 + 64 + Math.cos(a) * d, 64 + Math.sin(a) * d, d / 54);
     }
   };
+  // Flower panicles: clusters of small florets.
   tile(0, (x, y, d) => {
-    const g = Math.round(205 + rng() * 50 - d * 30);
-    ctx.fillStyle = `rgb(${g},${g},${g})`;
-    ctx.beginPath();
-    ctx.arc(x, y, 2.5 + rng() * 3.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = `rgba(90,80,110,0.5)`;
-    ctx.fillRect(x - 0.5, y - 0.5, 1.5, 1.5);
+    for (let k = 0; k < 4; k++) {
+      const g = Math.round(200 + rng() * 55 - d * 35);
+      ctx.fillStyle = `rgb(${g},${g},${g})`;
+      ctx.beginPath();
+      ctx.arc(x + (rng() - 0.5) * 6, y + (rng() - 0.5) * 6, 1.2 + rng() * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
   tile(128, (x, y, d) => {
     const g = Math.round(185 + rng() * 70 - d * 40);
@@ -104,7 +111,7 @@ function finish(geo, colorFn, uv = SOLID_UV) {
 
 function trunkGeometry(def, h, rng, forks) {
   const parts = [];
-  const trunkH = h * 0.42;
+  const trunkH = h * (def.column ? 0.2 : 0.42);
   const base = new THREE.CylinderGeometry(0.16, 0.26, trunkH, 6, 1, true);
   base.translate(0, trunkH / 2, 0);
   parts.push(base);
@@ -140,16 +147,21 @@ function canopyGeometry(def, h, r, rng, blobs, detail, cards, blobScale = 1) {
   const info = [];
   for (let i = 0; i < blobs; i++) {
     const a = rng() * Math.PI * 2;
-    const d = i === 0 ? 0 : r * (0.35 + rng() * 0.45);
+    const d = i === 0 || def.column ? 0 : r * (0.35 + rng() * 0.45);
     const br = r * (i === 0 ? 0.7 : 0.42 + rng() * 0.22) * blobScale;
     const bx = Math.cos(a) * d;
     const bz = Math.sin(a) * d;
-    const by = cy + (rng() - 0.35) * r * def.flat * 0.5 - (d / r) * r * 0.2 * def.flat;
-    const g = new THREE.IcosahedronGeometry(br, detail);
+    // Columnar trees (cypress) stack their blobs into a tapering spire.
+    const by = def.column
+      ? h * (0.3 + (0.6 * i) / Math.max(1, blobs - 1))
+      : cy + (rng() - 0.35) * r * def.flat * 0.5 - (d / r) * r * 0.2 * def.flat;
+    const r0 = def.column ? br * (1.15 - (0.55 * i) / blobs) : br;
+    const g = detail < 0 ? new THREE.OctahedronGeometry(r0, 0) : new THREE.IcosahedronGeometry(r0, detail);
     const pos = g.attributes.position;
+    const stretch = def.column ? 1.6 : def.flat;
     for (let k = 0; k < pos.count; k++) {
       const j = 0.88 + rng() * 0.24;
-      pos.setXYZ(k, pos.getX(k) * j, pos.getY(k) * j * def.flat, pos.getZ(k) * j);
+      pos.setXYZ(k, pos.getX(k) * j, pos.getY(k) * j * stretch, pos.getZ(k) * j);
     }
     g.translate(bx, by, bz);
     const base = pickColor(def, rng);
@@ -171,6 +183,12 @@ function canopyGeometry(def, h, r, rng, blobs, detail, cards, blobScale = 1) {
   return geo;
 }
 
+// Geometry for any species (palms included) at a LOD level.
+export function modelFor(name, lod) {
+  if (name === 'palm') return palmGeometry(Math.min(lod, 1));
+  return treeGeometry(name, lod);
+}
+
 // Flower/leaf-cluster cards scattered over the blob surfaces, facing roughly outwards.
 function cardGeometry(def, info, cy, r, rng, count) {
   const [u0, u1] = TILES[def.tile];
@@ -190,7 +208,7 @@ function cardGeometry(def, info, cy, r, rng, count) {
     }
     _n.set(rng() * 2 - 1, rng() * 1.6 - 0.45, rng() * 2 - 1).normalize();
     const k = blob.r * (0.95 + rng() * 0.3);
-    _p.set(blob.x + _n.x * k, blob.y + _n.y * k * def.flat, blob.z + _n.z * k);
+    _p.set(blob.x + _n.x * k, blob.y + _n.y * k * (def.column ? 1.6 : def.flat), blob.z + _n.z * k);
     _n.x += (rng() - 0.5) * 0.8;
     _n.y += (rng() - 0.5) * 0.8;
     _n.z += (rng() - 0.5) * 0.8;
@@ -215,24 +233,27 @@ function cardGeometry(def, info, cy, r, rng, count) {
   return g;
 }
 
-// lod 0 = near (blobs + cards), 1 = mid (blobs), 2 = far (one blob).
-export function treeGeometry(name, lod) {
+// lod 0 = near (blobs + leaf cards), 1 = mid (4 blobs), 2 = far (one blob).
+function treeGeometry(name, lod) {
   const def = SPECIES[name];
   const rng = makeRng(hashString(name));
   const h = (def.height[0] + def.height[1]) / 2;
   const r = (def.radius[0] + def.radius[1]) / 2;
   if (lod === 2) {
-    const canopy = canopyGeometry(def, h, r, rng, 1, 0, 0);
+    // Far away: one octahedron blob (8 triangles) stretched to the crown's footprint.
+    const canopy = canopyGeometry(def, h, r, rng, 1, -1, 0);
     const pos = canopy.attributes.position;
-    for (let k = 0; k < pos.count; k++) pos.setXYZ(k, pos.getX(k) * 1.35, pos.getY(k), pos.getZ(k) * 1.35);
+    const sxz = def.column ? 1 : 1.35;
+    const sy = def.column ? 2.2 : 1;
+    for (let k = 0; k < pos.count; k++) pos.setXYZ(k, pos.getX(k) * sxz, pos.getY(k) * sy, pos.getZ(k) * sxz);
     return canopy;
   }
-  const trunk = trunkGeometry(def, h, rng, lod === 0 ? (name === 'eucalyptus' ? 2 : 3) : 1);
+  const trunk = trunkGeometry(def, h, rng, def.column ? 0 : lod === 0 ? (name === 'eucalyptus' ? 2 : 3) : 1);
   const canopy = lod === 0 ? canopyGeometry(def, h, r, rng, def.blobs, 0, def.cards, 0.86) : canopyGeometry(def, h, r, rng, 4, 0, 0, 1.08);
   return mergeGeometries([trunk, canopy]);
 }
 
-export function palmGeometry(lod) {
+function palmGeometry(lod) {
   const rng = makeRng(404 + lod);
   const h = 11;
   const parts = [];

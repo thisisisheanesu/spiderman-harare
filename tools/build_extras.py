@@ -30,8 +30,11 @@ How the greeting windows were chosen (not repeated at build time, recorded here 
 split at pauses by an energy detector, every pause-delimited segment of the basic dialogues was transcribed with
 Meta's MMS-1b-all Shona ASR model and matched against the dialogue text printed in the FSI Shona Basic Course
 (1965); only segments whose ASR transcript matched the book's text were kept (the transcript is stored as `asr`
-next to each clip below). Speaker sex comes from the voice pitch (median F0, see `f0`), cross-checked by clustering
-all segments into two voices; the course preface names the two tape voices as Mr. and Mrs. Matthew Mataranyika.
+next to each clip below; "Hongu" alone was cut at the pause found by CTC forced alignment of "hongu tingaenda").
+Speaker: the course preface credits the Shona tape voices to Mr. and Mrs. Matthew Mataranyika. Every clip used here
+is the same male voice: a WavLM speaker-verification model scores all of them as close to each other as two takes of
+one line, and a wav2vec2 gender classifier (Common Voice) gives male >= 0.98 for each. Pitch (`f0`, median Hz)
+still varies a lot (108-273 Hz) with the tone pattern and emphasis of the phrase.
 """
 import argparse
 import json
@@ -116,45 +119,119 @@ AMBIENCE = [
 FSI_ITEM = 'https://archive.org/details/Shona_201407'
 FSI_BOOK = 'https://archive.org/details/micro_IA41153663_0434'
 
+# Honest notes for the 'call' clips: they are real Shona speech, but read calmly for a textbook, not shouted.
+CALL_NOTE = {cid: ('Destination read calmly from the course vocabulary list (1960s place-name forms), not a real '
+                   'conductor shout; pitch/volume it up for a hwindi.') for cid in (
+    'sn-ku-harare', 'sn-kwa-mutare', 'sn-ku-marondera', 'sn-ku-kwekwe', 'sn-ku-gweru', 'sn-ku-bhuruwayo',
+    'sn-ku-chipinga')}
+CALL_NOTE['sn-ndiri-kutengesa-mahobo'] = "Vendor's line from a textbook market dialogue, spoken calmly."
+
 
 def fsi_url(unit):
     return 'https://archive.org/download/Shona_201407/' + urllib.parse.quote(f'FSI - Shona Basic Course - Unit {unit:02d}.mp3')
 
 
-FSI_SPEAKER = {'male': 'Mr. Matthew Mataranyika', 'female': 'Mrs. Mataranyika'}
+FSI_SPEAKER = {'male': 'Matthew Mataranyika (FSI tape voice)'}
 
 # unit, window (s) in the unit mp3, kind, Shona text (FSI spelling, tone marks dropped), English, sex, MMS ASR
 # transcript of the window, median F0 (Hz). Filled from the review described in the module docstring.
 CLIPS = [
-    dict(id='sn-mangwanani-mai', unit=1, win=(9.82, 11.28), kind='greet', lang='sn', text='Mangwanani mai.',
-         en='Good morning, madam.', gender='male', asr='mangwanani mai', f0=128),
-    dict(id='sn-mangwanani-baba', unit=1, win=(17.56, 18.87), kind='greet', lang='sn', text='Mangwanani baba.',
-         en='Good morning, sir.', gender='male', asr='mangwanani baba', f0=116),
-    dict(id='sn-mwarara-here', unit=1, win=(29.76, 31.01), kind='greet', lang='sn', text='Mwarara here?',
-         en='Did you sleep well? (morning greeting)', gender='male', asr='mwararahere', f0=109),
-    dict(id='sn-ndarara-zvangu', unit=1, win=(37.02, 38.33), kind='greet', lang='sn', text='Ndarara zvangu.',
-         en='I slept well. (reply)', gender='male', asr='ndarara zvangu', f0=108),
-    dict(id='sn-mangwanani-shewe', unit=2, win=(12.68, 14.15), kind='greet', lang='sn', text='Mangwanani shewe.',
-         en='Good morning (respectful).', gender='male', asr='mangwa nanishewe', f0=146),
+    dict(id='sn-mangwanani-mai', unit=1, win=(9.82, 11.28), kind='greet', lang='sn',
+         text='Mangwanani mai.', en='Good morning, madam.',
+         gender='male', asr='mangwanani mai', f0=128),
+    dict(id='sn-mangwanani-baba', unit=1, win=(17.56, 18.87), kind='greet', lang='sn',
+         text='Mangwanani baba.', en='Good morning, sir.',
+         gender='male', asr='mangwanani baba', f0=116),
+    dict(id='sn-mwarara-here', unit=1, win=(29.76, 31.01), kind='greet', lang='sn',
+         text='Mwarara here?', en='Did you sleep well? (the usual morning "how are you")',
+         gender='male', asr='mwararahere', f0=109),
+    dict(id='sn-ndarara-zvangu', unit=1, win=(37.02, 38.33), kind='greet', lang='sn',
+         text='Ndarara zvangu.', en='I slept well. (reply)',
+         gender='male', asr='ndarara zvangu', f0=108),
+    dict(id='sn-mangwanani-shewe', unit=2, win=(12.68, 14.15), kind='greet', lang='sn',
+         text='Mangwanani shewe.', en='Good morning (respectful).',
+         gender='male', asr='mangwa nanishewe', f0=146),
     dict(id='sn-mangwanani-chirombowe', unit=2, win=(20.30, 21.84), kind='greet', lang='sn',
-         text='Mangwanani chirombowe.', en='Good morning (respectful, to a man).', gender='male',
-         asr='mangwananichirombawi', f0=136),
-    dict(id='sn-aiwa-zvitambo', unit=2, win=(36.68, 38.12), kind='exclaim', lang='sn', text='Aiwa, zvitambo.',
-         en='Oh, very well indeed!', gender='male', asr='aiwa zvitambo', f0=122),
-    dict(id='sn-masikati-muzvare', unit=3, win=(11.19, 13.11), kind='greet', lang='sn', text='Masikati muzvare.',
-         en='Good afternoon, miss.', gender='male', asr='masikati muzvare', f0=153),
-    dict(id='sn-masikati-shewe', unit=3, win=(20.35, 21.83), kind='greet', lang='sn', text='Masikati shewe.',
-         en='Good afternoon (respectful).', gender='male', asr='masikati shewe', f0=130),
+         text='Mangwanani chirombowe.', en='Good morning (respectful, to a man).',
+         gender='male', asr='mangwananichirombawi', f0=136),
+    dict(id='sn-masikati', unit=10, win=(19.65, 21.11), kind='greet', lang='sn',
+         text='Masikati.', en='Good afternoon.',
+         gender='male', asr='masikaati', f0=140),
+    dict(id='sn-masikati-baba', unit=4, win=(23.25, 24.74), kind='greet', lang='sn',
+         text='Masikati baba.', en='Good afternoon, sir.',
+         gender='male', asr='masikati baba', f0=131),
+    dict(id='sn-masikati-muzvare', unit=3, win=(11.19, 13.11), kind='greet', lang='sn',
+         text='Masikati muzvare.', en='Good afternoon, miss.',
+         gender='male', asr='masikati muzvare', f0=153),
+    dict(id='sn-masikati-mwanangu', unit=4, win=(10.29, 11.97), kind='greet', lang='sn',
+         text='Masikati mwanangu.', en='Good afternoon, my child.',
+         gender='male', asr='masikati mwanangu', f0=146),
+    dict(id='sn-masikati-shewe', unit=3, win=(20.35, 21.83), kind='greet', lang='sn',
+         text='Masikati shewe.', en='Good afternoon (respectful).',
+         gender='male', asr='masikati shewe', f0=130),
+    dict(id='sn-masikati-chirombowe', unit=10, win=(9.90, 11.93), kind='greet', lang='sn',
+         text='Masikati chirombowe.', en='Good afternoon (respectful, to a man).',
+         gender='male', asr='masikati chirombowe', f0=179),
     dict(id='sn-mwaswera-here-shewe', unit=3, win=(29.34, 31.17), kind='greet', lang='sn',
-         text='Mwaswera here shewe?', en='How has your day been? (respectful)', gender='male',
-         asr='mwaswerahere shewe', f0=151),
+         text='Mwaswera here shewe?', en='How has your day been? (respectful)',
+         gender='male', asr='mwaswerahere shewe', f0=151),
     dict(id='sn-ndaswera-zvangu', unit=3, win=(38.94, 41.70), kind='greet', lang='sn',
-         text='Ndaswera zvangu kana mwaswerawo.', en="My day's been fine, if yours has been too.", gender='male',
-         asr='ndaswera zvangu kana maswera', f0=130),
-    dict(id='sn-masikati-mwanangu', unit=4, win=(10.29, 11.97), kind='greet', lang='sn', text='Masikati mwanangu.',
-         en='Good afternoon, my child.', gender='male', asr='masikati mwanangu', f0=146),
-    dict(id='sn-masikati-baba', unit=4, win=(23.25, 24.74), kind='greet', lang='sn', text='Masikati baba.',
-         en='Good afternoon, sir.', gender='male', asr='masikati baba', f0=131),
+         text='Ndaswera zvangu kana mwaswerawo.', en="I've had a good day, if you have too.",
+         gender='male', asr='ndaswera zvangu kana maswera', f0=130),
+    dict(id='sn-masanga-chirombowe', unit=5, win=(9.76, 11.76), kind='greet', lang='sn',
+         text='Masanga chirombowe.', en='Hello! (greeting between people meeting on the road)',
+         gender='male', asr='masanga chirombowe', f0=164),
+    dict(id='sn-mwazviita', unit=9, win=(110.87, 112.28), kind='greet', lang='sn',
+         text='Mwazviita.', en='Thank you.',
+         gender='male', asr='mwazviita', f0=205),
+    dict(id='sn-tamusiya', unit=9, win=(112.77, 114.20), kind='greet', lang='sn',
+         text='Tamusiya.', en='Goodbye. (lit. "we have left you")',
+         gender='male', asr='kamusiiya', f0=152),
+    dict(id='sn-aiwa-zvitambo', unit=2, win=(36.68, 38.12), kind='exclaim', lang='sn',
+         text='Aiwa, zvitambo.', en='Oh, very well indeed!',
+         gender='male', asr='aiwa zvitambo', f0=122),
+    dict(id='sn-hongu', unit=8, win=(57.37, 58.12), kind='exclaim', lang='sn',
+         text='Hongu.', en='Yes.',
+         gender='male', asr='hunde', f0=273),
+    dict(id='sn-hongu-tingaenda', unit=8, win=(57.37, 59.20), kind='exclaim', lang='sn',
+         text='Hongu, tingaenda.', en="Yes, let's go.",
+         gender='male', asr='hunde tingaenda', f0=168),
+    dict(id='sn-munhu-ndiani', unit=5, win=(26.78, 28.41), kind='exclaim', lang='sn',
+         text='Munhu ndiani?', en='Who is that? / Who are you?',
+         gender='male', asr='munhu ndiani', f0=164),
+    dict(id='sn-muri-kutsvaka-ani', unit=10, win=(27.09, 28.81), kind='exclaim', lang='sn',
+         text='Muri kutsvaka ani?', en='Who are you looking for?',
+         gender='male', asr='muri kutsvaka ani', f0=177),
+    dict(id='sn-anoita-marinyi', unit=9, win=(21.56, 23.51), kind='exclaim', lang='sn',
+         text='Anoita marinyi?', en='How much are they?',
+         gender='male', asr='anoita marinyi', f0=195),
+    dict(id='sn-muri-kunyanya-kani', unit=9, win=(45.66, 48.49), kind='exclaim', lang='sn',
+         text='Ah! Muri kunyanya kani!', en="Oh, that's too much! (too expensive)",
+         gender='male', asr='aa muri kunyanya kaani', f0=192),
+    dict(id='sn-ndiri-kutengesa-mahobo', unit=9, win=(9.64, 11.92), kind='call', lang='sn',
+         text='Ndiri kutengesa mahobo.', en="I'm selling bananas.",
+         gender='male', asr='ndiri kutengesa mahobo', f0=190),
+    dict(id='sn-ku-harare', unit=10, win=(102.44, 103.88), kind='call', lang='sn',
+         text='KuHarare.', en='To Harare.',
+         gender='male', asr='kuharaare', f0=175),
+    dict(id='sn-kwa-mutare', unit=10, win=(93.17, 94.59), kind='call', lang='sn',
+         text='KwaMutare.', en='To Mutare.',
+         gender='male', asr='kwamutaare', f0=195),
+    dict(id='sn-ku-marondera', unit=10, win=(106.35, 107.95), kind='call', lang='sn',
+         text='KuMarondera.', en='To Marondera.',
+         gender='male', asr='kumarondera', f0=174),
+    dict(id='sn-ku-kwekwe', unit=10, win=(114.50, 115.78), kind='call', lang='sn',
+         text='KuKwekwe.', en='To Kwekwe.',
+         gender='male', asr='kukwekwe', f0=200),
+    dict(id='sn-ku-gweru', unit=10, win=(118.56, 119.89), kind='call', lang='sn',
+         text='KuGweru.', en='To Gweru.',
+         gender='male', asr='kugweru', f0=184),
+    dict(id='sn-ku-bhuruwayo', unit=10, win=(122.44, 123.94), kind='call', lang='sn',
+         text='KuBhuruwayo.', en='To Bulawayo.',
+         gender='male', asr='kubhuruwayo', f0=167),
+    dict(id='sn-ku-chipinga', unit=10, win=(126.20, 127.65), kind='call', lang='sn',
+         text='KuChipinga.', en='To Chipinge (then spelt Chipinga).',
+         gender='male', asr='kuchipinga', f0=202),
 ]
 
 
@@ -364,23 +441,28 @@ def build_sprite(ffmpeg, cache, out_dir):
 
 
 def verify_sprite(ffmpeg, path, clips, seconds):
+    """Decode the sprite and check every clip: speech must begin 20-200 ms after `start` (60 ms pad + trimmed
+    onset) and end 20-200 ms before `start + dur`, and the 0.30 s gap before each clip must be digital silence."""
     y = decode(ffmpeg, path, SPRITE_SR, 1)[:, 0]
     ok = abs(len(y) / SPRITE_SR - seconds) < 0.01
     log(f'  VERIFY {path.name}: decoded {len(y) / SPRITE_SR:.3f} s (PCM {seconds:.3f} s)')
-    worst_gap, worst_head = -200.0, 0.0
+    h = int(0.01 * SPRITE_SR)
+    worst_gap = -200.0
     for c in clips:
         a = int(round(c['start'] * SPRITE_SR))
         b = int(round((c['start'] + c['dur']) * SPRITE_SR))
-        clip_db = rms_db(y[a:b])
-        head = max(rms_db(y[a + i:a + i + int(0.02 * SPRITE_SR)]) for i in range(0, int(0.25 * SPRITE_SR), int(0.01 * SPRITE_SR)))
-        before = rms_db(y[max(0, a - int(0.25 * SPRITE_SR)):a - int(0.03 * SPRITE_SR)]) if a > 0 else -200.0
-        # speech must start within 250 ms of the offset (60 ms pad) and the gap before must be silent
-        good = head > -40 and before < -60 and clip_db > -35
-        worst_gap, worst_head = max(worst_gap, before), min(worst_head, head) if worst_head else head
+        seg = y[a:b]
+        e = db(np.mean(np.square(seg[:len(seg) // h * h].reshape(-1, h)), axis=1))
+        loud = np.nonzero(e > -45.0)[0]
+        onset = loud[0] * h / SPRITE_SR if len(loud) else 9.0
+        tail = (len(e) - 1 - loud[-1]) * h / SPRITE_SR if len(loud) else 9.0
+        before = rms_db(y[max(0, a - int(0.27 * SPRITE_SR)):a - int(0.03 * SPRITE_SR)]) if a > 0 else -200.0
+        good = 0.02 <= onset <= 0.20 and 0.0 <= tail <= 0.20 and before < -60 and rms_db(seg) > -35
+        worst_gap = max(worst_gap, before)
         ok &= good
-        log(f'    {c["id"]:<24} start {c["start"]:7.3f} dur {c["dur"]:5.2f}  first-250ms peak-20ms {head:6.1f} dBFS'
-            f'  clip {clip_db:6.1f}  gap before {before:7.1f}  {"OK" if good else "FAIL"}')
-    log(f'  loudest gap {worst_gap:.1f} dBFS, weakest clip head {worst_head:.1f} dBFS -> {"OK" if ok else "FAIL"}')
+        log(f'    {c["id"]:<26} start {c["start"]:7.3f} dur {c["dur"]:5.2f}  speech from +{onset * 1000:3.0f} ms to '
+            f'-{tail * 1000:3.0f} ms  clip {rms_db(seg):6.1f} dBFS  gap before {before:7.1f} dBFS  {"OK" if good else "FAIL"}')
+    log(f'  {len(clips)} clips, loudest gap {worst_gap:.1f} dBFS -> {"OK" if ok else "FAIL"}')
     return ok
 
 
@@ -390,7 +472,7 @@ def manifest(amb, clips):
         'version': 1,
         'attribution': ('Street ambience: KevZim (Freesound, CC0) and radio continental drift / Claudia Wegener '
                         '(radio aporee, CC BY-SA 3.0). Shona greetings: FSI Shona Basic Course tapes (U.S. Foreign '
-                        'Service Institute, 1965, public domain), voices of Mr. and Mrs. Matthew Mataranyika. '
+                        'Service Institute, 1965, public domain), voice of Matthew Mataranyika. '
                         'See audio/CREDITS-extra.md.'),
         'ambience': [dict(id=s['id'], url=f'audio/street/{s["id"]}.mp3', use=s['use'], place=s['place'],
                           author=s['author'], license=s['license'][0], license_url=s['license'][1],
@@ -399,8 +481,9 @@ def manifest(amb, clips):
         'sprite': 'audio/street/greetings.mp3',
         'clips': [dict(id=c['id'], start=c['start'], dur=c['dur'], kind=c['kind'], lang=c['lang'], text=c['text'],
                        en=c['en'], gender=c['gender'], speaker=FSI_SPEAKER[c['gender']],
-                       author='Foreign Service Institute (U.S. Department of State); voices: Mr. and Mrs. Matthew Mataranyika',
-                       license=PD_US[0], source=f'{FSI_ITEM} (Unit {c["unit"]:02d})') for c in clips],
+                       author='Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)',
+                       license=PD_US[0], license_url=PD_US[1], source=FSI_ITEM, source_file=fsi_url(c['unit']),
+                       **({'note': CALL_NOTE[c['id']]} if c['id'] in CALL_NOTE else {})) for c in clips],
     }
 
 
@@ -434,7 +517,8 @@ def credits(amb, clips):
               f'book (Shona text and English translations used for `text`/`en`): {FSI_BOOK}.',
               '- Voices: "Shona texts, exercises, and tape voicings were furnished by Mr. and Mrs. Matthew Mataranyika"',
               '  (course preface), Shona speakers from what was then Southern Rhodesia (today Zimbabwe), recorded in 1963–65.',
-              '  Which of the two speaks each clip is inferred from the voice pitch (male voice ~130 Hz, female ~170 Hz).',
+              '  All clips used here are the male voice (checked with a speaker-verification model and a gender',
+              '  classifier), i.e. Mr. Matthew Mataranyika. No female voice is included.',
               f'- Licence: {PD_US[0]} — FSI courses are works of the U.S. federal government (17 U.S.C. § 105); the',
               f'  archive.org item carries the Public Domain Mark ({PD_US[1]}). Attribution given as a courtesy.',
               '- Changes: cut from the unit recordings, 90 Hz high-pass, FFT denoise, trimmed to the phrase, loudness',

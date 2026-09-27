@@ -3,15 +3,16 @@ import { Painter, noiseTile } from './atlas.js';
 import { polyArea } from '../core/geo.js';
 
 // Ground surface layers (UV scale noted per layer: metres per tile).
+// Pale, sun-bleached asphalt with darker repair patches (PHOTOS.md §20).
 function asphalt(p) {
-  p.rect(0, 0, 1, 1, '#5d5c5a');
+  p.rect(0, 0, 1, 1, '#83807a');
   p.grime(0.5, 1);
   p.speckle(p.S * 60, ['rgba(0,0,0,0.25)', 'rgba(255,255,255,0.12)', 'rgba(120,100,80,0.2)'], p.S / 400);
   // Patches and cracks.
   for (let i = 0; i < 4; i++) {
     const x = p.rng() * 0.8;
     const y = p.rng() * 0.8;
-    p.rect(x, y, x + 0.1 + p.rng() * 0.15, y + 0.06 + p.rng() * 0.12, `rgba(${p.rng() < 0.5 ? '30,30,30' : '110,108,104'},0.35)`);
+    p.rect(x, y, x + 0.1 + p.rng() * 0.15, y + 0.06 + p.rng() * 0.12, `rgba(${p.rng() < 0.7 ? '40,40,40' : '150,148,142'},0.4)`);
   }
   for (let i = 0; i < 10; i++) {
     let x = p.rng();
@@ -39,32 +40,41 @@ function asphalt(p) {
 }
 
 function paving(p) {
-  // 600 mm concrete slabs, red dust in the joints.
-  p.rect(0, 0, 1, 1, '#b9ada0');
+  // 600 mm grey concrete slabs, cracked here and there, red dust in the joints.
+  p.rect(0, 0, 1, 1, '#a9a39a');
   const n = 5;
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      const t = 0.9 + p.rng() * 0.18;
-      const v = Math.round(200 * t);
-      p.rect(i / n + 0.004, j / n + 0.004, (i + 1) / n - 0.004, (j + 1) / n - 0.004, `rgb(${v},${Math.round(v * 0.96)},${Math.round(v * 0.9)})`);
+      const v = Math.round(196 * (0.9 + p.rng() * 0.16));
+      p.rect(i / n + 0.004, j / n + 0.004, (i + 1) / n - 0.004, (j + 1) / n - 0.004, `rgb(${v},${Math.round(v * 0.985)},${Math.round(v * 0.96)})`);
     }
+  }
+  for (let k = 0; k < 4; k++) {
+    const x = p.rng();
+    const y = p.rng();
+    p.line(x, y, x + (p.rng() - 0.5) * 0.15, y + (p.rng() - 0.5) * 0.15, 'rgba(60,55,50,0.4)', 0.003);
   }
   p.grime(0.35, 1);
   p.speckle(p.S * 30, ['rgba(0,0,0,0.12)', 'rgba(255,255,255,0.1)', 'rgba(150,80,50,0.12)'], p.S / 350);
 }
 
 function bricks(p) {
-  // Herringbone clay pavers (First Street Mall).
-  p.rect(0, 0, 1, 1, '#6f5f55');
-  const tones = ['#9b6d5a', '#a87a66', '#8f6555', '#b0856f', '#8a6858', '#a09080'];
-  const u = 1 / 16;
-  for (let i = -2; i < 18; i++) {
-    for (let j = -2; j < 18; j++) {
-      const x = (i + j) * u;
-      const y = (j - i) * u * 0.5 + (i % 2) * u;
-      p.rect(x + 0.003, y + 0.003, x + 2 * u - 0.003, y + u - 0.003, tones[Math.floor(p.rng() * tones.length)]);
-      p.rect(x + u + 0.003, y + u + 0.003, x + 2 * u - 0.003, y + 3 * u - 0.003, tones[Math.floor(p.rng() * tones.length)]);
+  // First Street Mall: terracotta pavers in running bond, divided by grey concrete bands into
+  // ~6 m squares (one tile).
+  p.rect(0, 0, 1, 1, '#7a6358');
+  const tones = ['#a58375', '#977669', '#ad8b7c', '#8f6e62', '#a07f70'];
+  const rows = 40;
+  const cols = 20;
+  for (let r = 0; r < rows; r++) {
+    const off = (r % 2) * 0.5;
+    for (let c = -1; c < cols; c++) {
+      const x = (c + off) / cols;
+      p.rect(x + 0.002, r / rows + 0.002, x + 1 / cols - 0.002, (r + 1) / rows - 0.002, tones[Math.floor(p.rng() * tones.length)]);
     }
+  }
+  for (const [a, b] of [[0, 0.035], [0.965, 1]]) {
+    p.rect(a, 0, b, 1, '#ada49b');
+    p.rect(0, a, 1, b, '#ada49b');
   }
   p.grime(0.3, 1);
 }
@@ -115,6 +125,13 @@ function kerb(p) {
   for (let x = 0; x < 1; x += 0.25) p.rect(x, 0, x + 0.006, 1, 'rgba(0,0,0,0.25)');
 }
 
+// Kerb painted in alternating black and white 1 m blocks (medians, junction corners).
+function kerbPaint(p) {
+  p.rect(0, 0, 0.5, 1, '#e8e6e0');
+  p.rect(0.5, 0, 1, 1, '#2a2a2a');
+  p.grime(0.35, 1);
+}
+
 function rock(p) {
   p.rect(0, 0, 1, 1, '#9d968c');
   p.grime(0.6, 0.5);
@@ -156,13 +173,14 @@ function flowers(p) {
 const GROUND_LAYERS = {
   asphalt: [asphalt, 7],
   paving: [paving, 3],
-  bricks: [bricks, 2.4],
+  bricks: [bricks, 6],
   grass: [grass, 6],
   dryGrass: [dryGrass, 9],
   dirt: [dirt, 6],
   ballast: [ballast, 2.6],
   concrete: [concrete, 4],
   kerb: [kerb, 2],
+  kerbPaint: [kerbPaint, 2],
   rock: [rock, 7],
   macro: [macro, 173],
   paint: [paint, 2],

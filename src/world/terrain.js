@@ -241,23 +241,3 @@ export class Kopje {
     return best;
   }
 }
-
-// Flickering flame (always lit), animated by the city update.
-export function createFlame(pos) {
-  const geo = new THREE.ConeGeometry(0.5, 1.8, 7, 1, true);
-  geo.translate(0, 0.9, 0);
-  const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.1, 0.35), transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending, fog: true });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.copy(pos);
-  const inner = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.5, 2.0, 1.0), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  inner.scale.set(0.5, 0.7, 0.5);
-  mesh.add(inner);
-  return {
-    mesh,
-    update(t) {
-      const f = 1 + Math.sin(t * 13) * 0.08 + Math.sin(t * 29 + 1) * 0.06;
-      mesh.scale.set(1 + Math.sin(t * 7) * 0.05, f, 1 + Math.cos(t * 9) * 0.05);
-      mesh.rotation.y = t * 0.7;
-    },
-  };
-}

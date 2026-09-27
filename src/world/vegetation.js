@@ -4,7 +4,7 @@ import { pointInRing, cleanRing, distToRing } from './polygon.js';
 import { SegmentGrid } from './lines.js';
 import { makeCanvas } from './atlas.js';
 import { KERB_HEIGHT } from './streetMetrics.js';
-import { SPECIES, leafTexture, treeGeometry, palmGeometry } from './treeModels.js';
+import { leafTexture, modelFor } from './treeModels.js';
 
 // Trees of late-September Harare: jacarandas in full purple bloom lining the avenues and filling
 // the parks, African flame trees (Spathodea) with orange-red flower clusters, msasa with their
@@ -273,9 +273,9 @@ export function planTrees(ctx) {
     const ring = cleanRing(a.pts);
     if (ring.length < 6) continue;
     if (a.name === 'Africa Unity Square') {
-      scatter(ring, 11, 0.8, { jacaranda: 10, green: 1 }, 1.05, 4);
+      scatter(ring, 11, 0.8, { jacaranda: 10, cypress: 1.2, palm: 0.8, green: 1 }, 1.05, 4);
     } else if (a.name === 'Harare Gardens') {
-      scatter(ring, 15, 0.8, { jacaranda: 4, green: 3, eucalyptus: 2, msasa: 1.5, flame: 1 }, 1.25, 3);
+      scatter(ring, 15, 0.8, { jacaranda: 4, green: 3, eucalyptus: 2, msasa: 1.5, flame: 1, cypress: 1, palm: 0.8 }, 1.25, 3);
     } else if (a.kind === 'park') {
       scatter(ring, 17, 0.6, { jacaranda: 4, green: 3, msasa: 1, flame: 1 }, 1.1);
     } else if (a.kind === 'wood') {
@@ -315,23 +315,25 @@ function pickFrom(rng, weights) {
 }
 
 // Builds the instanced meshes. Returns {count, update(cameraPosition)}.
-export function createVegetation(group, trees, palms, uniforms, quality, shadows, drawDistance) {
+export function createVegetation(group, trees, uniforms, quality, shadows, drawDistance) {
   const leaves = leafTexture();
   const mat = treeMaterial(uniforms, leaves);
   const near = quality.trees >= 1 ? 170 : 110;
   const mid = quality.trees >= 1 ? 450 : 300;
   const far = Math.min(2600, drawDistance);
-  const fields = [];
-  for (const name of Object.keys(SPECIES)) {
-    const items = trees.filter((t) => t.species === name);
-    if (!items.length) continue;
-    fields.push(new InstanceLOD(group, [
-      { geo: treeGeometry(name, 0), dist: near, shadow: shadows },
-      { geo: treeGeometry(name, 1), dist: mid },
-      { geo: treeGeometry(name, 2), dist: far },
-    ], mat, items));
+  const bySpecies = new Map();
+  for (const t of trees) {
+    let list = bySpecies.get(t.species);
+    if (!list) bySpecies.set(t.species, (list = []));
+    list.push(t);
   }
-  if (palms.length) fields.push(new InstanceLOD(group, [{ geo: palmGeometry(0), dist: mid, shadow: shadows }, { geo: palmGeometry(1), dist: far }], mat, palms));
+  const fields = [];
+  for (const [name, items] of bySpecies) {
+    const levels = name === 'palm'
+      ? [{ geo: modelFor(name, 0), dist: mid, shadow: shadows }, { geo: modelFor(name, 1), dist: far }]
+      : [{ geo: modelFor(name, 0), dist: near, shadow: shadows }, { geo: modelFor(name, 1), dist: mid }, { geo: modelFor(name, 2), dist: far }];
+    fields.push(new InstanceLOD(group, levels, mat, items));
+  }
   // Alpha-tested shadows (dappled light under the canopies).
   const depth = new THREE.MeshDepthMaterial({ map: leaves, alphaTest: 0.45, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
   for (const f of fields) for (const l of f.levels) l.mesh.customDepthMaterial = depth;
@@ -350,7 +352,7 @@ export function createVegetation(group, trees, palms, uniforms, quality, shadows
   let lastX = Infinity;
   let lastZ = Infinity;
   return {
-    count: trees.length + palms.length,
+    count: trees.length,
     update(cam) {
       const dx = cam.x - lastX;
       const dz = cam.z - lastZ;
