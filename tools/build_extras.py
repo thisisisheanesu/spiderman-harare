@@ -32,12 +32,15 @@ Meta's MMS-1b-all Shona ASR model and matched against the dialogue text printed 
 (1965); only segments whose ASR transcript matched the book's text were kept (the transcript is stored as `asr`
 next to each clip below). One exception, kept on purpose: in Unit 8 the book prints "Hongu, tingaenda" but the
 speaker clearly says "Hunde, tingaenda" (ASR and CTC scores agree; the book uses "Hunde" for "yes" elsewhere), so the
-text follows the audio. "Hunde" alone was cut at the energy minimum (58.19 s) of the short pause before
-"tingaenda" (found with CTC forced alignment, then refined on the energy curve).
+text follows the audio. "Hunde" alone ends at 58.17 s, inside the ~60 ms pause before "tingaenda" (found with CTC
+forced alignment, then refined on the energy curve; the /t/ burst of "tingaenda" starts at ~58.18 s and is left out).
 Speaker: the course preface credits the Shona tape voices to Mr. and Mrs. Matthew Mataranyika. Every clip used here
 is the same male voice: a WavLM speaker-verification model scores all of them as close to each other as two takes of
-one line, and a wav2vec2 gender classifier (Common Voice) gives male >= 0.98 for each. Pitch (`f0`, median Hz)
-still varies a lot (108-273 Hz) with the tone pattern and emphasis of the phrase.
+one line, and a wav2vec2 gender classifier (Common Voice) gives male >= 0.98 for each. Other gender classifiers
+(alefiury xlsr-53, audeering age-gender) call a few of the high-pitched lines uncertain, but independent ECAPA
+(VoxCeleb) speaker embeddings put every clip with the male dialogue voice of Units 1-4 and far from the tape's rare
+female voice (e.g. Unit 3 ~172 s, Unit 10 ~966 s; not used). Pitch (`f0`, median Hz) still varies a lot (108-273 Hz)
+with the tone pattern and emphasis of the phrase.
 """
 import argparse
 import json
@@ -127,6 +130,9 @@ CLIP_NOTE = {cid: ('Destination read calmly from the course vocabulary list (196
     'sn-ku-harare', 'sn-kwa-mutare', 'sn-ku-marondera', 'sn-ku-kwekwe', 'sn-ku-gweru', 'sn-ku-bhuruwayo',
     'sn-ku-chipinga')}
 CLIP_NOTE['sn-ndiri-kutengesa-mahobo'] = "Vendor's line from a textbook market dialogue, spoken calmly."
+CLIP_NOTE['sn-mangwanani-shewe'] = CLIP_NOTE['sn-masikati-shewe'] = CLIP_NOTE['sn-mwaswera-here-shewe'] = (
+    "The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape "
+    "voice reads the woman's line of the dialogue.")
 CLIP_NOTE['sn-hunde'] = CLIP_NOTE['sn-hunde-tingaenda'] = (
     "'Hunde' is this speaker's regional word for 'yes' (the course book prints 'Hongu' in this dialogue and "
     "'Hunde' elsewhere); in Harare you would more often hear 'Hongu' or 'Ehe'.")
@@ -155,10 +161,10 @@ CLIPS = [
          text='Ndarara zvangu.', en='I slept well. (reply)',
          gender='male', asr='ndarara zvangu', f0=108),
     dict(id='sn-mangwanani-shewe', unit=2, win=(12.68, 14.15), kind='greet', lang='sn',
-         text='Mangwanani shewe.', en='Good morning (respectful).',
+         text='Mangwanani shewe.', en='Good morning (courteous; shewe is the address women use).',
          gender='male', asr='mangwa nanishewe', f0=146),
     dict(id='sn-mangwanani-chirombowe', unit=2, win=(20.30, 21.84), kind='greet', lang='sn',
-         text='Mangwanani chirombowe.', en='Good morning (respectful, to a man).',
+         text='Mangwanani chirombowe.', en='Good morning (courteous; chirombowe is the address men use).',
          gender='male', asr='mangwananichirombawi', f0=136),
     dict(id='sn-masikati', unit=10, win=(19.65, 21.11), kind='greet', lang='sn',
          text='Masikati.', en='Good afternoon.',
@@ -173,13 +179,13 @@ CLIPS = [
          text='Masikati mwanangu.', en='Good afternoon, my child.',
          gender='male', asr='masikati mwanangu', f0=146),
     dict(id='sn-masikati-shewe', unit=3, win=(20.35, 21.83), kind='greet', lang='sn',
-         text='Masikati shewe.', en='Good afternoon (respectful).',
+         text='Masikati shewe.', en='Good afternoon (courteous; shewe is the address women use).',
          gender='male', asr='masikati shewe', f0=130),
     dict(id='sn-masikati-chirombowe', unit=10, win=(9.90, 11.93), kind='greet', lang='sn',
-         text='Masikati chirombowe.', en='Good afternoon (respectful, to a man).',
+         text='Masikati chirombowe.', en='Good afternoon (courteous; chirombowe is the address men use).',
          gender='male', asr='masikati chirombowe', f0=179),
     dict(id='sn-mwaswera-here-shewe', unit=3, win=(29.34, 31.17), kind='greet', lang='sn',
-         text='Mwaswera here shewe?', en='How has your day been? (respectful)',
+         text='Mwaswera here shewe?', en='How has your day been? (courteous; shewe is the address women use)',
          gender='male', asr='mwaswerahere shewe', f0=151),
     dict(id='sn-ndaswera-zvangu', unit=3, win=(38.94, 41.70), kind='greet', lang='sn',
          text='Ndaswera zvangu kana mwaswerawo.', en="I've had a good day, if you have too.",
@@ -196,7 +202,7 @@ CLIPS = [
     dict(id='sn-aiwa-zvitambo', unit=2, win=(36.68, 38.12), kind='exclaim', lang='sn',
          text='Aiwa, zvitambo.', en='Oh, very well indeed!',
          gender='male', asr='aiwa zvitambo', f0=122),
-    dict(id='sn-hunde', unit=8, win=(57.37, 58.19), kind='exclaim', lang='sn',
+    dict(id='sn-hunde', unit=8, win=(57.37, 58.17), kind='exclaim', lang='sn',
          text='Hunde.', en='Yes.',
          gender='male', asr='hunde', f0=273),
     dict(id='sn-hunde-tingaenda', unit=8, win=(57.37, 59.20), kind='exclaim', lang='sn',
