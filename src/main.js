@@ -98,10 +98,23 @@ async function boot() {
   game.start();
   window.__ready = true;
 
+  // Start / pause flow. The world waits (paused) behind the title card; after that the HUD owns
+  // pausing (pause menu, map, help, lost pointer lock, hidden tab).
   const start = document.getElementById('start');
   const loading = document.getElementById('loading');
+  game.setPaused(true);
+  // Enter / Space also start (input.js swallows Space's default button activation).
+  const onKey = (e) => {
+    if (e.code !== 'Enter' && e.code !== 'Space' && e.code !== 'NumpadEnter') return;
+    e.preventDefault();
+    e.stopPropagation(); // don't let the same press make Spider-Man jump
+    begin();
+  };
   const begin = () => {
+    window.removeEventListener('keydown', onKey, true);
+    if (!game.paused) return;
     loading.classList.add('hidden');
+    game.setPaused(false);
     game.audio.unlock?.();
     game.input.requestPointerLock();
     game.events.emit('game:start', {});
@@ -109,11 +122,14 @@ async function boot() {
   if (params.get('autostart')) {
     begin();
   } else {
+    const touch = window.matchMedia?.('(pointer: coarse)').matches;
     start.disabled = false;
-    start.textContent = 'Tap to swing in';
+    start.textContent = touch ? 'Tap to swing in' : 'Click to swing in';
     start.addEventListener('click', begin, { once: true });
+    if (!touch) start.focus({ preventScroll: true });
+    window.addEventListener('keydown', onKey, true);
   }
-  // Clicking the canvas re-captures the mouse after Esc.
+  // Clicking the game re-captures the mouse (after Esc, or when the browser refused the lock).
   game.renderer.domElement.addEventListener('click', () => {
     if (!game.paused) game.input.requestPointerLock();
   });

@@ -1,17 +1,27 @@
 import * as THREE from 'three';
+import { buildSpiderManMesh, PIVOT_Y, B } from './model.js';
+import { SuitMaterial, SUITS } from './suits.js';
+import { Animator } from './animator.js';
+import { Controller } from './controller.js';
+import { Webs } from './web.js';
+import { roofEdgeFacing } from './anchors.js';
 
-// Baseline player: capsule that runs, jumps and does a very simple web swing.
-// (Placeholder — the full Spider-Man controller replaces this file, keeping the public API.)
+// Spider-Man: procedural skinned model, traversal controller, animation and web visuals.
 //
 // Public API (game.player):
-//   position   THREE.Vector3  feet position (bottom of the capsule), world metres
+//   position   THREE.Vector3  feet position, world metres
 //   velocity   THREE.Vector3  m/s
-//   state      'ground' | 'air' | 'swing' | 'zip' | 'wall' | 'perch'
-//   heading    radians, facing direction around +y (0 = facing -z / north)
-//   object     THREE.Object3D  visual root
-//   suit       'classic' | 'symbiote'
-//   radius, height
+//   state      'ground' | 'air' | 'swing' | 'zip' | 'wall' | 'perch' | 'dive'
+//   heading    radians, 0 = facing north (-z), CCW positive: forward = (-sin h, 0, -cos h)
+//   object     THREE.Object3D visual root (pivot at the hips; the rig hangs below it)
+//   suit       'classic' | 'symbiote' (F toggles; setSuit(name) to force)
+//   radius, height, speed (m/s getter)
 //   teleport(x, y, z)
+//   hands      {L, R} world positions of the palms (web anchors), updated every frame
+// Emits player:jump / land / webShot / swingStart / swingEnd / zip / wallStart / perch / suit.
+
+const PALM = new THREE.Vector3(0, -0.09, -0.012);
+
 export class Player {
   constructor() {
     this.position = new THREE.Vector3();
@@ -21,132 +31,70 @@ export class Player {
     this.radius = 0.4;
     this.height = 1.8;
     this.suit = 'classic';
-    this.anchor = null;
+    this.object = null;
+    this.hands = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+  }
+
+  get speed() {
+    return this.velocity.length();
   }
 
   async init(game) {
     this.game = game;
-    this.world = game.world;
-    const body = new THREE.Mesh(
-      new THREE.CapsuleGeometry(this.radius, this.height - this.radius * 2, 4, 8),
-      new THREE.MeshStandardMaterial({ color: '#c8102e', roughness: 0.6 }),
-    );
-    body.position.y = this.height / 2;
-    body.castShadow = true;
+    this.suitMaterial = new SuitMaterial(game.renderer, game.quality);
+    this.rig = buildSpiderManMesh(this.suitMaterial.material);
+    this.rig.mesh.position.y = -PIVOT_Y;
+    this.rig.mesh.castShadow = game.quality.shadows;
     this.object = new THREE.Group();
-    this.object.add(body);
+    this.object.name = 'player';
+    this.object.add(this.rig.mesh);
     game.scene.add(this.object);
 
-    const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-    this.webLine = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: '#ffffff' }));
-    this.webLine.frustumCulled = false;
-    this.webLine.visible = false;
-    game.scene.add(this.webLine);
+    this.webs = new Webs(game.scene);
+    this.controller = new Controller(this, game);
+    this.animator = new Animator(this.rig, this.object);
+    this._spawnOnRBZ(game.data);
+    this._syncVisual(0);
+  }
 
-    // Start perched on the Reserve Bank of Zimbabwe (tallest building) if present.
-    const rbz = game.data.buildings.find((b) => b.lm === 'rbz' || b.name === 'Reserve Bank of Zimbabwe');
-    if (rbz) this.teleport(rbz.cx, rbz.h + 0.05, rbz.cz);
-    else this.teleport(0, 2, 0);
+  // Start crouched on the Reserve Bank's roof edge looking out over the CBD (like a perch shot).
+  _spawnOnRBZ(data) {
+    const rbz = data.buildings.find((b) => b.lm === 'rbz') || data.buildings.reduce((a, b) => (b.h > a.h ? b : a));
+    const edge = roofEdgeFacing(rbz, -rbz.cx, -rbz.cz);
+    this.teleport(edge.x - edge.nx * 0.35, rbz.h, edge.z - edge.nz * 0.35);
+    this.controller.perchAt(this.position, { x: edge.nx, z: edge.nz });
+    this.heading = Math.atan2(-edge.nx, -edge.nz);
   }
 
   teleport(x, y, z) {
     this.position.set(x, y, z);
     this.velocity.set(0, 0, 0);
     this.state = 'air';
+    this.controller.reset();
+    this.webs.clear();
+    this.game.cameraRig?.snap?.();
+  }
+
+  setSuit(name) {
+    if (!SUITS.includes(name) || name === this.suit) return;
+    this.suit = name;
+    this.suitMaterial.set(name);
+    this.game.events.emit('player:suit', { suit: name });
   }
 
   update(dt, game) {
-    const input = game.input;
-    const cam = game.camera;
-    const fwd = new THREE.Vector3();
-    cam.getWorldDirection(fwd);
-    fwd.y = 0;
-    fwd.normalize();
-    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
-    const wish = new THREE.Vector3().addScaledVector(fwd, input.move.y).addScaledVector(right, input.move.x);
-
-    if (input.pressed('jump') && this.state === 'ground') {
-      this.velocity.y = 9;
-      this.state = 'air';
-      game.events.emit('player:jump', { pos: this.position.clone() });
-    }
-
-    if (input.pressed('swing') && this.state !== 'swing') {
-      const dir = fwd.clone().multiplyScalar(0.8).add(new THREE.Vector3(0, 1, 0)).normalize();
-      const origin = this.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-      const hit = this.world.raycast(origin, dir, 120);
-      if (hit) {
-        this.anchor = hit.point;
-        this.ropeLen = hit.distance;
-        this.state = 'swing';
-        game.events.emit('player:webShot', { from: origin, to: hit.point.clone() });
-      }
-    }
-    if (this.state === 'swing' && !input.down('swing')) {
-      this.state = 'air';
-      this.anchor = null;
-    }
-
-    const steps = Math.max(1, Math.ceil((this.velocity.length() * dt) / 0.3));
-    const h = dt / steps;
-    for (let s = 0; s < steps; s++) this.substep(h, wish);
-
-    this.object.position.copy(this.position);
-    const hv = Math.hypot(this.velocity.x, this.velocity.z);
-    if (hv > 0.5) this.heading = Math.atan2(-this.velocity.x, -this.velocity.z);
-    this.object.rotation.y = this.heading;
-
-    this.webLine.visible = !!this.anchor;
-    if (this.anchor) {
-      const p = this.webLine.geometry.attributes.position;
-      p.setXYZ(0, this.position.x, this.position.y + 1.4, this.position.z);
-      p.setXYZ(1, this.anchor.x, this.anchor.y, this.anchor.z);
-      p.needsUpdate = true;
-    }
+    if (game.input.pressed('suit')) this.setSuit(this.suit === 'classic' ? 'symbiote' : 'classic');
+    this.controller.update(dt);
+    this._syncVisual(dt);
+    this.webs.update(dt, game.camera, this.hands);
   }
 
-  substep(h, wish) {
-    const v = this.velocity;
-    if (this.state === 'ground') {
-      const target = wish.clone().multiplyScalar(14);
-      v.x += (target.x - v.x) * Math.min(1, h * 10);
-      v.z += (target.z - v.z) * Math.min(1, h * 10);
-    } else {
-      v.x += wish.x * 8 * h;
-      v.z += wish.z * 8 * h;
-    }
-    v.y -= 22 * h;
-
-    this.position.addScaledVector(v, h);
-
-    if (this.state === 'swing' && this.anchor) {
-      const hand = this.position.clone().add(new THREE.Vector3(0, 1.4, 0));
-      const d = hand.clone().sub(this.anchor);
-      const len = d.length();
-      if (len > this.ropeLen) {
-        d.normalize();
-        this.position.addScaledVector(d, this.ropeLen - len);
-        const radial = v.dot(d);
-        if (radial > 0) v.addScaledVector(d, -radial);
-      }
-    }
-
-    const start = this.position.clone().add(new THREE.Vector3(0, this.radius, 0));
-    const end = this.position.clone().add(new THREE.Vector3(0, this.height - this.radius, 0));
-    const res = this.world.collideCapsule(start, end, this.radius);
-    if (res.hit) {
-      this.position.copy(start).y -= this.radius;
-      const n = res.normal;
-      const into = v.dot(n);
-      if (into < 0) v.addScaledVector(n, -into);
-    }
-    if (res.ground && v.y <= 0.1) {
-      if (this.state !== 'ground' && this.state !== 'swing') {
-        this.game.events.emit('player:land', { pos: this.position.clone(), speed: -v.y, hard: v.y < -18 });
-      }
-      if (this.state !== 'swing') this.state = 'ground';
-    } else if (this.state === 'ground') {
-      this.state = 'air';
-    }
+  _syncVisual(dt) {
+    this.suitMaterial.update(dt);
+    this.animator.update(dt, this, this.controller);
+    this.object.updateMatrixWorld(true);
+    const bones = this.rig.bones;
+    this.hands.L.copy(PALM).applyMatrix4(bones[B.handL].matrixWorld);
+    this.hands.R.copy(PALM).applyMatrix4(bones[B.handR].matrixWorld);
   }
 }

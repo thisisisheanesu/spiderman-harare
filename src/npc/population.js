@@ -1,0 +1,475 @@
+import * as THREE from 'three';
+import * as STREETLIFE from '../data/streetlife.js';
+import { makeRng, hashString } from '../core/rng.js';
+import { pointInPoly, polyCentroid } from '../core/geo.js';
+import { CROSS, WALK, PATH } from './walkways.js';
+import { Agent, headingOf } from './crowd.js';
+import { makeLook, pickArchetype, vendorLook } from './appearance.js';
+import { FLAG } from './bodies.js';
+
+// Who is out, and where: keeps a population of walkers, chatting groups, people standing about,
+// rank crowds with their touts, and stall vendors in a radius around the player, scaled by the
+// quality preset, the time of day and how busy each street is. Spawns happen out of sight.
+
+const PER_METRE = 0.075; // walkers per metre of pavement at density 1
+const HOURLY = STREETLIFE.TRAFFIC?.densityByHour || { 0: 0.05, 6: 0.5, 7: 0.9, 12: 0.7, 17: 1, 19: 0.5, 21: 0.2 };
+const HOURS = Object.keys(HOURLY).map(Number).sort((a, b) => a - b);
+const SELLING = STREETLIFE.VENDOR_RAID?.sellingHours || [6, 18];
+const RANK_INFO = STREETLIFE.KOMBI_RANKS || [];
+const VENDOR_LABEL = {
+  fruit_veg: 'fruit & veg seller',
+  airtime_phone: 'airtime vendor',
+  sweets_snacks: 'snack seller',
+  newspaper: 'newspaper vendor',
+  shoe_mender: 'shoe mender',
+  flowers: 'flower seller',
+  secondhand_clothes: 'clothes seller',
+  roast_maize: 'maize seller',
+  megaphone_herbalist: 'herbalist',
+  money_changer: 'money changer',
+  umbrella_accessories: 'hawker',
+};
+const ROLE_LABEL = { office_man: 'office worker', office_woman: 'office worker', school_kid: 'pupil', security_guard: 'security guard', police: 'police officer', street_preacher: 'preacher', market_woman: 'market trader', elder: 'elder', youth: 'youngster', apostolic: 'mupostori' };
+
+// Pedestrians per hour of day relative to the busiest hour (never fully empty: guards, late commuters).
+export function hourFactor(h) {
+  h = ((h % 24) + 24) % 24;
+  let i = 0;
+  while (i < HOURS.length - 1 && HOURS[i + 1] <= h) i++;
+  const h0 = HOURS[i];
+  const h1 = HOURS[(i + 1) % HOURS.length] + (i === HOURS.length - 1 ? 24 : 0);
+  const f = h1 > h0 ? (h - h0) / (h1 - h0) : 0;
+  const v = HOURLY[h0] + (HOURLY[HOURS[(i + 1) % HOURS.length]] - HOURLY[h0]) * f;
+  return Math.max(0.18, Math.min(1, v));
+}
+
+export class Population {
+  constructor(game, walkways, vendors, crowd, voices) {
+    this.game = game;
+    this.walk = walkways;
+    this.vendors = vendors;
+    this.crowd = crowd;
+    this.voices = voices;
+    const q = game.quality;
+    this.max = Math.max(60, Math.round(300 * (q.crowd ?? 1)));
+    this.radius = q.level === 'low' ? 115 : q.level === 'medium' ? 140 : 165;
+    this.pool = Array.from({ length: this.max }, (_, i) => new Agent(i));
+    this.free = this.pool.slice().reverse();
+    this.list = [];
+    this.nextId = 1;
+    this.groups = [];
+    this.rng = makeRng(hashString('harare-crowd'));
+    this.cands = [];
+    this.cum = new Float64Array(0);
+    this.candFocus = { x: 1e9, z: 1e9 };
+    this.candT = 0;
+    this.targetWalkers = 0;
+    this.focus = new THREE.Vector3(1e9, 0, 1e9);
+    this.frustum = new THREE.Frustum();
+    this._pm = new THREE.Matrix4();
+    this._v = new THREE.Vector3();
+    this._p = { x: 0, z: 0 };
+    this._tmp = [];
+    this.ranks = this._prepRanks();
+  }
+
+  // --- Pool ------------------------------------------------------------------------------------
+
+  _alloc(look, kind) {
+    const a = this.free.pop();
+    if (!a) return null;
+    a.reset(this.nextId++, look, kind);
+    const label = ROLE_LABEL[look.archetype];
+    a.role = label ? `${look.name}, ${label}` : look.name;
+    a.listIndex = this.list.length;
+    this.list.push(a);
+    return a;
+  }
+
+  release(a) {
+    this.voices.release(a);
+    if (a.group) {
+      const m = a.group.members;
+      m.splice(m.indexOf(a), 1);
+      a.group = null;
+    }
+    if (a.stall) a.stall.agent = null;
+    if (a.rank) a.rank.agents.splice(a.rank.agents.indexOf(a), 1);
+    a.stall = null;
+    a.rank = null;
+    a.id = -1;
+    const i = a.listIndex;
+    const last = this.list.pop();
+    if (last !== a) {
+      this.list[i] = last;
+      last.listIndex = i;
+    }
+    this.free.push(a);
+  }
+
+  // --- Frame update ----------------------------------------------------------------------------
+
+  update(dt, ctx) {
+    const game = this.game;
+    const t = game.time;
+    const cam = game.camera;
+    this._pm.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    this.frustum.setFromProjectionMatrix(this._pm);
+    const jumped = this.focus.distanceToSquared(ctx.focus) > 90 * 90;
+    this.focus.copy(ctx.focus);
+    const R = this.radius;
+    const hour = game.sky?.timeOfDay ?? 12;
+    this.hour = hour;
+    const tf = hourFactor(hour);
+    if (jumped) {
+      // Teleport or first frame: clear what is far away and fill the new area straight away.
+      for (let i = this.list.length - 1; i >= 0; i--) {
+        const a = this.list[i];
+        if (a.position.distanceToSquared(ctx.focus) > R * R) this.release(a);
+      }
+      for (const g of this.groups.slice()) if (!g.members.length) this.groups.splice(this.groups.indexOf(g), 1);
+    }
+    if (jumped || (this.candT -= dt) <= 0 || Math.hypot(this.candFocus.x - ctx.focus.x, this.candFocus.z - ctx.focus.z) > 15) {
+      this._refreshCandidates(ctx.focus, tf);
+      this.candT = 2;
+    }
+    this._updateVendors(ctx, hour, jumped);
+    this._updateRanks(ctx, tf, jumped);
+    this._updateGroups(t);
+
+    // Walkers: despawn far ones, top up toward the target out of sight.
+    let walkers = 0;
+    let groupsN = 0;
+    let idlers = 0;
+    const far2 = (R * 1.1) ** 2;
+    for (let i = this.list.length - 1; i >= 0; i--) {
+      const a = this.list[i];
+      if (a.kind === 'vendor' || a.kind === 'rank' || a.kind === 'hwindi') continue;
+      const d2 = a.position.distanceToSquared(ctx.focus);
+      if (d2 > far2 && a.kind !== 'group') {
+        this.release(a);
+        continue;
+      }
+      if (a.kind === 'walker') walkers++;
+      else if (a.kind === 'idle') {
+        idlers++;
+        if (t > a.timer) this._startWalking(a);
+      }
+    }
+    for (const g of this.groups) groupsN += g.members.length;
+    const room = this.free.length;
+    const target = this.targetWalkers;
+    let budget = jumped ? room : Math.min(room, 3);
+    const anywhere = jumped;
+    while (budget > 0 && walkers + groupsN + idlers < target) {
+      const r = this.rng();
+      let n = 0;
+      if (r < 0.08 && groupsN < target * 0.14) n = this._spawnGroup(ctx, anywhere);
+      else if (r < 0.13 && idlers < target * 0.06) n = this._spawnIdler(ctx, anywhere) ? 1 : 0;
+      else n = this._spawnWalker(ctx, anywhere) ? 1 : 0;
+      if (r < 0.08) groupsN += n;
+      else if (r < 0.13) idlers += n;
+      else walkers += n;
+      budget -= Math.max(1, n);
+      if (!n && !anywhere) break;
+    }
+    // Too many (time of day changed, or quality): let far, unseen walkers go.
+    if (walkers + groupsN + idlers > target * 1.15 + 5) {
+      for (let i = this.list.length - 1; i >= 0 && walkers > target; i--) {
+        const a = this.list[i];
+        if (a.kind !== 'walker' || this._inView(a.position.x, a.position.z)) continue;
+        if (a.position.distanceToSquared(ctx.focus) < (R * 0.6) ** 2) continue;
+        this.release(a);
+        walkers--;
+      }
+    }
+  }
+
+  // Edges near the focus weighted by length x busyness x distance falloff (denser close to the player).
+  _refreshCandidates(focus, tf) {
+    const W = this.walk;
+    const R = this.radius;
+    const cands = this.cands;
+    cands.length = 0;
+    const weights = [];
+    let expected = 0;
+    W.forEdgesNear(focus.x, focus.z, R, (e, i) => {
+      if (e.kind === CROSS || e.density <= 0) return;
+      const a = W.nodes[e.a];
+      const b = W.nodes[e.b];
+      const d = Math.hypot((a.x + b.x) / 2 - focus.x, (a.z + b.z) / 2 - focus.z);
+      if (d > R) return;
+      const fall = d < 45 ? 1 : 1 - 0.7 * ((d - 45) / (R - 45));
+      const w = e.len * e.density * fall;
+      cands.push(i);
+      weights.push(w);
+      expected += w;
+    });
+    this.cum = new Float64Array(weights.length);
+    let acc = 0;
+    for (let i = 0; i < weights.length; i++) this.cum[i] = acc += weights[i];
+    this.candFocus.x = focus.x;
+    this.candFocus.z = focus.z;
+    const vendors = this.list.reduce((n, a) => n + (a.kind === 'vendor' || a.kind === 'rank' || a.kind === 'hwindi' ? 1 : 0), 0);
+    this.targetWalkers = Math.min(this.max - vendors - 4, Math.round(expected * PER_METRE * tf));
+  }
+
+  _sampleEdge(filter) {
+    const cum = this.cum;
+    const n = cum.length;
+    if (!n) return -1;
+    for (let tries = 0; tries < 6; tries++) {
+      const r = this.rng() * cum[n - 1];
+      let lo = 0;
+      let hi = n - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (cum[mid] < r) lo = mid + 1;
+        else hi = mid;
+      }
+      const ei = this.cands[lo];
+      if (!filter || filter(this.walk.edges[ei])) return ei;
+    }
+    return -1;
+  }
+
+  _inView(x, z) {
+    const cam = this.game.camera.position;
+    const dx = x - cam.x;
+    const dz = z - cam.z;
+    if (dx * dx + dz * dz > 75 * 75) return false;
+    return this.frustum.containsPoint(this._v.set(x, 1, z));
+  }
+
+  _spawnWalker(ctx, anywhere) {
+    const W = this.walk;
+    const rng = this.rng;
+    for (let tries = 0; tries < 6; tries++) {
+      const ei = this._sampleEdge();
+      if (ei < 0) return null;
+      const e = W.edges[ei];
+      const s = rng() * e.len;
+      const lat = (rng() * 2 - 1) * e.spread * 0.9;
+      const p = W.pointOn(e, s, lat, this._p);
+      if (!anywhere && this._inView(p.x, p.z)) continue;
+      if (this.crowd.near(p.x, p.z, 0.9, this._tmp).length) continue;
+      const nearRank = this.ranks.some((r) => Math.abs(r.x - p.x) < 90 && Math.abs(r.z - p.z) < 90);
+      const look = makeLook(rng, pickArchetype(rng, { hour: this.hour, nearRank, walking: true }));
+      const a = this._alloc(look, 'walker');
+      if (!a) return null;
+      const fwd = rng() < 0.5;
+      this.crowd.putOnEdge(a, ei, fwd, fwd ? s : e.len - s, fwd ? lat : -lat);
+      return a;
+    }
+    return null;
+  }
+
+  // Someone standing at the building line: a guard, someone on the phone, waiting for a friend.
+  _spawnIdler(ctx, anywhere) {
+    const W = this.walk;
+    const rng = this.rng;
+    const ei = this._sampleEdge((e) => e.kind === WALK && e.spread >= 0.45);
+    if (ei < 0) return null;
+    const e = W.edges[ei];
+    const s = rng.range(0.5, e.len - 0.5);
+    const p = W.pointOn(e, s, e.side * e.spread, this._p);
+    if ((!anywhere && this._inView(p.x, p.z)) || this.crowd.near(p.x, p.z, 1.2, this._tmp).length || !W.free(p.x, p.z)) return null;
+    const look = makeLook(rng, pickArchetype(rng, { hour: this.hour }));
+    const a = this._alloc(look, 'idle');
+    if (!a) return null;
+    a.position.set(p.x, W.nodes[e.a].y, p.z);
+    a.heading = Math.atan2(e.side * e.uz, -e.side * e.ux);
+    a.home = { x: p.x, z: p.z, heading: a.heading, edge: ei };
+    a.timer = this.game.time + (look.stationary ? rng.range(60, 180) : rng.range(15, 60));
+    return a;
+  }
+
+  _startWalking(a) {
+    const W = this.walk;
+    const ei = a.home?.edge ?? a.group?.edge;
+    if (ei === undefined || ei < 0) return;
+    const e = W.edges[ei];
+    const A = W.nodes[e.a];
+    const fwd = this.rng() < 0.5;
+    const s = Math.max(0, Math.min(e.len, (a.position.x - A.x) * e.ux + (a.position.z - A.z) * e.uz));
+    const lat = Math.max(-e.spread, Math.min(e.spread, (a.position.x - A.x) * e.uz - (a.position.z - A.z) * e.ux));
+    a.kind = 'walker';
+    a.state = 'walk';
+    a.home = null;
+    a.group = null;
+    this.crowd.putOnEdge(a, ei, fwd, fwd ? s : e.len - s, fwd ? lat : -lat);
+  }
+
+  // --- Chatting groups -------------------------------------------------------------------------
+
+  _spawnGroup(ctx, anywhere) {
+    const W = this.walk;
+    const rng = this.rng;
+    const ei = this._sampleEdge((e) => (e.kind === WALK && e.spread >= 0.75) || (e.kind === PATH && e.spread >= 1.1));
+    if (ei < 0) return 0;
+    const e = W.edges[ei];
+    const out = e.kind === WALK ? e.side : rng() < 0.5 ? 1 : -1;
+    const s = rng.range(1, e.len - 1);
+    const c = W.pointOn(e, s, out * Math.max(0, e.spread - 0.4), this._p);
+    const cx = c.x;
+    const cz = c.z;
+    if ((!anywhere && this._inView(cx, cz)) || this.crowd.near(cx, cz, 2, this._tmp).length) return 0;
+    const n = rng.int(2, 4);
+    const y = W.nodes[e.a].y;
+    const spots = [];
+    const base = rng() * Math.PI * 2;
+    for (let k = 0; k < n; k++) {
+      const ang = base + (k / n) * Math.PI * 2 + rng.range(-0.3, 0.3);
+      const r = rng.range(0.52, 0.68);
+      const x = cx + Math.cos(ang) * r;
+      const z = cz + Math.sin(ang) * r;
+      if (W.free(x, z) && W.free(x + 0.25, z) && W.free(x - 0.25, z) && W.free(x, z + 0.25) && W.free(x, z - 0.25)) spots.push([x, z]);
+    }
+    if (spots.length < 2) return 0;
+    const group = { x: cx, z: cz, members: [], speaker: 0, switchAt: 0, until: this.game.time + rng.range(25, 90), edge: ei };
+    // Friends tend to share an archetype mix (colleagues, school friends, market women).
+    const theme = pickArchetype(rng, { hour: this.hour, group: true });
+    for (const [x, z] of spots) {
+      const arch = rng() < 0.6 ? theme : pickArchetype(rng, { hour: this.hour });
+      const a = this._alloc(makeLook(rng, arch), 'group');
+      if (!a) break;
+      a.position.set(x, y, z);
+      a.heading = headingOf(cx - x, cz - z);
+      a.home = { x, z, heading: a.heading };
+      a.group = group;
+      group.members.push(a);
+    }
+    this.groups.push(group);
+    return group.members.length;
+  }
+
+  _updateGroups(t) {
+    for (let i = this.groups.length - 1; i >= 0; i--) {
+      const g = this.groups[i];
+      if (!g.members.length) {
+        this.groups.splice(i, 1);
+        continue;
+      }
+      if (t > g.until && g.edge >= 0) {
+        for (const a of g.members.slice()) {
+          if (a.state === 'react') continue;
+          this._startWalking(a);
+          g.members.splice(g.members.indexOf(a), 1);
+        }
+        continue;
+      }
+      if (t > g.switchAt) {
+        g.speaker = Math.floor(this.rng() * g.members.length);
+        g.switchAt = t + this.rng.range(2.5, 6);
+      }
+    }
+  }
+
+  // --- Kombi ranks -----------------------------------------------------------------------------
+
+  _prepRanks() {
+    const data = this.game.data;
+    const rng = makeRng(hashString('harare-ranks'));
+    const W = this.walk;
+    const out = [];
+    for (const rk of data.ranks || []) {
+      if (out.some((o) => Math.hypot(o.x - rk.x, o.z - rk.z) < 40)) continue;
+      const poly = (data.areas || [])
+        .filter((a) => a.kind === 'rank')
+        .map((a) => ({ a, c: polyCentroid(a.pts) }))
+        .filter(({ a, c }) => pointInPoly(rk.x, rk.z, a.pts) || Math.hypot(c.x - rk.x, c.z - rk.z) < 60)[0]?.a;
+      const spots = [];
+      for (let i = 0; i < 500 && spots.length < 70; i++) {
+        const x = rk.x + rng.range(-38, 38);
+        const z = rk.z + rng.range(-38, 38);
+        if (poly && !pointInPoly(x, z, poly.pts) && rng() < 0.7) continue;
+        if (!W.free(x, z) || !W.free(x + 0.4, z) || !W.free(x - 0.4, z) || !W.free(x, z + 0.4) || !W.free(x, z - 0.4)) continue;
+        if (spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 1.1 * 1.1)) continue;
+        spots.push({ x, y: W.groundY(x, z), z, heading: rng.range(-Math.PI, Math.PI), used: null });
+      }
+      // Spots nearest the rank point first: the crowd thickens at the heart of the rank.
+      spots.sort((p, q) => Math.hypot(p.x - rk.x, p.z - rk.z) - Math.hypot(q.x - rk.x, q.z - rk.z));
+      const key = rk.name.toLowerCase();
+      const info = RANK_INFO.find((r) => [r.name, ...(r.altNames || [])].some((n) => key.includes(n.toLowerCase().split(' ')[0])));
+      out.push({ name: rk.name, x: rk.x, z: rk.z, kind: rk.kind, spots, agents: [], info });
+    }
+    return out;
+  }
+
+  _updateRanks(ctx, tf, jumped) {
+    const R = this.radius;
+    const rng = this.rng;
+    for (const rk of this.ranks) {
+      const d = Math.hypot(rk.x - ctx.focus.x, rk.z - ctx.focus.z);
+      if (d > R + 40) {
+        for (const a of rk.agents.slice()) this.release(a);
+        for (const s of rk.spots) s.used = null;
+        continue;
+      }
+      const want = Math.min(rk.spots.length, Math.round((rk.kind === 'bus_stop' ? 8 : 30) * (this.game.quality.crowd ?? 1) * Math.max(0.35, tf)));
+      let budget = jumped ? want : 2;
+      for (const s of rk.spots) {
+        if (rk.agents.length >= want || budget <= 0 || !this.free.length) break;
+        if (s.used && s.used.id === s.usedId) continue;
+        if (!jumped && this._inView(s.x, s.z)) continue;
+        if (this.game.traffic?.vehiclesNear?.(s.x, s.z, 2.5)?.length) continue;
+        const hwindi = rk.agents.filter((a) => a.kind === 'hwindi').length < (rk.kind === 'bus_stop' ? 1 : 3) && rng() < 0.3;
+        const look = hwindi ? makeLook(rng, { id: 'hwindi', walkSpeed: [1.3, 2.2] }, { gender: 'male' }) : makeLook(rng, pickArchetype(rng, { hour: this.hour, nearRank: true }));
+        const a = this._alloc(look, hwindi ? 'hwindi' : 'rank');
+        if (!a) break;
+        a.position.set(s.x, s.y, s.z);
+        const face = rng() < 0.6 ? headingOf(rk.x - s.x, rk.z - s.z) : s.heading;
+        a.heading = face;
+        a.home = { x: s.x, z: s.z, heading: face };
+        a.rank = rk;
+        if (hwindi) a.role = `${look.name}, hwindi`;
+        s.used = a;
+        s.usedId = a.id;
+        rk.agents.push(a);
+        budget--;
+      }
+      // A kombi pulling into someone's spot: they step aside (out of sight) or flinch.
+      if (this.game.time > (rk.checkAt || 0)) {
+        rk.checkAt = this.game.time + 0.7;
+        for (const a of rk.agents.slice()) {
+          if (!this.game.traffic?.vehiclesNear?.(a.position.x, a.position.z, 1.8)?.length) continue;
+          if (this._inView(a.position.x, a.position.z)) this.crowd.startReaction(a, 'cover', 1.5, 0);
+          else this.release(a);
+        }
+      }
+    }
+  }
+
+  // --- Vendors ---------------------------------------------------------------------------------
+
+  _updateVendors(ctx, hour, jumped) {
+    const R = this.radius + 10;
+    const open = hour >= SELLING[0] && hour < SELLING[1] + 0.5;
+    if (this.vendors.group) this.vendors.group.visible = open;
+    let budget = jumped ? 100 : 2;
+    for (const st of this.vendors.stalls) {
+      const d2 = (st.x - ctx.focus.x) ** 2 + (st.z - ctx.focus.z) ** 2;
+      const want = open && d2 < R * R;
+      if (!want) {
+        if (st.agent && st.agent.id === st.agentId) this.release(st.agent);
+        st.agent = null;
+        continue;
+      }
+      if ((st.agent && st.agent.id === st.agentId) || budget <= 0 || !this.free.length) continue;
+      const rng = makeRng(st.seed);
+      const look = vendorLook(rng, st.def);
+      if (st.sit && look.flags & FLAG.LONG) look.flags = (look.flags & ~FLAG.LONG) | FLAG.SKIRT;
+      const a = this._alloc(look, 'vendor');
+      if (!a) break;
+      const v = st.vendorSpot;
+      a.position.set(v.x, v.y, v.z);
+      a.heading = v.heading;
+      a.home = { x: v.x, z: v.z, heading: v.heading };
+      a.stall = st;
+      a.role = `${look.name}, ${VENDOR_LABEL[st.type] || 'vendor'}`;
+      st.agent = a;
+      st.agentId = a.id;
+      budget--;
+    }
+  }
+}
