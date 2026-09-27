@@ -183,6 +183,22 @@
   font-size: 11px;
 }
 
+/* Mouse-capture hint (small desktop windows): in the toasts' place, which moves down under it. */
+.hud.compact .lock-hint {
+  top: calc(var(--top) + 48px);
+  padding: 6px 13px 7px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.hud.compact:has(.lock-hint.shown) .compass-caption {
+  opacity: 0;
+}
+
+.hud.compact:has(.lock-hint.shown) .toasts {
+  top: calc(var(--top) + 84px);
+}
+
 /* ---------------------------------------------------------------- controls hint: small and brief */
 
 .hud.compact .controls-hint {

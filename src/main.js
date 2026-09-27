@@ -11,6 +11,7 @@ import { Npcs } from './npc/npcs.js';
 import { AudioManager } from './audio/audio.js';
 import { Hud } from './ui/hud.js';
 import { storedQuality } from './ui/settings.js';
+import { LoadingProgress } from './ui/loading.js';
 
 // URL flags (handy for testing):
 //   ?autostart=1        skip the start screen (headless tests)
@@ -51,21 +52,15 @@ function nextPaint() {
   });
 }
 
-function setProgress(frac, label) {
-  const bar = document.getElementById('load-bar');
-  const txt = document.getElementById('load-text');
-  if (bar) bar.style.width = `${Math.round(frac * 100)}%`;
-  if (txt && label) txt.textContent = label;
-}
-
 async function boot() {
   const container = document.getElementById('app');
-  setProgress(0.05, 'Loading map of Harare CBD…');
+  const load = new LoadingProgress(); // the title card's bar and status line
+  load.set(0.05, 'Loading map of Harare CBD…');
   const [data, voices] = await Promise.all([
     fetchJSON('data/harare.json'),
     fetchJSON('audio/voices.json').catch(() => null),
   ]);
-  setProgress(0.25, 'Building the city…');
+  load.set(0.2, 'Building the city…');
 
   const quality = pickQuality();
   const game = new Game({ container, data, voices, quality });
@@ -92,21 +87,24 @@ async function boot() {
   game.add('audio', new AudioManager());
   game.add('hud', new Hud());
 
+  // One stretch of the bar per system; within it the bar follows the models / textures the system
+  // downloads while it initialises (src/ui/loading.js).
   const names = Object.keys(game.systems);
+  const at = (k) => 0.2 + (k / names.length) * 0.66;
   let i = 0;
-  let stage = 0;
-  let stageLabel = labels[names[0]];
-  // Systems start downloading models/textures while they initialise; show those counts as well.
-  const offAssets = game.assets.onProgress((done, total) => {
-    const extra = total ? ` (${done}/${total} files)` : '';
-    setProgress(0.25 + stage * 0.7, `${stageLabel || 'Almost there…'}${extra}`);
+  load.stage(at(0), at(1), labels[names[0]]);
+  const offAssets = game.assets.onProgress((done, total) => load.assets(done, total));
+  await game.init(() => {
+    i++;
+    if (i < names.length) load.stage(at(i), at(i + 1), labels[names[i]] || 'Almost there…');
   });
-  await game.init((frac) => {
-    const next = names[++i];
-    stage = frac;
-    stageLabel = labels[next];
-    setProgress(0.25 + frac * 0.7, labels[next] || 'Almost there…');
-  });
+  // Files requested without waiting for them (textures fill in when they land, models streamed
+  // after init): let them arrive before the shader warm-up, so their materials are compiled too and
+  // the first frame isn't bare. Capped, so a very slow connection still gets to play.
+  if (game.assets.pending) {
+    load.stage(at(names.length), 0.94, 'Downloading people, cars and textures…');
+    await Promise.race([game.assets.whenIdle(), new Promise((resolve) => setTimeout(resolve, 25000))]);
+  }
   offAssets();
 
   const spawn = params.get('spawn');
@@ -119,7 +117,7 @@ async function boot() {
   if (params.get('mute')) game.audio.setMasterVolume?.(0);
 
   // Shader warm-up: with KHR_parallel_shader_compile the page keeps painting while the GPU compiles.
-  setProgress(0.96, 'Warming up…');
+  load.set(0.96, 'Warming up…');
   await nextPaint();
   try {
     const r = game.renderer;
@@ -129,7 +127,7 @@ async function boot() {
   } catch (err) {
     console.warn('[boot] shader warm-up failed', err);
   }
-  setProgress(1, 'Ready');
+  load.finish('Ready');
   game.start();
   window.__ready = true;
 

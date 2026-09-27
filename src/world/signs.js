@@ -1,26 +1,14 @@
-import { makeRng, hashString } from '../core/rng.js';
 import { tint } from './palette.js';
 
-// Shop signs (real business names from the map's POIs, painted on canvas) on street frontages,
-// generic trade signs for the rest, and billboards with made-up local brands. All signs live in
-// reserved layers of the facade texture array: 16 sign slots (4:1) per layer, 2 ads (2:1) per layer.
+// Painted lettering for landmarks (building names, the National Gallery mural) and the billboard
+// posters, in reserved layers of the facade texture array: 16 sign slots (4:1) per layer, 2 ads (2:1)
+// per layer. Shop signs are not painted here any more: they come from data/shops.json (shops.js).
 
 const SLOT_COLS = 2;
 const SLOT_ROWS = 8;
 const PER_LAYER = SLOT_COLS * SLOT_ROWS;
-
-const SIGN_STYLES = [
-  ['#c62828', '#ffffff'], ['#1e4fa0', '#ffffff'], ['#1b7a3a', '#ffffff'], ['#f2c230', '#1a1a1a'],
-  ['#f4f1ea', '#b71c1c'], ['#202020', '#f2c230'], ['#e8601c', '#ffffff'], ['#5e2a84', '#ffffff'],
-  ['#0f6e6e', '#ffffff'], ['#f4f1ea', '#1e3f8a'], ['#8b1d1d', '#f4e3b0'], ['#ffffff', '#1b5e20'],
-];
-
-const GENERIC = [
-  'BUTCHERY', 'BOTTLE STORE', 'PHARMACY', 'SUPERMARKET', 'WHOLESALE', 'CELLPHONES & ACCESSORIES', 'HAIR SALON', 'FAST FOODS',
-  'HARDWARE', 'BOUTIQUE', 'BUREAU DE CHANGE', 'SHOES & BAGS', 'TAKEAWAYS', 'OPTICIANS', 'STATIONERS', 'BAKERY',
-];
-
-const SHOP_CATS = /store|shop|fashion|electronics|restaurant|food|pharmacy|bank|financial|salon|beauty|bakery|butcher|hardware|clothing|supermarket|grocery|cafe|furniture|jewel|mobile|phone|travel|optic|book/;
+// Landmark lettering needs about six slots; one layer is plenty.
+const MAX_CUSTOM = 16;
 
 const ADS = [
   { bg: ['#0d47a1', '#1976d2'], title: 'MHEPO MOBILE', line: 'Talk more. Pay less.', accent: '#ffca28', shape: 'phone' },
@@ -40,30 +28,6 @@ function fitText(ctx, text, maxW, maxH, weight = 'bold') {
   if (w > maxW) size = Math.max(8, Math.floor((size * maxW) / w));
   ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
   return size;
-}
-
-function drawSign(ctx, x, y, w, h, text, rng) {
-  const [bg, fg] = SIGN_STYLES[Math.floor(rng() * SIGN_STYLES.length)];
-  ctx.fillStyle = bg;
-  ctx.fillRect(x, y, w, h);
-  const style = rng();
-  if (style < 0.35) {
-    ctx.fillStyle = fg;
-    ctx.fillRect(x, y + h * 0.84, w, h * 0.08);
-  } else if (style < 0.6) {
-    ctx.strokeStyle = fg;
-    ctx.lineWidth = Math.max(1, h * 0.05);
-    ctx.strokeRect(x + h * 0.08, y + h * 0.08, w - h * 0.16, h - h * 0.16);
-  }
-  ctx.fillStyle = fg;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const upper = rng() < 0.75 ? text.toUpperCase() : text;
-  fitText(ctx, upper, w * 0.88, h * 0.56);
-  ctx.fillText(upper, x + w / 2, y + h * 0.47);
-  // Weathering.
-  ctx.fillStyle = 'rgba(60,50,40,0.12)';
-  ctx.fillRect(x, y + h * 0.9, w, h * 0.1);
 }
 
 function drawAd(ctx, x, y, w, h, ad) {
@@ -135,18 +99,11 @@ function drawAd(ctx, x, y, w, h, ad) {
 
 // Reserves atlas layers now (their canvases are painted once the names are known).
 export class SignPainter {
-  constructor(atlas, maxSigns) {
+  constructor(atlas, maxSigns = MAX_CUSTOM) {
     this.atlas = atlas;
     this.layers = [];
-    const n = Math.ceil(maxSigns / PER_LAYER);
+    const n = Math.ceil(Math.min(maxSigns, MAX_CUSTOM) / PER_LAYER);
     for (let i = 0; i < n; i++) this.layers.push(atlas.add(`signs${i}`, () => {}));
-    this.genericLayer = atlas.add('signsGeneric', (c, m, S) => {
-      const rng = makeRng(31);
-      GENERIC.forEach((text, k) => {
-        const [x, y, w, h] = slotRect(k, S);
-        drawSign(c, x + 2, y + 2, w - 4, h - 4, text, rng);
-      });
-    });
     this.adLayers = [];
     for (let i = 0; i < ADS.length / 2; i++) {
       this.adLayers.push(atlas.add(`ads${i}`, (c, m, S) => {
@@ -186,61 +143,10 @@ export class SignPainter {
     });
   }
 
-  // Splits frontages into shop units (~7 m), gives named POIs the unit nearest to them (painting
-  // their signs) and generic trade signs to most other units. Returns placements
-  // [{frontage, t (0..1 along the edge), width, layer, slot, seed}].
-  assign(frontages, pois) {
-    const units = new Map();
-    for (const f of frontages) {
-      const n = Math.max(1, Math.floor(f.len / 7));
-      const arr = [];
-      for (let k = 0; k < n; k++) arr.push({ frontage: f, t: (k + 0.5) / n, width: Math.min(5.2, (f.len / n) * 0.8), used: false });
-      let list = units.get(f.b.id);
-      if (!list) units.set(f.b.id, (list = []));
-      list.push(...arr);
-    }
-    const seen = new Set();
-    const cands = [];
-    for (const p of pois) {
-      if (p.b === undefined || !units.has(p.b)) continue;
-      const name = (p.name || '').replace(/[^\w &'.,-]/g, '').trim();
-      if (name.length < 3 || name.length > 26 || seen.has(name.toLowerCase())) continue;
-      seen.add(name.toLowerCase());
-      const shop = SHOP_CATS.test(p.cat || '') ? 0 : 150;
-      cands.push({ p, name, d: Math.hypot(p.x + 150, p.z) + shop });
-    }
-    cands.sort((a, b) => a.d - b.d);
-    const out = [];
-    const S = this.atlas.size;
-    for (const c of cands) {
-      let best = null;
-      let bestD = Infinity;
-      for (const u of units.get(c.p.b)) {
-        if (u.used || u.width < 2.4) continue;
-        const f = u.frontage;
-        const d = Math.hypot(f.ax + (f.bx - f.ax) * u.t - c.p.x, f.az + (f.bz - f.az) * u.t - c.p.z);
-        if (d < bestD) {
-          bestD = d;
-          best = u;
-        }
-      }
-      if (!best) continue;
-      const s = this._slot();
-      if (!s) break;
-      best.used = true;
-      const pl = { ...best, ...s, seed: hashString(c.name) & 255 };
-      const [x, y, w, h] = slotRect(pl.slot, S);
-      drawSign(this.atlas.layers[pl.layer].color.getContext('2d'), x + 2, y + 2, w - 4, h - 4, c.name, makeRng(pl.seed + 1));
-      out.push(pl);
-    }
-    const rng = makeRng(99);
-    for (const list of units.values()) {
-      for (const u of list) {
-        if (u.used || u.width < 2.4 || rng() > 0.7) continue;
-        out.push({ ...u, layer: this.genericLayer, slot: Math.floor(rng() * GENERIC.length), seed: Math.floor(rng() * 255) });
-      }
-    }
-    return out;
+  // Retired: shop signs are built from data/shops.json by shops.js (via props.js). Kept so older
+  // city wiring (`for (const pl of signs.assign(...)) emitSign(...)`) still runs; paints nothing.
+  assign() {
+    return [];
   }
 }
 

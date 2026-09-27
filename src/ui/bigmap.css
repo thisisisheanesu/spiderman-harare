@@ -138,6 +138,15 @@
   background: var(--gold);
 }
 
+.legend-shop {
+  width: 8px !important;
+  height: 8px !important;
+  margin: 0 1.5px;
+  border-radius: 50%;
+  background: #e80820;
+  box-shadow: 0 0 0 1.5px rgba(243, 247, 255, 0.92);
+}
+
 .legend-wp {
   border-radius: 50% 50% 50% 0;
   background: var(--gold);
@@ -189,6 +198,141 @@
 
 .bigmap[data-mode='gamepad'] .bigmap-crosshair {
   display: block;
+}
+
+/* ---------------------------------------------------------------- search (mapSearch.js) */
+
+.bigmap-top .bigmap-searchbox {
+  position: relative;
+  flex: none;
+  margin-left: auto;
+}
+
+.bigmap-searchbox + .close-btn {
+  margin-left: 0;
+}
+
+.search-btn[aria-expanded='true'] {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(38, 46, 60, 0.95);
+}
+
+.search-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 2;
+  display: none;
+  width: min(360px, calc(100vw - var(--left) - var(--right)));
+  max-height: min(430px, calc(100vh - var(--top) - var(--bottom) - 70px));
+  padding: 8px;
+  flex-direction: column;
+  background: rgba(11, 15, 21, 0.94);
+}
+
+.bigmap-searchbox.open .search-panel {
+  display: flex;
+}
+
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--panel-border);
+}
+
+.search-row:focus-within {
+  border-color: rgba(242, 193, 78, 0.7);
+}
+
+.search-icon {
+  display: grid;
+  color: var(--muted);
+}
+
+.search-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  border: 0;
+  outline: none !important;
+  background: transparent;
+  color: var(--text);
+  font: 600 15px/1 var(--font);
+  -webkit-user-select: text;
+  user-select: text;
+  touch-action: manipulation;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.search-input::-webkit-search-cancel-button {
+  filter: invert(1) opacity(0.6);
+}
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  margin-top: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.search-results:empty {
+  display: none;
+}
+
+.search-result {
+  appearance: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result[aria-selected='true'] {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sr-name {
+  font: 700 13.5px/1.2 var(--font);
+}
+
+.sr-meta {
+  font: 500 11.5px/1.2 var(--font);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-note {
+  padding: 8px 6px 2px;
+  font: 500 12px/1.35 var(--font);
+  color: var(--muted);
+}
+
+.search-note:empty {
+  display: none;
 }
 
 /* Narrow screens (portrait phones). */

@@ -5,8 +5,11 @@ import * as THREE from 'three';
 //   position (3f), normal (3f), uv (2f, usually metres or tile units),
 //   color  (4 x u8, normalized)  - tint multiplied into the texture (alpha: ground blend factor)
 //   facade (4 x u8, integer)     - [texture-array layer, seed, kind + 8 * class, glass preset]
-// The current "brush" (tint + facade bytes) and an optional local transform (translation,
-// rotation about Y, uniform scale) apply to every vertex written after they are set.
+//   pbr    (4 x u8, integer)     - [PBR material, accent material, extra, flags] (255 = auto: the
+//                                  material follows the layer; see materials.js / surface())
+// The current "brush" (tint + facade bytes + surface) and an optional local transform (translation,
+// rotation about Y, uniform scale) apply to every vertex written after they are set. brush() resets
+// the surface to auto, so only code that calls surface() after it picks PBR materials explicitly.
 export class GeoBuffer {
   constructor(capacity = 4096) {
     this._alloc(capacity, capacity * 2);
@@ -14,6 +17,7 @@ export class GeoBuffer {
     this.iCount = 0;
     this.brushColor = [255, 255, 255, 255];
     this.brushFacade = [0, 0, 0, 0];
+    this.brushPbr = [255, 255, 0, 0];
     this._tf = null;
   }
 
@@ -29,6 +33,7 @@ export class GeoBuffer {
       this.uv = new Float32Array(vCap * 2);
       this.col = new Uint8Array(vCap * 4);
       this.fac = new Uint8Array(vCap * 4);
+      this.pbr = new Uint8Array(vCap * 4);
       this.idx = new Uint32Array(iCap);
       return;
     }
@@ -38,6 +43,7 @@ export class GeoBuffer {
       this.uv = grow(this.uv, vCap * 2);
       this.col = grow(this.col, vCap * 4);
       this.fac = grow(this.fac, vCap * 4);
+      this.pbr = grow(this.pbr, vCap * 4);
     }
     if (iCap > this.idx.length) this.idx = grow(this.idx, iCap);
   }
@@ -60,6 +66,22 @@ export class GeoBuffer {
     this.brushFacade[1] = seed & 255;
     this.brushFacade[2] = (kind & 7) + 8 * (cls & 31);
     this.brushFacade[3] = glass;
+    this.brushPbr[0] = 255;
+    this.brushPbr[1] = 255;
+    this.brushPbr[2] = 0;
+    this.brushPbr[3] = 0;
+    return this;
+  }
+
+  // Explicit PBR surface for following vertices (until the next brush()): `mat` / `accent` are
+  // indices into the facade PBR set (materials.js PBR), `extra` a per-kind byte (shop interior hint on
+  // ground-floor walls), `flags` = uv mode (bits 0-1: 0 world-planar, 1 vertex uv in metres) +
+  // frame colour (bits 2-3) + weathering (bits 4-5) + age (bits 6-7).
+  surface(mat, accent = 255, extra = 0, flags = 0) {
+    this.brushPbr[0] = mat;
+    this.brushPbr[1] = accent;
+    this.brushPbr[2] = extra;
+    this.brushPbr[3] = flags;
     return this;
   }
 
@@ -124,6 +146,10 @@ export class GeoBuffer {
     this.fac[c + 1] = this.brushFacade[1];
     this.fac[c + 2] = this.brushFacade[2];
     this.fac[c + 3] = this.brushFacade[3];
+    this.pbr[c] = this.brushPbr[0];
+    this.pbr[c + 1] = this.brushPbr[1];
+    this.pbr[c + 2] = this.brushPbr[2];
+    this.pbr[c + 3] = this.brushPbr[3];
     return i;
   }
 
@@ -292,6 +318,7 @@ export class GeoBuffer {
     const base = this.vCount;
     const saveC = this.brushColor.slice();
     const saveF = this.brushFacade.slice();
+    const saveP = this.brushPbr.slice();
     for (let i = 0; i < other.vCount; i++) {
       const p = i * 3;
       const c = i * 4;
@@ -302,6 +329,10 @@ export class GeoBuffer {
       this.brushFacade[1] = other.fac[c + 1];
       this.brushFacade[2] = other.fac[c + 2];
       this.brushFacade[3] = other.fac[c + 3];
+      this.brushPbr[0] = other.pbr[c];
+      this.brushPbr[1] = other.pbr[c + 1];
+      this.brushPbr[2] = other.pbr[c + 2];
+      this.brushPbr[3] = other.pbr[c + 3];
       this.vertex(
         other.pos[p], other.pos[p + 1], other.pos[p + 2],
         other.nrm[p], other.nrm[p + 1], other.nrm[p + 2],
@@ -313,6 +344,7 @@ export class GeoBuffer {
     this.iCount += other.iCount;
     this.brushColor = saveC;
     this.brushFacade = saveF;
+    this.brushPbr = saveP;
   }
 
   toGeometry() {
@@ -323,6 +355,7 @@ export class GeoBuffer {
     g.setAttribute('uv', new THREE.BufferAttribute(this.uv.slice(0, n * 2), 2));
     g.setAttribute('color', new THREE.BufferAttribute(this.col.slice(0, n * 4), 4, true));
     g.setAttribute('facade', new THREE.BufferAttribute(this.fac.slice(0, n * 4), 4, false));
+    g.setAttribute('pbr', new THREE.BufferAttribute(this.pbr.slice(0, n * 4), 4, false));
     const idx = n < 65536 ? new Uint16Array(this.idx.subarray(0, this.iCount)) : this.idx.slice(0, this.iCount);
     g.setIndex(new THREE.BufferAttribute(idx, 1));
     g.computeBoundingSphere();

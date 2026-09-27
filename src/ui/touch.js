@@ -3,6 +3,10 @@ import { el } from './dom.js';
 import { ICONS } from './icons.js';
 
 const STICK_RADIUS = 50; // CSS px of knob travel
+// The big button sprints on the ground and swings in the air (src/player/controller.js); its label
+// says which, once the new state has lasted this long (s), so touch-and-go landings don't flicker it.
+const LABEL_TO_GROUND = 0.35;
+const LABEL_TO_AIR = 0.5;
 const LOOK_GAIN = 2.2; // touch px -> "mouse px" for the camera rig
 
 // Thumb cluster (bottom right), drawn around the big Swing button.
@@ -25,6 +29,9 @@ export class TouchControls {
     this.stickId = null;
     this.lookId = null;
     this.held = new Map(); // action -> pointer id holding its button
+    this.labels = {}; // action -> label span
+    this._ground = false;
+    this._groundT = 0;
 
     this.zone = el('div', 'touch-zone');
     this.knob = el('div', 'stick-knob');
@@ -78,8 +85,26 @@ export class TouchControls {
     for (const b of this.root.querySelectorAll('.tb.pressed')) b.classList.remove('pressed');
   }
 
+  // ~5 Hz from the HUD: 'Sprint' on the ground / a roof, 'Swing' in the air.
+  updateSwingLabel(state, dt) {
+    const ground = state === 'ground' || state === 'perch';
+    if (ground === this._ground) {
+      this._groundT = 0;
+      return;
+    }
+    this._groundT += dt;
+    if (this._groundT < (ground ? LABEL_TO_GROUND : LABEL_TO_AIR)) return;
+    this._ground = ground;
+    this._groundT = 0;
+    const text = ground ? 'Sprint' : 'Swing';
+    const span = this.labels.swing;
+    if (span) span.textContent = text;
+    span?.parentElement?.setAttribute('aria-label', ground ? 'Sprint (hold) · jump while sprinting to web-launch' : 'Swing (hold)');
+  }
+
   _holdButton(action, label, cls) {
-    const b = el('button', `tb ${cls}`, { type: 'button', 'aria-label': label, html: ICONS[action] }, [el('span', 'tb-label', { text: label })]);
+    const span = (this.labels[action] = el('span', 'tb-label', { text: label }));
+    const b = el('button', `tb ${cls}`, { type: 'button', 'aria-label': label, html: ICONS[action] }, [span]);
     const release = (e) => {
       if (this.held.get(action) !== e.pointerId) return;
       this.held.delete(action);

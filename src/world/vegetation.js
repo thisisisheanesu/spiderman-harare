@@ -4,7 +4,7 @@ import { pointInRing, cleanRing, distToRing } from './polygon.js';
 import { SegmentGrid } from './lines.js';
 import { makeCanvas } from './atlas.js';
 import { KERB_HEIGHT } from './streetMetrics.js';
-import { leafTexture, modelFor, farBlobGeometry, farBlobFit } from './treeModels.js';
+import { leafTexture, modelFor, farBlobGeometry, farBlobFit, SPECIES } from './treeModels.js';
 
 // Trees of late-September Harare: jacarandas in full lavender bloom lining the avenues and filling
 // the parks, African flame trees (Spathodea) with orange-red flower clusters, msasa with their
@@ -378,6 +378,33 @@ export function planTrees(ctx) {
   }
   for (const [x, z] of data.trees) add('green', x, z, 0, 1);
   return trees;
+}
+
+// Crown of a planted tree record ({species, x, y, z, s}): top height, crown centre height and
+// horizontal radius (m, world). Shared by the web anchors below and anything that needs the canopy
+// volume (shade, perching, culling).
+const PALM_CROWN = { top: 11.5, radius: 4.2 };
+export function treeCrown(t, out = {}) {
+  const def = SPECIES[t.species];
+  const top = (t.species === 'palm' ? PALM_CROWN.top : def ? (def.height[0] + def.height[1]) / 2 : 9) * t.s;
+  const radius = (t.species === 'palm' ? PALM_CROWN.radius : def ? (def.radius[0] + def.radius[1]) / 2 : 4) * t.s;
+  out.x = t.x;
+  out.z = t.z;
+  out.top = t.y + top;
+  out.y = t.y + top - Math.min(radius * 0.6, top * 0.3);
+  out.radius = radius;
+  return out;
+}
+
+// Street-level obstacles (trunks) and web anchors for the trees: every tree whose crown top is at
+// least 7 m up gives an anchor {x, y, z, kind: 'tree', species, radius} half a metre under its top.
+export function addTreeAnchors(trees, anchors, obstacles) {
+  const c = {};
+  for (const t of trees) {
+    if (!t.planted) obstacles.push({ x: t.x, z: t.z, r: 0.3 * t.s });
+    treeCrown(t, c);
+    if (c.top - t.y >= 7) anchors.push({ x: t.x, y: c.top - 0.5, z: t.z, kind: 'tree', species: t.species, radius: c.radius });
+  }
 }
 
 function pickFrom(rng, weights) {

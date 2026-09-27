@@ -366,6 +366,7 @@
   left: 50%;
   top: 74%; /* below Spider-Man, above the subtitles */
   transform: translateX(-50%);
+  max-width: calc(100% - 2 * var(--g));
   padding: 10px 18px;
   border-radius: 99px;
   background: var(--panel-solid);
@@ -459,6 +460,39 @@
 @keyframes overlay-in {
   from {
     opacity: 0;
+  }
+}
+
+/* Desktop: toasts and the mouse-capture hint share one lane under the compass (the hint first, the
+   toasts below it), centred on the view but never over the location / objective column on the left:
+   on views too narrow for that (under ~1020 px) the lane starts right of the column. --col is the
+   column's right edge plus a gap (.hud-left width + 12 px); translateX(max(-50%, --col - 50vw)) keeps
+   the box's left edge at max(centred, --col). Below the compass the hint no longer sits over the
+   bottom-row controls hint and the subtitles, as it did at 74 % of short windows. */
+.hud:not(.compact) {
+  --col: calc(var(--left) + min(256px, calc(50vw - var(--left) - 8px)) + 12px);
+  --lane: calc(var(--top) + 84px);
+}
+
+.hud.touch:not(.compact) {
+  --col: calc(var(--left) + min(280px, calc(50vw - var(--left) - 8px)) + 12px);
+  --lane: calc(var(--top) + 80px);
+}
+
+@media (min-width: 641px) {
+  .hud:not(.compact) .toasts {
+    width: min(460px, calc(100% - var(--col) - var(--right)));
+    transform: translateX(max(-50%, calc(var(--col) - 50vw)));
+  }
+
+  .hud:not(.compact):not(.touch) .lock-hint {
+    top: var(--lane);
+    max-width: calc(100% - var(--col) - var(--right));
+    transform: translateX(max(-50%, calc(var(--col) - 50vw)));
+  }
+
+  .hud:not(.compact):not(.touch):has(.lock-hint.shown) .toasts {
+    top: calc(var(--lane) + 46px);
   }
 }
 

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
-import { GLASS_PRESETS } from './facades.js';
+import { facadeFragmentDecl, FACADE_MAIN } from './render/facadeShader.js';
+import { groundFragmentDecl, GROUND_MAIN } from './render/groundShader.js';
 
-// Shared uniforms for every city material (updated by City.setNight and from the sky palette).
+// Shared uniforms for every city material (updated by City.setNight / City.update and from the
+// sky palette). Vegetation reads uTime / uNight.
 export function createCityUniforms() {
   return {
     uNight: { value: 0 },
@@ -11,153 +13,90 @@ export function createCityUniforms() {
     uSkyGround: { value: new THREE.Color(0.12, 0.11, 0.1) },
     uReflect: { value: 0.55 },
     uShutterFrac: { value: 0.2 },
+    // x = interior exposure, y = unlit-room level at night, z = daylight on blinds / curtains
+    uInterior: { value: new THREE.Vector3(0.5, 0.04, 1) },
+    uSunDir: { value: new THREE.Vector3(0.3, 0.8, 0.2) },
   };
 }
 
-const HASH = /* glsl */ `
-float cityHash(vec2 p) {
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
-}
-`;
+const VERT_DECL = /* glsl */ `
+attribute vec4 facade;
+attribute vec4 pbr;
+varying vec4 vFac;
+varying vec4 vPbr;
+varying vec2 vFacUv;
+varying vec3 vWPos;
+varying vec3 vWNrm;`;
 
-// Buildings, props, signs: MeshStandardMaterial sampling the facade texture array.
-// Per-vertex `facade` = [layer, seed, kind + 8 * class, glass preset]:
-//   kind 0 = facade (glass panes reflect the sky, random windows light up at night)
-//   kind 1 = sign (its texture glows at night)       kind 2 = plain surface (no glass)
-//   kind 3 = working lamp (emissive at night)        kind 4 = backlit panel (billboards)
+const VERT_MAIN = /* glsl */ `
+vFac = facade;
+vPbr = pbr;
+vFacUv = uv;
+vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+vWNrm = normalize(mat3(modelMatrix) * objectNormal);`;
+
+// Lighting hooks shared by the facade and ground materials: the surface block (injected at
+// <color_fragment>) fills sRough, sMetal, sNw (world normal), sEmit, sF0 + sGlass (reflectance of
+// glass), sSun (direct light reaching into window recesses) and sAO.
+function patchLighting(fs) {
+  return fs
+    .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = sRough;')
+    .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = sMetal;')
+    .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize((viewMatrix * vec4(sNw, 0.0)).xyz);')
+    .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += sEmit;')
+    .replace(
+      '#include <lights_physical_fragment>',
+      `#include <lights_physical_fragment>
+material.specularColor = mix(material.specularColor, sF0, sGlass);
+material.specularColorBlended = mix(material.specularColorBlended, sF0, sGlass);`,
+    )
+    .replace(
+      '#include <lights_fragment_end>',
+      `#include <lights_fragment_end>
+reflectedLight.directDiffuse *= sSun;
+reflectedLight.directSpecular *= sSun;
+reflectedLight.indirectDiffuse *= sAO;
+reflectedLight.indirectSpecular *= mix(1.0, sAO, 0.6);`,
+    );
+}
+
+// Buildings, props, signs: one MeshStandardMaterial for every city chunk.
+// Per-vertex `facade` = [layer, seed, kind + 8 * class, glass preset] and `pbr` = [material,
+// accent, extra, flags] (see geoBuffer.js, facades.js):
+//   kind 0 = facade (windows; lit rooms at night)   kind 1 = sign (glows at night)
+//   kind 2 = plain surface                          kind 3 = working lamp (emissive at night)
+//   kind 4 = backlit panel (billboards)
 //   class 0 office, 1 residential/hotel, 2 shop, 3 other, 4 never lit (water, solar panels).
-export function createFacadeMaterial(map, uniforms, layers) {
+// res = {pbr (PbrSet), interiors ({tex}), noise (Texture)}
+export function createFacadeMaterial(map, uniforms, layers, res) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 });
-  const glass = GLASS_PRESETS.map((c) => new THREE.Vector3(...c));
+  const normals = !!res.pbr.texB;
+  const interiors = !!res.interiors;
+  const decl = facadeFragmentDecl(res.pbr, { normals, interiors });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.uniforms.facadeMap = { value: map };
-    shader.uniforms.uGlass = { value: glass };
-    shader.uniforms.uShopLayer = { value: layers.shop };
-    shader.uniforms.uShutterLayer = { value: layers.shutter };
+    shader.uniforms.pbrA = { value: res.pbr.texA };
+    if (normals) shader.uniforms.pbrB = { value: res.pbr.texB };
+    shader.uniforms.interiorMap = { value: res.interiors?.tex || null };
+    shader.uniforms.noiseMap = { value: res.noise };
     shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-attribute vec4 facade;
-varying vec4 vFac;
-varying vec2 vFacUv;
-varying float vWorldY;`,
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-vFac = facade;
-vFacUv = uv;
-vWorldY = (modelMatrix * vec4(transformed, 1.0)).y;`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-precision highp sampler2DArray;
-uniform sampler2DArray facadeMap;
-uniform float uNight;
-uniform float uReflect;
-uniform float uShutterFrac;
-uniform float uShopLayer;
-uniform float uShutterLayer;
-uniform vec3 uSkyZenith;
-uniform vec3 uSkyHorizon;
-uniform vec3 uSkyGround;
-uniform vec3 uGlass[8];
-varying vec4 vFac;
-varying vec2 vFacUv;
-varying float vWorldY;
-${HASH}`,
-      )
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-diffuseColor.a = 1.0;
-float fKind = floor(mod(vFac.z + 0.5, 8.0));
-float fCls = floor((vFac.z + 0.5) / 8.0);
-vec2 fCell = floor(vFacUv + 1e-3);
-float fSeed = vFac.y * 0.137;
-float fR1 = cityHash(fCell * vec2(1.0, 1.73) + fSeed);
-float fR2 = cityHash(fCell.yx * 1.31 + fSeed * 3.1 + 11.0);
-float fR3 = cityHash(fCell * 0.71 + fSeed * 5.3 + 47.0);
-float fLayer = vFac.x;
-// Street-level shops: some bays have their roller shutters down (more at night).
-if (abs(fLayer - uShopLayer) < 0.5 && fR3 < uShutterFrac) fLayer = uShutterLayer;
-vec4 fTex = texture(facadeMap, vec3(vFacUv, fLayer));
-float isFacade = 1.0 - step(0.5, fKind);
-float fGlass = isFacade * smoothstep(0.44, 0.6, fTex.a);
-float fLocalV = clamp((fTex.a - 0.5) * 2.0, 0.0, 1.0);
-float fBlindAmt = fR2 < 0.3 ? fR1 * 0.85 : 0.0;
-// Blinds show through clear glass only (not tinted/reflective curtain glass), and not in shops.
-float fClearGlass = 1.0 - step(0.5, vFac.w) * (1.0 - step(6.5, vFac.w));
-float fBlind = fGlass * step(1.0 - fBlindAmt, fLocalV) * (1.0 - step(1.5, fCls) * step(fCls, 2.5)) * fClearGlass;
-vec3 fGlassTint = uGlass[int(vFac.w + 0.5)];
-vec3 fGlassCol = fTex.rgb * fGlassTint * (0.7 + 0.55 * fR1);
-vec3 fBlindCol = mix(vec3(0.72, 0.68, 0.6), vec3(0.6, 0.63, 0.66), step(0.5, fR1));
-vec3 fWall = fTex.rgb * diffuseColor.rgb;
-// Dust and splash near the ground, a little darker at the base of walls.
-fWall *= mix(0.72, 1.0, smoothstep(0.0, 2.2, vWorldY));
-vec3 fCol = mix(fWall, fGlassCol, fGlass);
-fCol = mix(fCol, fBlindCol, fBlind);
-diffuseColor.rgb = fCol;
-float fClear = fGlass - fBlind;`,
-      )
-      .replace(
-        '#include <roughnessmap_fragment>',
-        `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
-      )
-      .replace(
-        '#include <emissivemap_fragment>',
-        `#include <emissivemap_fragment>
-{
-  float isRes = step(0.5, fCls) * (1.0 - step(1.5, fCls));
-  float isShop = step(1.5, fCls) * (1.0 - step(2.5, fCls));
-  // Some buildings are dark, some busy; offices mostly empty at night, homes and hotels lit.
-  float bldBusy = cityHash(vec2(vFac.y, 1.7));
-  float litFrac = mix(mix(0.16, 0.45, isRes), 0.6, isShop) * (1.0 - step(3.5, fCls)) * smoothstep(0.1, 0.55, bldBusy) * 1.4;
-  float lit = step(fR2, litFrac) * step(0.02, fR1);
-  vec3 warm = vec3(1.0, 0.62, 0.3);
-  vec3 cool = vec3(0.9, 0.88, 0.78);
-  vec3 winCol = mix(cool, warm, clamp(isRes + isShop * 0.7 + step(0.7, fR3) * 0.6, 0.0, 1.0));
-  winCol = mix(winCol, vec3(0.5, 0.62, 1.0), step(0.94, fR3) * isRes);
-  float glow = fGlass * lit * (0.45 + 0.75 * fR1) * (1.0 + fBlind * 0.4);
-  totalEmissiveRadiance += winCol * glow * uNight * 0.9;
-  float isSign = step(0.5, fKind) * (1.0 - step(1.5, fKind));
-  float signLit = step(0.25, cityHash(vec2(vFac.y, 3.0)));
-  totalEmissiveRadiance += fTex.rgb * isSign * signLit * uNight * 0.9;
-  float isLamp = step(2.5, fKind) * (1.0 - step(3.5, fKind));
-  totalEmissiveRadiance += vec3(1.0, 0.7, 0.38) * isLamp * uNight * 5.0;
-  float isPanel = step(3.5, fKind) * (1.0 - step(4.5, fKind));
-  totalEmissiveRadiance += fTex.rgb * diffuseColor.rgb * isPanel * uNight * 1.4;
-}`,
-      )
-      .replace(
-        '#include <opaque_fragment>',
-        `{
-  vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
-  vec3 R = reflect(-geometryViewDir, geometryNormal);
-  float ry = dot(R, upV);
-  vec3 refl = ry > 0.0 ? mix(uSkyHorizon, uSkyZenith, smoothstep(0.0, 0.75, ry)) : mix(uSkyHorizon, uSkyGround, smoothstep(0.0, 0.3, -ry));
-  float fres = pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), 5.0);
-  outgoingLight += refl * fClear * mix(0.22, 0.7, fres) * uReflect;
-}
-#include <opaque_fragment>`,
-      );
+      .replace('#include <common>', `#include <common>\n${VERT_DECL}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_MAIN}`);
+    shader.fragmentShader = patchLighting(
+      shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${decl}`)
+        .replace('#include <color_fragment>', `#include <color_fragment>\n${FACADE_MAIN}`),
+    );
   };
-  mat.customProgramCacheKey = () => 'city-facade-1';
+  mat.customProgramCacheKey = () => `city-facade-3${normals ? 'n' : ''}${interiors ? 'i' : ''}`;
   return mat;
 }
 
-// Ground surfaces (roads, pavements, grass, rail ballast...): texture-array albedo with a
-// large-scale variation layer so tiles do not visibly repeat. kind 1 = blended "base ground"
-// (paved in the city core, dry grass/red soil in the suburbs) driven by the urban mask texture;
-// kind 2 = hillside (dry grass / granite by vertex alpha).
+// Ground surfaces (roads, pavements, kerbs, grass, soil, rail ballast): the ground PBR set, with
+// large-scale variation, asphalt patches and cracks, worn paint. See render/groundShader.js.
 export function createGroundMaterial(map, uniforms, layers, urban, opts = {}) {
+  const res = opts.res;
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
     roughness: 0.95,
@@ -166,78 +105,25 @@ export function createGroundMaterial(map, uniforms, layers, urban, opts = {}) {
     polygonOffsetFactor: opts.offset || 0,
     polygonOffsetUnits: opts.offset || 0,
   });
+  const normals = !!res.ground.texB;
+  const decl = groundFragmentDecl(res.ground, layers, { normals });
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.uniforms.groundMap = { value: map };
+    shader.uniforms.gPbrA = { value: res.ground.texA };
+    if (normals) shader.uniforms.gPbrB = { value: res.ground.texB };
+    shader.uniforms.noiseMap = { value: res.noise };
     shader.uniforms.urbanMap = { value: urban.texture };
     shader.uniforms.urbanRect = { value: urban.rect };
-    shader.uniforms.uMacro = { value: layers.macro };
-    shader.uniforms.uPave = { value: layers.paving };
-    shader.uniforms.uDry = { value: layers.dryGrass };
-    shader.uniforms.uDirt = { value: layers.dirt };
-    shader.uniforms.uRock = { value: layers.rock };
     shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-attribute vec4 facade;
-varying vec4 vFac;
-varying vec2 vFacUv;
-varying vec2 vWorldXZ;`,
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-vFac = facade;
-vFacUv = uv;
-vWorldXZ = (modelMatrix * vec4(transformed, 1.0)).xz;`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
-precision highp sampler2DArray;
-uniform sampler2DArray groundMap;
-uniform sampler2D urbanMap;
-uniform vec4 urbanRect;
-uniform float uMacro;
-uniform float uPave;
-uniform float uDry;
-uniform float uDirt;
-uniform float uRock;
-varying vec4 vFac;
-varying vec2 vFacUv;
-varying vec2 vWorldXZ;`,
-      )
-      .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-diffuseColor.a = 1.0;
-float gKind = floor(mod(vFac.z + 0.5, 8.0));
-vec3 gMacro = texture(groundMap, vec3(vWorldXZ / 173.0, uMacro)).rgb;
-vec3 gMacro2 = texture(groundMap, vec3(vWorldXZ / 41.0 + 0.37, uMacro)).rgb;
-vec3 gCol;
-if (gKind > 1.5) {
-  // Hillside: dry grass blended into granite by the vertex alpha (slope + noise).
-  vec3 dry = texture(groundMap, vec3(vWorldXZ / 9.0, uDry)).rgb;
-  vec3 rock = texture(groundMap, vec3(vWorldXZ / 7.0, uRock)).rgb * 1.1;
-  gCol = mix(dry, rock, smoothstep(0.3, 0.7, vColor.a + (gMacro2.r - 0.5) * 0.3));
-} else if (gKind > 0.5) {
-  vec2 uvU = (vWorldXZ - urbanRect.xy) / urbanRect.zw;
-  float urban = texture(urbanMap, uvU).r;
-  urban = smoothstep(0.2, 0.8, urban + (gMacro2.r - 0.5) * 0.5);
-  vec3 pave = texture(groundMap, vec3(vWorldXZ / 3.0, uPave)).rgb * vec3(0.93, 0.9, 0.86);
-  vec3 dry = texture(groundMap, vec3(vWorldXZ / 9.0, uDry)).rgb;
-  vec3 dirt = texture(groundMap, vec3(vWorldXZ / 6.0, uDirt)).rgb;
-  vec3 wild = mix(dry, dirt, smoothstep(0.45, 0.7, gMacro.g + (gMacro2.b - 0.5) * 0.4));
-  gCol = mix(wild, pave, urban);
-} else {
-  gCol = texture(groundMap, vec3(vFacUv, vFac.x)).rgb;
-}
-gCol *= diffuseColor.rgb * (0.82 + 0.36 * gMacro.r) * (0.92 + 0.16 * gMacro2.g);
-diffuseColor.rgb = gCol;`,
-      );
+      .replace('#include <common>', `#include <common>\n${VERT_DECL}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_MAIN}`);
+    shader.fragmentShader = patchLighting(
+      shader.fragmentShader
+        .replace('#include <common>', `#include <common>\n${decl}`)
+        .replace('#include <color_fragment>', `#include <color_fragment>\n${GROUND_MAIN}`),
+    );
   };
-  mat.customProgramCacheKey = () => 'city-ground-1';
+  mat.customProgramCacheKey = () => `city-ground-3${normals ? 'n' : ''}`;
   return mat;
 }

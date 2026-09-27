@@ -1,14 +1,31 @@
 import { pointInRing } from './polygon.js';
 import { MISC_CELLS, miscUV } from './facades.js';
-import { PALETTE, tint } from './palette.js';
+import { tint } from './palette.js';
 
-// Rooftop clutter for flat roofs: lift/stair rooms, water tanks on stands, AC units, solar
-// geysers (panels face north, the sun is to the north in Harare), antennas, satellite dishes,
-// vent pipes. Everything is merged into the chunk mesh; solid items also go into `colliders`.
+// Rooftop clutter for flat roofs: lift/stair rooms, JoJo water tanks (on steel stands or on the lift
+// room), AC condenser units, satellite dishes (pointing north at the geostationary arc: the sun and
+// the satellites are to the north in Harare), solar geysers, antennas and vent pipes. Lift rooms,
+// geysers, antennas and vents are merged into the chunk meshes; the tanks, AC units and dishes are
+// street-prop models (public/models/props) recorded here and instanced by props.js. Solid items
+// also go into `col` (physics), and the tops of lift rooms, tank stands and masts are web-swing
+// anchors {x, y, z, kind, radius}.
 
 const METAL_DARK = tint('#4a4f53');
 const METAL = tint('#9aa0a4');
 const CONCRETE = tint('#cfcbc2');
+
+// Model placements [name, x, y, z, rot, scale] and anchors collected while the buildings are
+// emitted; props.js takes them (takeRooftopItems) when it builds the street furniture.
+let items = { props: [], anchors: [] };
+export function takeRooftopItems() {
+  const out = items;
+  items = { props: [], anchors: [] };
+  return out;
+}
+const anchor = (x, y, z, kind, radius = 0, b = -1) => items.anchors.push({ x, y, z, kind, radius, b });
+
+// JoJo tank model sizes (props.json): radius ~0.83 m; heights 2.1 m (tank) / 4.16 m (on its stand).
+const TANK_R = 0.83;
 
 function doorQuad(gb, L, x, y, z, w, h, nx, nz) {
   // Door on a wall facing (nx, nz), centred at (x, z), bottom at y.
@@ -53,30 +70,22 @@ function liftRoom(gb, col, L, x, y, z, w, d, h, rot, wallTint, seed) {
   const pz = z + nz * (d / 2 + 0.02);
   gb.quad(px - tx * 0.5, y + 2.35, pz - tz * 0.5, px + tx * 0.5, y + 2.35, pz + tz * 0.5, px + tx * 0.5, y + 2.85, pz + tz * 0.5, px - tx * 0.5, y + 2.85, pz - tz * 0.5, nx, 0, nz, u0, v0, u1, v1);
   rbox(col, x, y, z, w, h + 0.18, d, rot, 1);
-}
-
-function tank(gb, col, L, x, y, z, r, h, standH, color, seed) {
-  if (standH > 0.1) {
-    gb.brush(METAL_DARK, L.metal, seed, 2);
-    const o = r * 0.75;
-    for (const [dx, dz] of [[-o, -o], [o, -o], [o, o], [-o, o]]) gb.box(x + dx, y, z + dz, 0.1, standH, 0.1, 2);
-    gb.box(x, y + standH - 0.12, z, r * 2.1, 0.12, r * 2.1, 2, true);
+  // Web anchors on the corners of its roof slab.
+  for (const [lx, lz] of [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]]) {
+    anchor(x + c * lx + s * lz, y + h + 0.18, z - s * lx + c * lz, 'roofRoom');
   }
-  const y0 = y + standH;
-  gb.brush(color, L.tank, seed, 2);
-  gb.cylinder(x, y0, z, r, h, 12, 2, false);
-  gb.cylinder(x, y0 + h, z, r, r * 0.25, 12, 2, true, r * 0.35);
-  col.box(x, y, z, r * 2, standH + h + r * 0.25, r * 2, 1);
 }
 
-function acUnit(gb, L, x, y, z, rot, seed) {
-  gb.brush(tint('#e6e6e2'), L.metal, seed, 2);
-  rbox(gb, x, y, z, 0.9, 0.65, 0.36, rot, 1);
-  const [u0, v0, u1, v1] = miscUV(MISC_CELLS.ac);
-  gb.brush([255, 255, 255], L.misc, seed, 2);
-  gb.setTransform(x, y, z, rot);
-  gb.quad(-0.4, 0.05, 0.19, 0.2, 0.05, 0.19, 0.2, 0.6, 0.19, -0.4, 0.6, 0.19, 0, 0, 1, u0, v0, u1, v1);
-  gb.clearTransform();
+// JoJo tank (model), on a 2 m steel stand when `stand`. Scale s ~ radius / 0.83.
+function tank(col, x, y, z, s, stand, rot, bid) {
+  const h = (stand ? 4.16 : 2.1) * s;
+  items.props.push([stand ? 'water_tank_stand' : 'water_tank', x, y, z, rot, s]);
+  col.box(x, y, z, TANK_R * 2 * s, h, TANK_R * 2 * s, 1);
+  if (y + h > 8) anchor(x, y + h, z, 'tank', TANK_R * s, bid);
+}
+
+function acUnit(x, y, z, rot) {
+  items.props.push(['ac_unit', x, y, z, rot, 1]);
 }
 
 function hvac(gb, col, L, x, y, z, rot, seed) {
@@ -129,9 +138,10 @@ function solarGeyser(gb, L, x, y, z, seed) {
   }
 }
 
-function antenna(gb, L, x, y, z, h, seed) {
+function antenna(gb, L, x, y, z, h, seed, bid) {
   gb.brush(METAL, L.metal, seed, 2);
   gb.cylinder(x, y, z, 0.05, h, 5, 1, true);
+  anchor(x, y + h, z, 'mast', 0, bid);
   for (let k = 0; k < 3; k++) {
     const yy = y + h * (0.55 + k * 0.15);
     const w = 1.4 - k * 0.35;
@@ -140,32 +150,9 @@ function antenna(gb, L, x, y, z, h, seed) {
   }
 }
 
-// Satellite dish tilted up towards the north (geostationary arc).
-function dish(gb, L, x, y, z, r, seed) {
-  gb.brush(METAL_DARK, L.metal, seed, 2);
-  gb.cylinder(x, y, z, 0.04, 0.9, 5, 1, true);
-  const cy = y + 0.9 + r * 0.6;
-  const tilt = 1.0;
-  const nY = Math.sin(tilt);
-  const nZ = -Math.cos(tilt);
-  // Disc basis: u = east, w = up/north tilted.
-  const wy = Math.cos(tilt);
-  const wz = Math.sin(tilt);
-  gb.brush([255, 255, 255], L.misc, seed, 2);
-  const [u0, v0, u1, v1] = miscUV(MISC_CELLS.dish);
-  const segs = 10;
-  const c = gb.vertex(x, cy, z, 0, nY, nZ, (u0 + u1) / 2, (v0 + v1) / 2);
-  const ring = gb.vCount;
-  for (let i = 0; i <= segs; i++) {
-    const a = (i / segs) * Math.PI * 2;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    gb.vertex(x + ca * r, cy + sa * r * wy - 0.08 * nY, z + sa * r * wz - 0.08 * nZ, 0, nY, nZ, u0 + (0.5 + ca * 0.5) * (u1 - u0), v0 + (0.5 + sa * 0.5) * (v1 - v0));
-  }
-  for (let i = 0; i < segs; i++) {
-    gb.tri(c, ring + i, ring + i + 1);
-    gb.tri(c, ring + i + 1, ring + i);
-  }
+// DStv-style dish (model) on its ballast frame, facing north with a little scatter.
+function dish(x, y, z, rot, s) {
+  items.props.push(['satellite_dish', x, y, z, rot, s]);
 }
 
 function ventPipes(gb, L, x, y, z, seed) {
@@ -220,23 +207,27 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
         placed.push({ x, z, r });
         liftRoom(opts.base, col, L, x, y, z, w, d, h, rot, opts.wallTint, seed);
         if (opts.clutter > 0.5 && rng() < 0.6) {
-          tank(gb, col, L, x + obb.ux * (w * 0.25), y + h + 0.18, z + obb.uz * (w * 0.25), 0.85, 1.9, 0.4, tint(rng.pick(PALETTE.tanks)), seed);
+          // Tank on the lift room's roof slab: the highest thing on many CBD roofs.
+          const lx = Math.min(w / 2 - 0.9, w * 0.25);
+          tank(col, x + obb.ux * lx, y + h + 0.18, z + obb.uz * lx, rng.range(0.9, 1.05), false, rng() * 6.28, b.id);
         }
         break;
       }
     }
   }
 
-  const nTanks = Math.min(4, Math.floor(area / 250) + (rng() < 0.6 ? 1 : 0));
+  // JoJo tanks, 1-3 per roof (more on residential blocks), most of them up on stands.
+  const nTanks = Math.min(4, Math.floor(area / 250) + (rng() < 0.6 ? 1 : 0) + (/apartments|residential|hotel|dormitory/.test(b.cls || '') ? 1 : 0));
   for (let i = 0; i < nTanks * opts.clutter; i++) {
-    const r = rng.range(0.7, 1.2);
-    const p = sample(r + 0.2);
-    if (p) tank(gb, col, L, p.x, y, p.z, r, rng.range(1.5, 2.4), rng() < 0.6 ? rng.range(0.5, 2.2) : 0, tint(rng.pick(PALETTE.tanks)), seed);
+    const s = rng.range(0.85, 1.12);
+    const p = sample(TANK_R * s + 0.3);
+    if (p) tank(col, p.x, y, p.z, s, rng() < 0.65, rng() * 6.28, b.id);
   }
-  const nAc = Math.min(10, Math.floor((area / 90) * opts.clutter));
+  // Condenser units in rows along the roof's axis.
+  const nAc = Math.min(8, Math.floor((area / 110) * opts.clutter));
   for (let i = 0; i < nAc; i++) {
-    const p = sample(0.6, 6);
-    if (p) acUnit(gb, L, p.x, y, p.z, rot + (rng() < 0.5 ? 0 : Math.PI / 2), seed);
+    const p = sample(0.55, 6);
+    if (p) acUnit(p.x, y, p.z, rot + (rng() < 0.5 ? 0 : Math.PI / 2) + (rng() < 0.5 ? Math.PI : 0));
   }
   if (area > 700 && rng() < 0.7 * opts.clutter) {
     const p = sample(2.0);
@@ -251,12 +242,12 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
   }
   if (rng() < 0.45 * opts.clutter) {
     const p = sample(0.4);
-    if (p) antenna(gb, L, p.x, y, p.z, rng.range(3, b.h > 30 ? 10 : 6), seed);
+    if (p) antenna(gb, L, p.x, y, p.z, rng.range(3, b.h > 30 ? 10 : 6), seed, b.id);
   }
   const nDish = rng() < 0.5 ? rng.int(1, 3) : 0;
   for (let i = 0; i < nDish * opts.clutter; i++) {
     const p = sample(0.6, 6);
-    if (p) dish(gb, L, p.x, y, p.z, rng.range(0.35, 0.55), seed);
+    if (p) dish(p.x, y, p.z, (rng() - 0.5) * 0.5, rng.range(0.85, 1.1));
   }
   const nVent = rng.int(0, 3);
   for (let i = 0; i < nVent * opts.clutter; i++) {

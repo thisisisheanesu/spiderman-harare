@@ -21,12 +21,14 @@ const MALL_TARGET = { x: -252, z: 58 };
 const JOINA = { x: -500, z: 262 };
 
 // how: per input mode ('keyboard' | 'touch' | 'gamepad'), plus 'free' = keyboard without mouse capture.
+// ground (optional): the same, shown while Spider-Man is on the ground or a roof, where the swing
+// button is the parkour sprint and jumping mid-sprint web-launches (src/player/controller.js).
 const STEPS = [
   {
     id: 'dive',
     title: 'Dive off the Reserve Bank',
     how: {
-      keyboard: 'Press C to swan-dive, or walk off the edge with W',
+      keyboard: 'Press C to swan-dive, or run off the edge with W',
       touch: 'Tap DIVE, or push the stick over the edge',
       gamepad: 'Press B to swan-dive off the edge',
     },
@@ -40,6 +42,11 @@ const STEPS = [
       touch: 'Hold SWING in the air · let go to fly',
       gamepad: 'Hold RT to swing · let go to fly',
     },
+    ground: {
+      keyboard: 'Hold Shift to sprint, then Space to web-launch into a swing',
+      touch: 'Hold SWING to sprint, then tap JUMP to web-launch into a swing',
+      gamepad: 'Hold RT to sprint, then A to web-launch into a swing',
+    },
     target: 'samora',
     label: 'Samora Machel Avenue',
   },
@@ -51,6 +58,11 @@ const STEPS = [
       touch: 'Let go of SWING over the square and land · people here speak Shona',
       gamepad: 'Let go over the square and land · people here speak Shona',
     },
+    ground: {
+      keyboard: 'Hold Shift to sprint there, Space to launch · people here speak Shona',
+      touch: 'Hold SWING to sprint there, JUMP to launch · people here speak Shona',
+      gamepad: 'Hold RT to sprint there, A to launch · people here speak Shona',
+    },
     target: 'aus',
     label: 'Africa Unity Square',
   },
@@ -58,9 +70,9 @@ const STEPS = [
     id: 'mall',
     title: 'Walk down First Street Mall',
     how: {
-      keyboard: 'Walk (W) among the shoppers and vendors',
-      touch: 'Walk with the left stick among the shoppers and vendors',
-      gamepad: 'Walk with the left stick among the shoppers and vendors',
+      keyboard: 'Hold Alt (or switch CapsLock on) to walk among the shoppers and vendors',
+      touch: 'Push the stick lightly to walk among the shoppers and vendors',
+      gamepad: 'Push the left stick lightly to walk among the shoppers and vendors',
     },
     target: 'mall',
     label: 'First Street Mall',
@@ -79,6 +91,11 @@ const STEPS = [
   },
 ];
 
+// The "how" line switches between its air and ground versions only once the new state has lasted
+// this long (s), so a touch-and-go landing between swings doesn't flicker it.
+const TO_GROUND = 0.4;
+const TO_AIR = 0.6;
+
 export class Tour {
   constructor(hud) {
     this.hud = hud;
@@ -88,6 +105,9 @@ export class Tour {
     this.userWp = false; // the player replaced it with their own
     this.mallTime = 0;
     this._mode = '';
+    this._ground = false; // on the ground / a roof, for the step's "how" line (see TO_GROUND)
+    this._stateT = 0; // s the other state has lasted
+    this._shownGround = null;
     const places = hud.places;
     const at = (key, fallback) => {
       const p = places.list.find((q) => q.key === key);
@@ -126,8 +146,9 @@ export class Tour {
     const { player } = this.game;
     const p = player.position;
     this._syncWaypoint();
+    this._trackGround(player.state, dt);
     const mode = this.hud.hintMode();
-    if (mode !== this._mode) this._show();
+    if (mode !== this._mode || this._ground !== this._shownGround) this._show();
     if (this._done(STEPS[this.step], p, player.state, dt)) this._advance();
   }
 
@@ -150,6 +171,19 @@ export class Tour {
     }
   }
 
+  _trackGround(state, dt) {
+    const grounded = GROUNDED.has(state);
+    if (grounded === this._ground) {
+      this._stateT = 0;
+      return;
+    }
+    this._stateT += dt;
+    if (this._stateT >= (grounded ? TO_GROUND : TO_AIR)) {
+      this._ground = grounded;
+      this._stateT = 0;
+    }
+  }
+
   _advance() {
     const hud = this.hud;
     hud.flashObjective();
@@ -169,6 +203,8 @@ export class Tour {
   _go(i) {
     this.step = i;
     this.mallTime = 0;
+    this._ground = GROUNDED.has(this.game.player?.state);
+    this._stateT = 0;
     this.userWp = false;
     this._dropWaypoint();
     const step = STEPS[i];
@@ -183,8 +219,11 @@ export class Tour {
 
   _show() {
     const step = STEPS[this.step];
-    this._mode = this.hud.hintMode();
-    const how = step.how[this._mode] || step.how.keyboard;
+    const mode = (this._mode = this.hud.hintMode());
+    this._shownGround = this._ground;
+    const lines = (this._ground && step.ground) || step.how;
+    // 'free' (keyboard without mouse capture) falls back to the keyboard line.
+    const how = lines[mode] || lines.keyboard;
     this.hud.setObjective(step.title, { how, step: `${this.step + 1}/${STEPS.length}` });
   }
 

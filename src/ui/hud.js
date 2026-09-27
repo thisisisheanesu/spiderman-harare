@@ -3,6 +3,7 @@ import './hud.css';
 import { headingDeg } from '../core/geo.js';
 import { Settings } from './settings.js';
 import { Places } from './places.js';
+import { ShopIndex } from './shops.js';
 import { MapPainter } from './mapPainter.js';
 import { Minimap } from './minimap.js';
 import { Compass } from './compass.js';
@@ -32,7 +33,12 @@ const WAYPOINT_REACHED = 25; // m
 const LOCK_HINT_MS = 5000;
 const FREE_HINT_MS = 9000; // first "drag to look" notice when the mouse can't be captured
 const LOCK_TEXT = 'Click to capture the mouse · or drag to look';
-const FREE_TEXT = 'Drag the mouse to look · hold Shift to swing';
+const FREE_TEXT = 'Drag the mouse to look · hold Shift to sprint or swing';
+// Street-level location label: the business Spider-Man is outside (see _shopAt).
+const SHOP_RANGE = 30; // m
+const SHOP_SWITCH = 4; // m: another shop must be this much nearer to take over the label
+const STREET_LEVEL = 4; // m above the ground
+const SHOP_HOLD_MS = 1500; // the label survives a hop / vault this long
 // npc:speak clip kinds that appear as speech bubbles, not subtitles (FLEURS barks, extras greetings).
 const BUBBLE_KINDS = new Set(['bark', 'greet', 'exclaim', 'call']);
 
@@ -59,6 +65,9 @@ export class Hud {
     this.game = game;
     this.settings = new Settings();
     this.places = new Places(game.data);
+    this.shops = new ShopIndex(game); // loads in the background
+    this._shop = null;
+    this._shopUntil = 0;
     this.overlay = null;
     this.waypoint = null;
     this.started = false;
@@ -314,9 +323,10 @@ export class Hud {
     this.requestLock();
   }
 
-  // "Samora Machel Avenue · near Africa Unity Square"
+  // "Samora Machel Avenue · near Africa Unity Square", "Outside OK Supermarket · First Street"
   locationText() {
-    const { street, detail } = this._location();
+    const { street, detail, shop } = this._location();
+    if (shop) return `${detail[0].toUpperCase()}${detail.slice(1)} · ${street}`;
     return detail ? `${street} · ${detail}` : street;
   }
 
@@ -423,7 +433,8 @@ export class Hud {
     else if (key === 'subtitles') this.notices.setMode(this.subtitleMode);
   }
 
-  // Street as the title; the detail says which rooftop / park the player is on, or what is nearby.
+  // Street as the title; the detail says which rooftop / park the player is on, which business he
+  // is outside at street level, or what is nearby.
   _location() {
     const { world } = this.game;
     const p = this.game.player.position;
@@ -431,15 +442,47 @@ export class Hud {
     const area = this.places.areaAt(p.x, p.z);
     const near = this.places.nearest(p.x, p.z, 350);
     const district = this.places.district(p.x, p.z);
-    const title = street || area || near?.name || district;
     const roof = world.buildingAt(p.x, p.z);
     const roofName = roof && p.y > roof.h - 3 ? this.places.nameOf(roof) : '';
+    const shop = roofName || area ? null : this._shopAt(p);
+    const title = street || shop?.road || area || near?.name || district;
     let detail = '';
     if (roofName) detail = `atop ${roofName}`;
     else if (area && area !== title) detail = `in ${area}`;
+    else if (shop && shop.name !== title) detail = `outside ${shop.name}`;
     else if (near && near.name !== title) detail = `near ${near.name}`;
     else if (title !== district) detail = district;
-    return { street: title, detail };
+    return { street: title, detail, shop: detail.startsWith('outside ') ? shop : null };
+  }
+
+  // At street level: the business Spider-Man is standing outside. The city's shopNear() when it has
+  // one (it knows which signs it built), else the HUD's own index of public/data/shops.json. The
+  // current shop keeps the label until another is clearly nearer (no flicker walking past a row of
+  // shop fronts) and through a hop or a vault (SHOP_HOLD_MS).
+  _shopAt(p) {
+    const now = performance.now();
+    const ground = this.game.city?.heightAt?.(p.x, p.z) ?? 0;
+    if (p.y - ground > STREET_LEVEL) return now < this._shopUntil ? this._shop : null;
+    let found;
+    try {
+      found = this.game.city?.shopNear?.(p.x, p.z, SHOP_RANGE);
+    } catch {
+      found = undefined;
+    }
+    if (Array.isArray(found)) found = found[0] ?? null;
+    if (found === undefined) found = this.shops.nearest(p.x, p.z, SHOP_RANGE);
+    const name = found && String(found.name || found.label || found.text || '').trim();
+    let next = name ? { name, x: found.x, z: found.z, road: found.road || '' } : null;
+    const cur = this._shop;
+    if (cur && Number.isFinite(cur.x) && next?.name !== cur.name) {
+      const dCur = Math.hypot(cur.x - p.x, cur.z - p.z);
+      // (a shop without coordinates can't be compared: it takes over)
+      const dNext = !next ? Infinity : Number.isFinite(next.x) ? Math.hypot(next.x - p.x, next.z - p.z) : -Infinity;
+      if (dCur < SHOP_RANGE + SHOP_SWITCH && dNext > dCur - SHOP_SWITCH) next = cur;
+    }
+    this._shop = next;
+    if (next) this._shopUntil = now + SHOP_HOLD_MS;
+    return next;
   }
 
   _refreshText(p, speed) {
@@ -452,6 +495,7 @@ export class Hud {
     setText(this.street, street);
     setText(this.near, detail);
     this._keepSubtitleOffHero(now, true);
+    if (this.touch.enabled) this.touch.updateSwingLabel(this.game.player.state, this._textT);
     setText(this.alt, `ALT ${Math.max(0, Math.round(p.y))} m`);
     setText(this.speed, `${Math.round(speed * 3.6)} km/h`);
     this.compass.updateCaption();

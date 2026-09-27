@@ -90,12 +90,23 @@ export function drawWaypointPin(ctx, x, y, size) {
   ctx.restore();
 }
 
+// Business: a small dot in the sign's own colour (shops.json styles) with a light rim.
+export function drawShopDot(ctx, x, y, r, color) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, r * 0.42);
+  ctx.strokeStyle = 'rgba(243, 247, 255, 0.92)';
+  ctx.stroke();
+}
+
 // Text with a dark halo so it reads over any map colour.
-export function haloText(ctx, text, x, y, haloWidth) {
+export function haloText(ctx, text, x, y, haloWidth, color = MAP_COLORS.label) {
   ctx.lineJoin = 'round';
   ctx.lineWidth = haloWidth;
   ctx.strokeStyle = MAP_COLORS.halo;
   ctx.strokeText(text, x, y);
-  ctx.fillStyle = MAP_COLORS.label;
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
 }

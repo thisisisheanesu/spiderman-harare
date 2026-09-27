@@ -1,16 +1,21 @@
 import { el } from './dom.js';
 
 // Control reference for the help overlay, the pause menu and the first-minute hint.
-// Each row: [keys[], action]. Mirrors the bindings in src/core/input.js. Dive is C, not Ctrl:
-// Ctrl held with W (move) is the browser's close-tab shortcut, which no page can block.
+// Each row: [keys[], action, sep?] (sep '+' = press together; default '/' = either key). Mirrors the bindings in src/core/input.js and the gaits in
+// src/player/controller.js: the stick / WASD runs (a light push, Alt held or CapsLock switched on
+// walks); the swing button held on the ground is the parkour sprint, and jumping mid-sprint (or
+// pressing swing standing still) web-launches into a swing. Dive is C, not Ctrl: Ctrl held with W
+// (move) is the browser's close-tab shortcut, which no page can block.
 const CONTROLS = {
   keyboard: {
     title: 'Keyboard & mouse',
     rows: [
-      [['W', 'A', 'S', 'D'], 'Move'],
+      [['W', 'A', 'S', 'D'], 'Run'],
+      [['Alt', 'CapsLock'], 'Walk (hold Alt, or CapsLock on)'],
       [['Mouse'], 'Look'],
       [['Space'], 'Jump · wall-run'],
-      [['Left click', 'Shift'], 'Swing (hold)'],
+      [['Left click', 'Shift'], 'Hold: swing · sprint on the ground'],
+      [['Shift', 'Space'], 'Web-launch (jump mid-sprint)', '+'],
       [['E', 'Right click'], 'Web-zip'],
       [['C'], 'Dive'],
       [['F'], 'Change suit'],
@@ -21,9 +26,10 @@ const CONTROLS = {
       [['Esc', 'P'], 'Pause'],
     ],
     hint: [
-      [['WASD'], 'Move'],
+      [['WASD'], 'Run'],
+      [['Alt'], 'Walk'],
+      [['Shift'], 'Sprint · swing'],
       [['Space'], 'Jump'],
-      [['Click'], 'Swing'],
       [['E'], 'Zip'],
       [['C'], 'Dive'],
       [['M'], 'Map'],
@@ -33,10 +39,11 @@ const CONTROLS = {
   gamepad: {
     title: 'Gamepad',
     rows: [
-      [['Left stick'], 'Move'],
+      [['Left stick'], 'Run (push lightly to walk)'],
       [['Right stick'], 'Look'],
       [['A'], 'Jump · wall-run'],
-      [['RT'], 'Swing (hold)'],
+      [['RT'], 'Hold: swing · sprint on the ground'],
+      [['RT', 'A'], 'Web-launch (jump mid-sprint)', '+'],
       [['LB', 'RB', 'LT'], 'Web-zip'],
       [['B'], 'Dive'],
       [['Y'], 'Change suit'],
@@ -44,8 +51,8 @@ const CONTROLS = {
       [['Start'], 'Pause'],
     ],
     hint: [
+      [['RT'], 'Sprint · swing'],
       [['A'], 'Jump'],
-      [['RT'], 'Swing'],
       [['LB'], 'Zip'],
       [['B'], 'Dive'],
       [['Back'], 'Map'],
@@ -55,10 +62,11 @@ const CONTROLS = {
   touch: {
     title: 'Touch',
     rows: [
-      [['Left thumb'], 'Move (joystick)'],
+      [['Left thumb'], 'Run (push lightly to walk)'],
       [['Right thumb'], 'Drag to look'],
-      [['Swing'], 'Hold to swing'],
+      [['Swing'], 'Hold: swing · sprint on the ground'],
       [['Jump'], 'Jump · wall-run'],
+      [['Swing', 'Jump'], 'Web-launch (jump mid-sprint)', '+'],
       [['Zip'], 'Web-zip'],
       [['Dive'], 'Dive'],
       [['Suit'], 'Change suit'],
@@ -68,19 +76,21 @@ const CONTROLS = {
     hint: [
       [['Left side'], 'Move'],
       [['Right side'], 'Look'],
-      [['Swing'], 'Hold to swing'],
+      [['Swing'], 'Sprint · swing'],
     ],
   },
 };
 
 // Keyboard + mouse when the page can't capture the mouse (sandboxed iframe): look by dragging,
-// swing with Shift (left click only swings while the mouse is captured).
+// swing / sprint with Shift (left click only swings while the mouse is captured).
 const FREE = {
   rows: [
-    [['W', 'A', 'S', 'D'], 'Move'],
+    [['W', 'A', 'S', 'D'], 'Run'],
+    [['Alt', 'CapsLock'], 'Walk (hold Alt, or CapsLock on)'],
     [['Drag'], 'Look (hold a mouse button)'],
     [['Space'], 'Jump · wall-run'],
-    [['Shift'], 'Swing (hold)'],
+    [['Shift'], 'Hold: swing · sprint on the ground'],
+    [['Shift', 'Space'], 'Web-launch (jump mid-sprint)', '+'],
     [['E', 'Q'], 'Web-zip'],
     [['C'], 'Dive'],
     [['F'], 'Change suit'],
@@ -91,10 +101,10 @@ const FREE = {
     [['Esc', 'P'], 'Pause'],
   ],
   hint: [
-    [['WASD'], 'Move'],
+    [['WASD'], 'Run'],
     [['Drag'], 'Look'],
+    [['Shift'], 'Sprint · swing'],
     [['Space'], 'Jump'],
-    [['Shift'], 'Swing'],
     [['E'], 'Zip'],
     [['C'], 'Dive'],
     [['M'], 'Map'],
@@ -104,10 +114,10 @@ const FREE = {
 
 const CONTROL_MODES = Object.keys(CONTROLS);
 
-function keyList(keys) {
+function keyList(keys, sep = '/') {
   const out = [];
   keys.forEach((k, i) => {
-    if (i) out.push(el('span', 'key-sep', { text: '/' }));
+    if (i) out.push(el('span', 'key-sep', { text: sep }));
     out.push(el('kbd', null, { text: k }));
   });
   return out;
@@ -130,8 +140,8 @@ export function controlsColumns(active) {
           'dl',
           'controls-list',
           null,
-          (free && mode === 'keyboard' ? FREE : CONTROLS[mode]).rows.flatMap(([keys, action]) => [
-            el('dt', null, null, keyList(keys)),
+          (free && mode === 'keyboard' ? FREE : CONTROLS[mode]).rows.flatMap(([keys, action, sep]) => [
+            el('dt', null, null, keyList(keys, sep)),
             el('dd', null, { text: action }),
           ]),
         ),
@@ -142,4 +152,18 @@ export function controlsColumns(active) {
 
 export function controlsHint(mode) {
   return (mode === 'free' ? FREE : CONTROLS[mode] || CONTROLS.keyboard).hint.map(([keys, action]) => el('span', 'hint-item', null, [...keyList(keys), el('span', null, { text: action })]));
+}
+
+// One-paragraph primer under the help overlay's tables, for the device in use.
+const TIPS = {
+  keyboard:
+    'On the ground, hold Shift to sprint: it vaults railings and runs up walls. Press Space mid-sprint to web-launch into a swing, and keep holding Shift to swing on. Hold Alt (or switch CapsLock on) to walk. Press M for the map of Harare CBD and drop a waypoint anywhere.',
+  touch:
+    'On the ground, hold Swing to sprint: it vaults railings and runs up walls. Tap Jump mid-sprint to web-launch into a swing, and keep holding Swing to swing on. Push the stick lightly to walk. Tap the minimap for the map of Harare CBD and drop a waypoint anywhere.',
+  gamepad:
+    'On the ground, hold RT to sprint: it vaults railings and runs up walls. Press A mid-sprint to web-launch into a swing, and keep holding RT to swing on. Push the left stick lightly to walk. Press Back for the map of Harare CBD and drop a waypoint anywhere.',
+};
+
+export function controlsTip(mode) {
+  return TIPS[mode] || TIPS.keyboard;
 }

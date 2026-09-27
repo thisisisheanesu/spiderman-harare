@@ -15,5 +15,6 @@ export const ICONS = {
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   minus: svg('<path d="M5 12h14"/>'),
   locate: svg('<circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'),
+  search: svg('<circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/>'),
   pin: svg('<path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.2"/>'),
 };

@@ -1,7 +1,7 @@
 import './menus.css';
 import { el } from './dom.js';
 import { ICONS } from './icons.js';
-import { controlsColumns } from './controls.js';
+import { controlsColumns, controlsTip } from './controls.js';
 import { creditsPage } from './credits.js';
 import { SettingsPage } from './settingsPage.js';
 
@@ -76,16 +76,16 @@ export class HelpOverlay {
           el('button', 'icon-btn close-btn', { type: 'button', 'aria-label': 'Close help (H)', html: ICONS.close, onclick: () => hud.closeOverlay() }),
         ]),
         this.content,
-        el('p', 'help-foot', {
-          text: 'Swing from buildings, zip to ledges, dive between towers. Press M for the map of Harare CBD and drop a waypoint anywhere.',
-        }),
+        (this.foot = el('p', 'help-foot')),
       ]),
     ]);
     hud.root.append(this.root);
   }
 
   show() {
-    this.content.replaceChildren(controlsColumns(this.hud.hintMode()));
+    const mode = this.hud.hintMode();
+    this.content.replaceChildren(controlsColumns(mode));
+    this.foot.textContent = controlsTip(mode === 'free' ? 'keyboard' : mode);
     this.root.classList.add('open');
     this.root.setAttribute('aria-hidden', 'false');
     this.root.querySelector('.close-btn').focus({ preventScroll: true });

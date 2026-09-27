@@ -1,7 +1,8 @@
 import './bigmap.css';
 import { closestOnSegment } from '../core/geo.js';
 import { MAP_COLORS, MAJOR_ROADS } from './mapPainter.js';
-import { drawPlaceIcon, drawPlayerArrow, drawRankIcon, drawWaypointPin, haloText } from './mapIcons.js';
+import { drawPlaceIcon, drawPlayerArrow, drawRankIcon, drawShopDot, drawWaypointPin, haloText } from './mapIcons.js';
+import { MapSearch } from './mapSearch.js';
 import { clamp, el, fitCanvas, fmtDistance, setText } from './dom.js';
 import { ICONS } from './icons.js';
 
@@ -10,8 +11,14 @@ const MIN_ZOOM = 0.18; // CSS px per metre
 const MAX_ZOOM = 4;
 // Street names appear once the map is zoomed in at least this far (CSS px per metre).
 const LABEL_ZOOM = { trunk: 0.3, primary: 0.3, secondary: 0.45, tertiary: 0.6, residential: 1.1, unclassified: 1.1, living_street: 1.6 };
+// Businesses (hud.shops, from public/data/shops.json): web-verified ones and chains from the first
+// zoom, every business from the second (CSS px per metre); labels go where they fit, best first.
+const SHOP_ZOOM = [1.1, 2];
+const SHOP_LABELS_MAX = 70;
+const SHOP_LABEL = ['#ffe3a1', '#f3f7ff', '#dce6f5', '#dce6f5']; // by rank: verified, chain, street level, upstairs
+const HIT_PX = 14; // a tap this close to a business / place drops the waypoint on it, with its name
 const HINTS = {
-  keyboard: 'Click to set a waypoint · drag or WASD to pan · scroll to zoom',
+  keyboard: 'Click to set a waypoint · drag or WASD to pan · scroll to zoom · / to search',
   touch: 'Tap to set a waypoint · drag to pan · pinch to zoom',
   gamepad: 'Ⓐ set waypoint · left stick pan · RT / LT zoom · Ⓑ close',
 };
@@ -33,6 +40,9 @@ export class BigMap {
     this.pointers = new Map();
     this._labelWidths = new Map();
     this.streets = buildStreetCandidates(hud.game.data.roads);
+    this.shops = hud.shops;
+    this._shopsVersion = -1;
+    this._hits = []; // [x, y, name, wx, wz] of the businesses / places drawn, for taps
     this._build();
   }
 
@@ -49,12 +59,14 @@ export class BigMap {
     ]);
     this.hint = el('div', 'bigmap-hint');
     this.crosshair = el('div', 'bigmap-crosshair');
+    this.search = new MapSearch(this);
     this.root = el('div', 'overlay bigmap', { role: 'dialog', 'aria-label': 'Map of Harare CBD', 'aria-hidden': 'true' }, [
       this.canvas,
       this.crosshair,
       el('div', 'bigmap-top', null, [
         el('div', 'bigmap-title panel', null, [el('div', 'eyebrow', { text: 'Map' }), el('h2', null, { text: 'Harare CBD' }), this.street]),
         this.wpBar,
+        this.search.root,
         iconBtn('close', 'Close map (M)', () => this.hud.closeOverlay(), 'close-btn'),
       ]),
       el('div', 'bigmap-bottom', null, [
@@ -63,6 +75,7 @@ export class BigMap {
           legendItem('legend-landmark', 'Landmark'),
           legendItem('legend-park', 'Park'),
           legendItem('legend-rank', 'Kombi rank'),
+          legendItem('legend-shop', 'Business'),
           legendItem('legend-wp', 'Waypoint'),
         ]),
         this.hint,
@@ -90,8 +103,12 @@ export class BigMap {
       },
       { passive: false },
     );
+    c.addEventListener('pointerdown', () => this.search.close());
     this._onKey = (e) => {
-      if (e.key === '+' || e.key === '=') this._zoomBy(1.4);
+      if (e.key === '/' && !this.search.isOpen) {
+        e.preventDefault();
+        this.search.openPanel();
+      } else if (e.key === '+' || e.key === '=') this._zoomBy(1.4);
       else if (e.key === '-' || e.key === '_') this._zoomBy(1 / 1.4);
     };
   }
@@ -113,6 +130,7 @@ export class BigMap {
 
   hide() {
     this.open = false;
+    this.search.close();
     this.pointers.clear();
     this.root.classList.remove('open');
     this.root.setAttribute('aria-hidden', 'true');
@@ -141,6 +159,10 @@ export class BigMap {
 
   // Called every frame while open (the game is paused): stick / keys pan, triggers zoom, A drops a pin.
   update(dt, input, mode) {
+    if (this._shopsVersion !== this.shops.version) {
+      this._shopsVersion = this.shops.version;
+      this.dirty = true;
+    }
     if (this.root.dataset.mode !== mode) {
       this.root.dataset.mode = mode;
       this.hint.textContent = HINTS[mode];
@@ -160,6 +182,16 @@ export class BigMap {
     if (input.down('zip')) this._zoomBy(Math.exp(-dt * 1.6));
     if (mode === 'gamepad' && input.pressed('jump')) this._toggleWaypointAt(this.w / 2, this.h / 2);
     if (this.dirty) this._draw();
+  }
+
+  // Centre on (x, z), zoomed in to at least `zoom`, and drop a waypoint there (search results).
+  focusOn(x, z, zoom, label) {
+    this.cx = x;
+    this.cz = z;
+    this.zoom = clamp(Math.max(this.zoom, zoom || 0), MIN_ZOOM, MAX_ZOOM);
+    this._clampCentre();
+    this.hud.setWaypoint(x, z, { label });
+    this.dirty = true;
   }
 
   _centreOnPlayer() {
@@ -206,6 +238,20 @@ export class BigMap {
         this.hud.clearWaypoint();
         return;
       }
+    }
+    // On a business or place marker: the waypoint goes on it, with its name.
+    let hit = null;
+    let best = HIT_PX;
+    for (const h of this._hits) {
+      const d = Math.hypot(h[0] - sx, h[1] - sy);
+      if (d < best) {
+        best = d;
+        hit = h;
+      }
+    }
+    if (hit) {
+      this.hud.setWaypoint(hit[3], hit[4], { label: hit[2] });
+      return;
     }
     const w = this._toWorld(sx, sy);
     this.hud.setWaypoint(w.x, w.z);
@@ -315,8 +361,12 @@ export class BigMap {
       placed.push([wpScreen[0] - 14, wpScreen[1] - 34, wpScreen[0] + 14, wpScreen[1]]);
     }
 
-    // Icons first (always drawn, and reserved so no label covers them), then labels where they fit.
+    // Icons first (always drawn, and reserved so no label covers them), then labels where they fit:
+    // places, then street names, then businesses (best first).
     const inView = (x, y) => x > -20 && y > -20 && x < this.w + 20 && y < this.h + 20;
+    const hits = this._hits;
+    hits.length = 0;
+    const shops = this._drawShopDots(ctx, inView);
     const marks = [];
     for (const p of this.places.list) {
       if (p.distant) continue;
@@ -325,6 +375,7 @@ export class BigMap {
       drawPlaceIcon(ctx, x, y, 6, p.kind);
       placed.push([x - 7, y - 7, x + 7, y + 7]);
       marks.push([x, y, p.name, 13, 10]);
+      hits.push([x, y, p.name, p.x, p.z]);
     }
     for (const q of this.places.ranks) {
       const [x, y] = this._toScreen(q.x, q.z);
@@ -337,10 +388,11 @@ export class BigMap {
     ctx.textAlign = 'left';
     for (const [x, y, text, size, gap] of marks) {
       ctx.font = `${size === 13 ? 700 : 600} ${size}px system-ui, sans-serif`;
-      const tw = this._measure(ctx, text, size);
+      const tw = this._measure(ctx, text);
       if (fits(x + gap - 2, y - 9, x + gap + tw + 2, y + 9)) haloText(ctx, text, x + gap, y, 4);
     }
     this._drawStreetLabels(ctx, fits);
+    this._drawShopLabels(ctx, shops, fits);
 
     if (wpScreen) {
       drawWaypointPin(ctx, wpScreen[0], wpScreen[1], 13);
@@ -352,6 +404,47 @@ export class BigMap {
     drawPlayerArrow(ctx, px, py, -(player.heading || 0), 10);
   }
 
+  // Business dots in view (their sign colours), for the zoom level; returns them best first.
+  _drawShopDots(ctx, inView) {
+    const out = [];
+    if (this.zoom < SHOP_ZOOM[0]) return out;
+    const all = this.zoom >= SHOP_ZOOM[1];
+    const r = all ? 3.4 : 3;
+    for (const s of this.shops.places) {
+      if (!all && s.rank > 1) break; // sorted by rank: verified and chains come first
+      const [x, y] = this._toScreen(s.x, s.z);
+      if (!inView(x, y)) continue;
+      drawShopDot(ctx, x, y, s.rank === 0 ? r + 0.6 : r, s.color);
+      out.push([x, y, s]);
+      this._hits.push([x, y, s.name, s.x, s.z]);
+    }
+    return out;
+  }
+
+  // Names beside the dots (right, else left) where they fit, verified businesses first.
+  _drawShopLabels(ctx, shops, fits) {
+    let shown = 0;
+    ctx.textBaseline = 'middle';
+    for (const [x, y, s] of shops) {
+      if (shown >= SHOP_LABELS_MAX) break;
+      const size = s.rank === 0 ? 11.5 : 11;
+      ctx.font = `${s.rank <= 1 ? 700 : 600} ${size}px system-ui, sans-serif`;
+      const tw = this._measure(ctx, s.name);
+      const color = SHOP_LABEL[s.rank] || MAP_COLORS.label;
+      if (fits(x + 6, y - 7, x + 8 + tw, y + 7)) {
+        ctx.textAlign = 'left';
+        haloText(ctx, s.name, x + 7, y, 3, color);
+      } else if (fits(x - 8 - tw, y - 7, x - 6, y + 7)) {
+        ctx.textAlign = 'right';
+        haloText(ctx, s.name, x - 7, y, 3, color);
+      } else {
+        continue;
+      }
+      shown++;
+    }
+    ctx.textAlign = 'left';
+  }
+
   _drawStreetLabels(ctx, fits) {
     const zoom = this.zoom;
     for (const st of this.streets) {
@@ -359,7 +452,7 @@ export class BigMap {
       const major = MAJOR_ROADS.has(st.cls);
       const size = major ? 12.5 : 11.5;
       ctx.font = `${major ? 700 : 600} ${size}px system-ui, sans-serif`;
-      const tw = this._measure(ctx, st.name, size);
+      const tw = this._measure(ctx, st.name);
       const shown = [];
       for (const seg of st.segs) {
         if (shown.length >= 3) break;
@@ -391,8 +484,9 @@ export class BigMap {
     ctx.textAlign = 'left';
   }
 
-  _measure(ctx, text, size) {
-    const key = `${size}|${text}`;
+  // Text width in the context's current font (cached per font + text).
+  _measure(ctx, text) {
+    const key = `${ctx.font}|${text}`;
     let w = this._labelWidths.get(key);
     if (w === undefined) {
       w = ctx.measureText(text).width;
