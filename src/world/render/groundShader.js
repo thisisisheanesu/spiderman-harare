@@ -53,6 +53,7 @@ varying vec3 vWNrm;
 #define G_CANVAS ${f(GROUND_CANVAS_BASE)}
 #define G_PAINT ${f(GROUND_PAINT)}
 ${normals ? '#define CITY_NORMALS' : ''}
+${set.compressed ? '#define CITY_BC5' : ''}
 const vec4 G_INFO[NG] = vec4[NG](${info.join(', ')});
 const vec3 G_AVG[NG] = vec3[NG](${avg.join(', ')});
 ${GLSL_HELPERS}
@@ -66,6 +67,9 @@ GSample gSample(float layer, vec2 m, vec2 mdx, vec2 mdy) {
   o.b = textureGrad(gPbrB, vec3(m * s, layer), mdx * s, mdy * s);
 #else
   o.b = vec4(0.5, 0.5, 1.0, 0.0);
+#endif
+#ifdef CITY_BC5
+  o.b.ba = vec2(1.0, 0.0);
 #endif
   return o;
 }

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { encodeLayer } from './bcEncode.js';
 
 // The CC0 PBR materials of public/textures (see its README) packed into texture arrays, so the
 // merged city meshes keep one material (and one draw call) per chunk:
@@ -6,6 +7,9 @@ import * as THREE from 'three';
 //   B array (linear): rg = tangent-space normal xy (OpenGL, +Y up), b = ambient occlusion (ORM.r),
 //                     a = metalness (ORM.b)          -- omitted on 'low' (no normal mapping on phones)
 // Every layer is resampled to one square size; tileSizeMetres keeps non-square sources right.
+// Compressed variant ('high' on desktop GPUs with S3TC + RGTC): 1024 px layers encoded at load in
+// web workers (render/bcEncode.js): A = BC3 (albedo with its AO folded in, roughness), B = BC5
+// (normal xy); metalness becomes a per-material constant (only aluminium and zinc carry any).
 // Materials missing from a (reduced) set resolve to a stand-in through FALLBACK, so callers can ask
 // for any name at any quality level.
 
@@ -80,6 +84,8 @@ export class PbrSet {
     this.info = new Float32Array(this.count * 4);
     // Per layer: linear average albedo (to tint towards a target colour: target / avg).
     this.avg = new Float32Array(this.count * 3);
+    this.metal = new Float32Array(this.count);
+    this.compressed = false;
     this.bytes = 0;
     this.texA = null;
     this.texB = null;
@@ -107,7 +113,11 @@ export class PbrSet {
   }
 
   // Fetch + decode (through the shared asset loader), then resample into the arrays.
-  async load(assets, manifest, renderer) {
+  // compressSize: build BC3/BC5 arrays of that size when the GPU supports them.
+  async load(assets, manifest, renderer, { compressSize = 0 } = {}) {
+    const ext = renderer.extensions;
+    const canCompress = compressSize > 0 && this.normals && ext.has('WEBGL_compressed_texture_s3tc') && ext.has('WEBGL_compressed_texture_s3tc_srgb') && ext.has('EXT_texture_compression_rgtc');
+    if (canCompress) this.size = compressSize;
     const S = this.size;
     const byName = manifest?.materials ? Object.fromEntries(manifest.materials.map((m) => [m.name, m])) : {};
     const entries = this.names.map((n) => byName[n]);
@@ -124,6 +134,17 @@ export class PbrSet {
     });
     const loaded = await Promise.all(jobs);
 
+    const loadedEntries = { entries, loaded };
+    if (canCompress) {
+      try {
+        await this._buildCompressed(loadedEntries, renderer);
+        return this;
+      } catch (err) {
+        console.warn('[city] texture compression failed, using uncompressed 512 px layers', err);
+        this.size = 512;
+        return this.load(assets, manifest, renderer, {});
+      }
+    }
     const dataA = new Uint8Array(S * S * 4 * this.count);
     const dataB = this.normals ? new Uint8Array(S * S * 4 * this.count) : null;
     const canvas = document.createElement('canvas');
@@ -142,19 +163,8 @@ export class PbrSet {
       ctx.restore();
       return ctx.getImageData(0, 0, S, S).data;
     };
+    this._fillInfo(entries);
     for (let i = 0; i < this.count; i++) {
-      const e = entries[i];
-      const o = i * 4;
-      if (e) {
-        this.info[o] = 1 / e.tileSizeMetres[0];
-        this.info[o + 1] = 1 / e.tileSizeMetres[1];
-        this.info[o + 2] = e.tags?.includes('tintable') ? 1 : 0;
-        this.info[o + 3] = e.roughnessMean ?? 0.8;
-        this.avg.set(e.avgColorLinear || [0.5, 0.5, 0.5], i * 3);
-      } else {
-        this.info.set([0.5, 0.5, 1, 0.8], o);
-        this.avg.set([0.5, 0.5, 0.5], i * 3);
-      }
       const maps = loaded[i];
       const off = i * S * S * 4;
       if (!maps) {
@@ -212,6 +222,162 @@ export class PbrSet {
     if (this.texB) drop(this.texB);
     return this;
   }
+}
+
+PbrSet.prototype._fillInfo = function (entries) {
+  for (let i = 0; i < this.count; i++) {
+    const e = entries[i];
+    const o = i * 4;
+    if (e) {
+      this.info[o] = 1 / e.tileSizeMetres[0];
+      this.info[o + 1] = 1 / e.tileSizeMetres[1];
+      this.info[o + 2] = e.tags?.includes('tintable') ? 1 : 0;
+      this.info[o + 3] = e.roughnessMean ?? 0.8;
+      this.avg.set(e.avgColorLinear || [0.5, 0.5, 0.5], i * 3);
+      this.metal[i] = e.metalnessMean ?? 0;
+    } else {
+      this.info.set([0.5, 0.5, 1, 0.8], o);
+      this.avg.set([0.5, 0.5, 0.5], i * 3);
+    }
+  }
+};
+
+// Compressed arrays: per layer, read the maps at S px, pack RGBA (albedo * AO, roughness) and
+// (normal xy), encode in workers, assemble one CompressedArrayTexture per map type.
+PbrSet.prototype._buildCompressed = async function ({ entries, loaded }, renderer) {
+  const S = this.size;
+  this._fillInfo(entries);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const read = (img) => {
+    ctx.save();
+    ctx.clearRect(0, 0, S, S);
+    ctx.translate(0, S);
+    ctx.scale(1, -1);
+    ctx.drawImage(img, 0, 0, S, S);
+    ctx.restore();
+    return ctx.getImageData(0, 0, S, S).data;
+  };
+  const pack = (i) => {
+    const a = new Uint8Array(S * S * 4);
+    const n = new Uint8Array(S * S * 4);
+    const maps = loaded[i];
+    if (!maps) {
+      for (let p = 0; p < S * S * 4; p += 4) {
+        a[p] = a[p + 1] = a[p + 2] = 188;
+        a[p + 3] = 204;
+        n[p] = n[p + 1] = 128;
+      }
+      return { a, n };
+    }
+    const [albedo, orm, normal] = maps;
+    const al = read(albedo.image);
+    const r = read(orm.image);
+    for (let p = 0; p < S * S * 4; p += 4) {
+      const ao = 0.5 + (0.5 * r[p]) / 255;
+      a[p] = al[p] * ao;
+      a[p + 1] = al[p + 1] * ao;
+      a[p + 2] = al[p + 2] * ao;
+      a[p + 3] = r[p + 1];
+    }
+    const nm = normal ? read(normal.image) : null;
+    for (let p = 0; p < S * S * 4; p += 4) {
+      n[p] = nm ? nm[p] : 128;
+      n[p + 1] = nm ? nm[p + 1] : 128;
+    }
+    return { a, n };
+  };
+  const results = await encodeLayers(this.count, pack, S);
+  const levels = results[0].a.length;
+  const mipsA = [];
+  const mipsB = [];
+  let bytes = 0;
+  for (let l = 0; l < levels; l++) {
+    const w = Math.max(1, S >> l);
+    const la = results[0].a[l].length;
+    const ln = results[0].n[l].length;
+    const A = new Uint8Array(la * this.count);
+    const B = new Uint8Array(ln * this.count);
+    for (let i = 0; i < this.count; i++) {
+      A.set(results[i].a[l], i * la);
+      B.set(results[i].n[l], i * ln);
+    }
+    mipsA.push({ data: A, width: w, height: w });
+    mipsB.push({ data: B, width: w, height: w });
+    bytes += A.length + B.length;
+  }
+  const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  const make = (mips, format, srgb) => {
+    const t = new THREE.CompressedArrayTexture(mips, S, S, this.count, format);
+    t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.magFilter = THREE.LinearFilter;
+    t.minFilter = THREE.LinearMipmapLinearFilter;
+    t.generateMipmaps = false;
+    t.anisotropy = aniso;
+    t.needsUpdate = true;
+    return t;
+  };
+  this.texA = make(mipsA, THREE.RGBA_S3TC_DXT5_Format, true);
+  this.texB = make(mipsB, THREE.RED_GREEN_RGTC2_Format, false);
+  this.compressed = true;
+  this.bytes = bytes;
+};
+
+// Encodes `count` layers (pack(i) -> {a, n} RGBA arrays) on a small worker pool, falling back to
+// the main thread. Resolves to [{a: [levels], n: [levels]}].
+async function encodeLayers(count, pack, S) {
+  const results = new Array(count);
+  let workers = [];
+  try {
+    const n = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 4) - 1));
+    for (let k = 0; k < n; k++) workers.push(new Worker(new URL('./bcWorker.js', import.meta.url), { type: 'module' }));
+  } catch {
+    workers = [];
+  }
+  if (!workers.length) {
+    for (let i = 0; i < count; i++) {
+      const { a, n } = pack(i);
+      results[i] = { a: encodeLayer(a, S, 'bc3'), n: encodeLayer(n, S, 'bc5') };
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return results;
+  }
+  return new Promise((resolve, reject) => {
+    let next = 0;
+    let done = 0;
+    const feed = (w) => {
+      if (next >= count) return;
+      const i = next++;
+      const { a, n } = pack(i);
+      w.postMessage({ id: i, S, a, n }, [a.buffer, n.buffer]);
+    };
+    for (const w of workers) {
+      w.onmessage = (e) => {
+        const { id, a, n, error } = e.data;
+        if (error) {
+          for (const x of workers) x.terminate();
+          reject(new Error(error));
+          return;
+        }
+        results[id] = { a, n };
+        if (++done === count) {
+          for (const x of workers) x.terminate();
+          resolve(results);
+        } else {
+          feed(w);
+        }
+      };
+      w.onerror = (err) => {
+        for (const x of workers) x.terminate();
+        reject(err);
+      };
+    }
+    for (const w of workers) feed(w);
+  });
 }
 
 // Interior-mapping atlas (glass/interiors.json): 4 x 2 rooms rendered in Blender.

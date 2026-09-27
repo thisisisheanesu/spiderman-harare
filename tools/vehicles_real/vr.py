@@ -553,3 +553,37 @@ def cylinder_mask(cen, hub, r, side, x_inner):
     dy = cen[:, 1] - hub[1]
     dz = cen[:, 2] - hub[2]
     return (dy * dy + dz * dz < r * r) & (np.sign(cen[:, 0]) == side) & (np.abs(cen[:, 0]) > x_inner)
+
+
+def atlas_fill(path, uv_tris, color=None, grow=2):
+    """Paint the texels under the given UV triangles with one colour (median of those texels when
+    color is None). Used to remove badges / wordmarks baked into photo atlases."""
+    from PIL import Image, ImageDraw, ImageFilter
+    im = Image.open(path).convert('RGB')
+    W, H = im.size
+    mask = Image.new('L', (W, H), 0)
+    d = ImageDraw.Draw(mask)
+    for t in uv_tris:
+        d.polygon([(float(u) * W, (1.0 - float(vv)) * H) for u, vv in t], fill=255)
+    if grow:
+        mask = mask.filter(ImageFilter.MaxFilter(grow * 2 + 1))
+    a = np.asarray(im).copy()
+    m = np.asarray(mask) > 127
+    if color is None:
+        color = np.median(a[m], axis=0) if m.any() else np.array([20, 20, 20])
+    a[m] = np.asarray(color, np.uint8)
+    Image.fromarray(a).save(path)
+
+
+def blend_state_save(path, info):
+    import json
+    bpy.ops.wm.save_as_mainfile(filepath=path, copy=True)
+    json.dump(info, open(path + '.json', 'w'))
+
+
+def blend_state_load(path):
+    import json
+    if not os.path.exists(path) or not os.path.exists(path + '.json'):
+        return None
+    bpy.ops.wm.open_mainfile(filepath=path)
+    return json.load(open(path + '.json'))

@@ -34,7 +34,7 @@ class Vehicle:
         self.lod = lod
         self.rawdir = rawdir
         self.outdir = outdir
-        self.texdir = os.path.join(outdir, 'tex', name)
+        self.texdir = os.path.abspath(os.path.join(outdir, 'tex', name))
         os.makedirs(self.texdir, exist_ok=True)
         self.body = None           # joined body object (game materials)
         self.extra = []            # extra body parts (interior, plates, lamps ...) joined into body at the end
@@ -44,6 +44,15 @@ class Vehicle:
         self.meta = {}
         self.stats = {}
         self.textures = {}         # game material -> image path
+
+    def cache(self, key):
+        """Path of a cached intermediate .blend (heavy import/decimation stage); None when VR_NOCACHE=1."""
+        d = os.path.join(self.outdir, 'cache')
+        os.makedirs(d, exist_ok=True)
+        p = os.path.join(d, f'{self.name}_{key}.blend')
+        if os.environ.get('VR_NOCACHE') == '1' and os.path.exists(p):
+            os.remove(p)
+        return p
 
     def raw(self, uid):
         return os.path.join(self.rawdir, uid + '.glb')
@@ -156,15 +165,10 @@ def van_interior(v, *, x_half, y_front, y_rear, z_floor, z_belt, z_roof, y_dash,
 
 
 def finish(v, out_path):
-    """Assemble root / body / wheels / toggles, set extras and export."""
+    """Assemble root / body / wheels / toggles, set extras and export. Consumes v's objects."""
     col = bpy.context.scene.collection
-    body = v.body
-    parts = [body] + [e for e in v.extra if e is not None]
-    # unify materials by name before joining (MB objects carry all 14 contract slots)
+    parts = [v.body] + [e for e in v.extra if e is not None]
     body = vr.join(parts, 'body')
-    # drop unused material slots
-    used = set(p.material_index for p in body.data.polygons)
-    names = [body.data.materials[i].name for i in sorted(used)]
     labels = [body.data.materials[p.material_index].name for p in body.data.polygons]
     vr.assign_game_materials(body, labels)
     body.data.name = f'{v.name}_body'
@@ -177,6 +181,7 @@ def finish(v, out_path):
         emp.parent = root
         emp.location = hub
         src = v.wheel_meshes[key]
+        src.data.name = f'{v.name}_{key}'
         ob = bpy.data.objects.new(f'{wname}_mesh', src.data)
         col.objects.link(ob)
         ob.parent = emp
@@ -191,22 +196,62 @@ def finish(v, out_path):
         tob.parent = root
         tob['toggle'] = group
         tob['default_visible'] = bool(default)
-        used = set(p.material_index for p in tob.data.polygons)
         labels = [tob.data.materials[p.material_index].name for p in tob.data.polygons]
         vr.assign_game_materials(tob, labels)
     root['vehicle'] = v.name
     root['lod'] = v.lod
     for k, val in v.meta.items():
+        if k.startswith('_'):
+            continue
         root[k] = val if not isinstance(val, (list, dict)) else json.dumps(val)
-    # materials: textures per game material
-    for m in body.data.materials:
-        pass
-    v.stats['tris_body'] = vr.tri_count(body)
-    v.stats['tris_wheels'] = {k: vr.tri_count(o) for k, o in v.wheel_meshes.items()}
-    v.stats['tris_toggles'] = {t: vr.tri_count(o) for t, (o, g, d) in v.toggles.items()}
+    st = {'tris_body': vr.tri_count(body),
+          'tris_wheels': {k: vr.tri_count(o) for k, o in v.wheel_meshes.items()},
+          'tris_toggles': {t: vr.tri_count(o) for t, (o, g, d) in v.toggles.items()}}
+    st['tris_default_view'] = st['tris_body'] + sum(st['tris_wheels'][k] for (_, k) in v.wheels.values()) + \
+        sum(vr.tri_count(o) for t, (o, g, d) in v.toggles.items() if d)
+    for o in [body] + list(v.wheel_meshes.values()) + [t[0] for t in v.toggles.values()]:
+        o.data.validate(clean_customdata=False)
     vr.export_glb(root, out_path)
-    v.stats['file'] = out_path
+    st['file'] = out_path
+    v.stats[f'lod{v.lod}'] = st
     return root
+
+
+def make_lod1(v):
+    """Reduce the LOD0 state to LOD1 (about 1.5-4k triangles on screen): decimated body, 12-sided-ish
+    wheels, the interior silhouette replaced by a few boxes (recipes may override via v.lod1_hook)."""
+    v.lod = 1
+    tgt = v.meta.get('_lod1_body', 2200)
+    vr.decimate(v.body, tgt)
+    for k, w in v.wheel_meshes.items():
+        vr.decimate(w, v.meta.get('_lod1_wheel', 150))
+    keep = []
+    for e in v.extra:
+        if e is None:
+            continue
+        if e.name.endswith('_interior'):
+            vr.decimate(e, 120)
+        keep.append(e)
+    v.extra = keep
+    for t, (o, g, d) in v.toggles.items():
+        if vr.tri_count(o) > 300:
+            vr.decimate(o, max(120, vr.tri_count(o) // 4))
+    if getattr(v, 'lod1_hook', None):
+        v.lod1_hook(v)
+
+
+def snapshot(v):
+    return {'body': v.body.name, 'extra': [e.name for e in v.extra if e is not None],
+            'wheel_meshes': {k: o.name for k, o in v.wheel_meshes.items()},
+            'toggles': {t: (o.name, g, d) for t, (o, g, d) in v.toggles.items()}}
+
+
+def restore(v, snap):
+    O = bpy.data.objects
+    v.body = O[snap['body']]
+    v.extra = [O[n] for n in snap['extra']]
+    v.wheel_meshes = {k: O[n] for k, n in snap['wheel_meshes'].items()}
+    v.toggles = {t: (O[n], g, d) for t, (n, g, d) in snap['toggles'].items()}
 
 
 def main():
@@ -219,16 +264,25 @@ def main():
     import recipes
     statp = os.path.join(args.out, 'stats.json')
     allstats = json.load(open(statp)) if os.path.exists(statp) else {}
+    lods = [int(x) for x in args.lod.split(',')]
+    os.makedirs(os.path.join(args.out, 'state'), exist_ok=True)
     for n in args.names:
-        for lod in [int(x) for x in args.lod.split(',')]:
-            vr.clear()
-            v = Vehicle(n, lod, args.raw, args.out)
-            recipes.ALL[n](v)
-            path = os.path.join(args.out, 'raw', f'{n}{"_lod1" if lod else ""}.glb')
-            finish(v, path)
-            allstats[f'{n}_lod{lod}'] = v.stats
-            print(n, lod, json.dumps(v.stats))
-    json.dump(allstats, open(statp, 'w'), indent=1)
+        vr.clear()
+        v = Vehicle(n, 0, args.rawdir if hasattr(args, 'rawdir') else args.raw, args.out)
+        recipes.ALL[n](v)
+        snap = snapshot(v)
+        state = os.path.join(args.out, 'state', f'{n}.blend')
+        bpy.ops.wm.save_as_mainfile(filepath=state, copy=True)
+        if 0 in lods:
+            finish(v, os.path.join(args.out, 'raw', f'{n}.glb'))
+        if 1 in lods:
+            bpy.ops.wm.open_mainfile(filepath=state)
+            restore(v, snap)
+            make_lod1(v)
+            finish(v, os.path.join(args.out, 'raw', f'{n}_lod1.glb'))
+        allstats[n] = v.stats
+        print(n, json.dumps(v.stats))
+        json.dump(allstats, open(statp, 'w'), indent=1)
 
 
 if __name__ == '__main__':

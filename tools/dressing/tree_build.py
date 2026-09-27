@@ -26,6 +26,7 @@ import json
 import math
 import os
 import random
+import re
 import zlib
 import sys
 
@@ -236,8 +237,8 @@ def dilate_rgba(arr):
 
 
 def render_impostor(objs, alb, nrm, wd, samples=16):
-    """8-azimuth albedo + normal atlases of objs (materials swapped for alb / nrm per object name).
-    Frame k: seen from three.js direction (sin a, 0, cos a), a = k * 45 deg. Returns the impostor metadata."""
+    """8-azimuth albedo + normal atlases of objs. alb / nrm map a material name to its bake material (every
+    material slot is swapped). Frame k: seen from three.js direction (sin a, 0, cos a), a = k * 45 deg."""
     from PIL import Image
     for o in bpy.data.objects:
         if o.type == 'MESH':
@@ -253,7 +254,7 @@ def render_impostor(objs, alb, nrm, wd, samples=16):
         px_w, px_h = max(32, int(round(IMP_PX * fw / fh / 8)) * 8), IMP_PX
         fw = fh * px_w / px_h
     cam = U.setup_render(px_w, px_h, samples=samples)
-    keep = {o.name: o.data.materials[0] for o in objs}
+    keep = {o.name: list(o.data.materials) for o in objs}
     cols, rows = 4, 2
     imp = np.zeros((rows * px_h, cols * px_w, 4), dtype=np.uint8)
     impn = np.zeros((rows * px_h, cols * px_w, 4), dtype=np.uint8)
@@ -262,7 +263,8 @@ def render_impostor(objs, alb, nrm, wd, samples=16):
         d = (math.sin(th), -math.cos(th), 0.0)
         for mats, arr, tag in ((alb, imp, 'a'), (nrm, impn, 'n')):
             for o in objs:
-                o.data.materials[0] = mats[o.name]
+                for i, m in enumerate(keep[o.name]):
+                    o.data.materials[i] = mats[m.name]
             U.aim_camera(cam, (0, 0, fh / 2), d, dist=80, ortho=max(fw, fh))
             p = os.path.join(wd, f'imp_{tag}{k}.png')
             U.render_to(p, raw=(tag == 'n'))
@@ -274,8 +276,28 @@ def render_impostor(objs, alb, nrm, wd, samples=16):
     Image.fromarray(dilate_rgba(imp), 'RGBA').save(os.path.join(wd, 'imp.png'))
     Image.fromarray(dilate_rgba(impn)[..., :3], 'RGB').save(os.path.join(wd, 'imp_n.png'))
     for o in objs:
-        o.data.materials[0] = keep[o.name]
+        for i, m in enumerate(keep[o.name]):
+            o.data.materials[i] = m
     return {'cols': cols, 'rows': rows, 'frames': IMP_FRAMES, 'frameW': round(fw, 3), 'frameH': round(fh, 3), 'px': [px_w, px_h]}
+
+
+def impostor_only(cfg):
+    """Re-render the impostor atlases from the exported LOD0 (work/<name>/lod0.glb) and update meta.json."""
+    name = cfg['name']
+    wd = os.path.join(WORK, name)
+    U.reset()
+    objs = U.import_glb(os.path.join(wd, 'lod0.glb'))
+    alb, nrm = {}, {}
+    for o in objs:
+        for m in o.data.materials:
+            img, alpha = U.base_image(m)
+            cut = alpha or bool(re.search('foliage|frond|skirt', m.name))
+            alb[m.name] = U.albedo_material('ia_' + m.name, img, alpha=cut, hard_alpha=True)
+            nrm[m.name] = U.normal_material('in_' + m.name, img if cut else None, alpha=cut)
+    meta = json.load(open(os.path.join(wd, 'meta.json')))
+    meta['impostor'] = render_impostor(objs, alb, nrm, wd, cfg.get('impSamples', 16))
+    json.dump(meta, open(os.path.join(wd, 'meta.json'), 'w'), indent=1)
+    log('IMPOSTOR', name, meta['impostor'])
 
 
 # ------------------------------------------------------------------------------------------------ build
@@ -476,7 +498,7 @@ def build_broadleaf(cfg):
         nimg.colorspace_settings.name = 'Non-Color'
         if max(nimg.size) > 512:
             nimg.scale(max(4, nimg.size[0] // 2), max(4, nimg.size[1] // 2))
-    m_bark0 = U.pbr_material('bark', bark_g, normal_img=nimg, rough=0.95)
+    m_bark0 = U.pbr_material('bark', bark_g, rough=0.95)
     m_bark1 = U.pbr_material('bark', bark_g, rough=0.95)
     m_leaf = U.pbr_material('foliage', atlas_img, alpha=True, rough=0.85, double=True)
     for o, m in ((bark0, m_bark0), (bark1, m_bark1), (cards0, m_leaf), (cards1, m_leaf)):
@@ -490,10 +512,10 @@ def build_broadleaf(cfg):
     Htop = float(allco[:, 2].max())
     imp_meta = None
     if cfg.get('impostor', True):
-        m_alb = {bark0.name: U.albedo_material('imp_bark', bark_g, alpha=False),
-                 cards0.name: U.albedo_material('imp_leaf', atlas_img, alpha=True, hard_alpha=True)}
-        m_nrm = {bark0.name: U.normal_material('impn_bark'),
-                 cards0.name: U.normal_material('impn_leaf', atlas_img, alpha=True)}
+        m_alb = {m_bark0.name: U.albedo_material('imp_bark', bark_g, alpha=False),
+                 m_leaf.name: U.albedo_material('imp_leaf', atlas_img, alpha=True, hard_alpha=True)}
+        m_nrm = {m_bark0.name: U.normal_material('impn_bark'),
+                 m_leaf.name: U.normal_material('impn_leaf', atlas_img, alpha=True)}
         imp_meta = render_impostor(lod0_objs, m_alb, m_nrm, wd, cfg.get('impSamples', 16))
 
     # ---- export LODs (bark + foliage joined: one mesh, two primitives)
@@ -863,10 +885,11 @@ def build_palm(cfg):
     Htop = float(allco[:, 2].max())
     alb, nrm = {}, {}
     for o in lod0_objs:
-        img, _ = U.base_image(o.data.materials[0])
+        m = o.data.materials[0]
+        img, _ = U.base_image(m)
         is_alpha = o in (fr0, skirt0)
-        alb[o.name] = U.albedo_material('ia_' + o.name, img, alpha=is_alpha, hard_alpha=True)
-        nrm[o.name] = U.normal_material('in_' + o.name, img if is_alpha else None, alpha=is_alpha)
+        alb[m.name] = U.albedo_material('ia_' + m.name, img, alpha=is_alpha, hard_alpha=True)
+        nrm[m.name] = U.normal_material('in_' + m.name, img if is_alpha else None, alpha=is_alpha)
     imp_meta = render_impostor(lod0_objs, alb, nrm, wd, cfg.get('impSamples', 16))
 
     lod0 = U.join(lod0_objs, name)
@@ -888,9 +911,15 @@ def build_palm(cfg):
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
+    imp_only = '--impostor-only' in argv
+    argv = [a for a in argv if not a.startswith('--')]
     cfgs = json.load(open(os.path.join(HERE, 'trees.json')))['trees']
     for c in cfgs:
         if argv and c['name'] not in argv:
+            continue
+        if imp_only:
+            if c.get('impostor', True):
+                impostor_only(c)
             continue
         if c['kind'] == 'broadleaf':
             build_broadleaf(c)

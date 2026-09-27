@@ -7,7 +7,7 @@ import * as THREE from 'three';
 // faces the game sun and tinted / dimmed by the time of day. The shader writes a 512 x 256
 // equirectangular half-float target, converted by PMREMGenerator.fromEquirectangular into a reused
 // cube-UV target. Rebuilt when the time of day moves (a fraction of a millisecond of GPU work).
-// Phones ('low'): the HDRI alone, converted once, faded by night.
+// Phones ('low'): the sky alone (no HDRI), rebuilt only when the hour moves by 0.3 h.
 
 const VERT = /* glsl */ `
 varying vec2 vUv;
@@ -118,6 +118,8 @@ export class CityEnvironment {
 
   // Loads the HDRI (through the shared asset loader). Safe to skip: the sky alone still lights.
   async load(assets) {
+    // Phones: sky-only environment (no HDRI download, 4 MB less texture memory), rebuilt rarely.
+    if (this.low) return;
     try {
       const [hdr, meta] = await Promise.all([assets.hdr('textures/env/harare_day_ibl_1k.hdr'), assets.json('textures/env/env.json')]);
       if (meta?.sunInSource?.threeDirectionDefaultMapping) this.hdrSun.fromArray(meta.sunInSource.threeDirectionDefaultMapping);
@@ -127,10 +129,6 @@ export class CityEnvironment {
       this.hdr = hdr;
       this.uniforms.uHdr.value = hdr;
       this.uniforms.uHdrOn.value = 1;
-      if (this.low) {
-        // Phones: one PMREM of the HDRI itself (sky included), faded by night.
-        this.lowTexture = this.pmrem.fromEquirectangular(hdr).texture;
-      }
     } catch (err) {
       console.warn('[sky] HDRI unavailable, sky-only environment', err);
     }
@@ -139,13 +137,10 @@ export class CityEnvironment {
   // raw: the sky's display-referred palette (zenith, horizon, fog, glow, hemiGround); night 0..1.
   update(sky, raw, night, force = false) {
     const u = this.uniforms;
-    if (this.low && this.lowTexture) {
-      this.texture = this.lowTexture;
-      return this.texture;
-    }
     const t = sky.timeOfDay;
     const dt = Math.abs(t - this._last.t);
-    if (!force && !this.dirty && Math.min(dt, 24 - dt) < 0.1 && Math.abs(night - this._last.night) < 0.03) return this.texture;
+    const step = this.low ? 0.3 : 0.1;
+    if (!force && !this.dirty && Math.min(dt, 24 - dt) < step && Math.abs(night - this._last.night) < 0.03) return this.texture;
     this._last.t = t;
     this._last.night = night;
     this.dirty = false;

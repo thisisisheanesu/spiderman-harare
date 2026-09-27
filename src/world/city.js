@@ -20,12 +20,13 @@ import { makeNoiseTexture } from './render/noise.js';
 import { AO_LAYER } from '../core/postfx.js';
 import { createCanopyFade, applyCanopyFade } from './render/canopyFade.js';
 
-// tex: canvas layers (signs, painted artwork); pbr: PBR texture-array size; normals: normal /
+// tex: canvas layers (signs, painted artwork); pbr: PBR texture-array size; compress: size of
+// the block-compressed arrays used instead when the GPU has S3TC + RGTC (desktop); normals: normal /
 // AO / metalness array; smallInteriors: the 1024 x 512 interior atlas.
 const QUALITY = {
   low: { tex: 256, props: 0.5, trees: 0.4, signs: 48, pbr: 512, normals: false, smallInteriors: true, low: true },
   medium: { tex: 384, props: 0.8, trees: 0.7, signs: 80, pbr: 512, normals: true, smallInteriors: true },
-  high: { tex: 384, props: 1, trees: 1, signs: 112, pbr: 512, normals: true, smallInteriors: false },
+  high: { tex: 384, props: 1, trees: 1, signs: 112, pbr: 512, compress: 1024, normals: true, smallInteriors: false },
 };
 
 const NONE = [];
@@ -85,7 +86,10 @@ export class City {
     const facadeSet = new PbrSet(quality.low ? FACADE_SET_LOW : FACADE_SET, { size: quality.pbr, normals: quality.normals });
     const groundSet = new PbrSet(quality.low ? GROUND_SET_LOW : GROUND_SET, { size: quality.pbr, normals: quality.normals });
     const texturesReady = assets.json('textures/materials.json').then((man) =>
-      Promise.all([facadeSet.load(assets, man, game.renderer), groundSet.load(assets, man, game.renderer)]),
+      Promise.all([
+        facadeSet.load(assets, man, game.renderer, { compressSize: quality.compress || 0 }),
+        groundSet.load(assets, man, game.renderer, { compressSize: quality.compress || 0 }),
+      ]),
     );
     const interiorsReady = loadInteriors(assets, quality.smallInteriors).catch((err) => {
       console.warn('[city] interior atlas unavailable', err);

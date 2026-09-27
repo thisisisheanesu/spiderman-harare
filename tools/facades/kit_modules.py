@@ -477,9 +477,9 @@ def granite_pier(W, H, floor='middle'):
 # ------------------------------------------------------------------------------------------------------------
 def gg_bay(W, H, loggia=False):
     mb = MB()
-    pw = 0.3
-    sp = 1.05
-    head = 0.3
+    pw = 0.2
+    sp = 1.1
+    head = 0.35
     gy = 0.2 if not loggia else 1.4
     mb.box(0, pw, -0.1, 0, 0, H, 'wall', 'fr')
     mb.box(W - pw, W, -0.1, 0, 0, H, 'wall', 'fl')

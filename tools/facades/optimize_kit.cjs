@@ -50,7 +50,7 @@ function roleInfo(role, spec) {
   return out;
 }
 
-async function optimise(io, src, dst, { texMax = 0, materialNames = null } = {}) {
+async function optimise(io, src, dst, { texMax = 0, materialNames = null, nodeExtras = null } = {}) {
   const doc = await io.readBinary(fs.readFileSync(src));
   for (const mat of doc.getRoot().listMaterials()) {
     const name = mat.getName();
@@ -63,7 +63,11 @@ async function optimise(io, src, dst, { texMax = 0, materialNames = null } = {})
     mat.setBaseColorFactor(bc.map((v, i) => (i < 3 ? Math.min(1, v) : v)));
   }
   // three.js GLTFLoader strips '.' from node names (PropertyBinding.sanitizeNodeName): use '_' instead
-  for (const node of doc.getRoot().listNodes()) node.setName(node.getName().replace(/\./g, '_'));
+  for (const node of doc.getRoot().listNodes()) {
+    node.setName(node.getName().replace(/\./g, '_'));
+    const ex = nodeExtras ? nodeExtras(node.getName()) : null;
+    if (ex) node.setExtras(ex);
+  }
   for (const mesh of doc.getRoot().listMeshes()) mesh.setName(mesh.getName().replace(/\./g, '_'));
   // TEXCOORD_1 (room coordinates) only matters on glass primitives
   for (const mesh of doc.getRoot().listMeshes()) {
@@ -86,6 +90,17 @@ async function optimise(io, src, dst, { texMax = 0, materialNames = null } = {})
     .setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.FILTER });
   fs.writeFileSync(dst, await io.writeBinary(doc));
   return fs.statSync(dst).size;
+}
+
+// per-node extras (glTF node.extras -> three.js object.userData): the module metadata of kit.json
+function nodeMeta(t, modules, nodeName) {
+  for (const [k, m] of Object.entries(modules)) {
+    if (m.node === nodeName || m.lod1Node === nodeName) {
+      return { type: t, module: k, lod: m.node === nodeName ? 0 : 1, kind: m.kind, floor: m.floor, width: m.width, height: m.height,
+        depth: m.depth, pivot: m.pivot, stretch: m.stretch, materials: m.materials, anchors: m.anchors };
+    }
+  }
+  return null;
 }
 
 function convModule(key, m, prefix) {
@@ -156,11 +171,12 @@ async function main() {
       roles[role] = roleInfo(role, spec);
       usedPbr.add(spec[0]);
     }
-    const bytes = await optimise(io, path.join(RAW, `${t}.glb`), path.join(OUT, `${t}.glb`), {
-      materialNames: (role) => (roles[role] ? { role, ...roles[role] } : { role }),
-    });
     const modules = {};
     for (const [k, m] of Object.entries(meta.modules)) modules[k] = convModule(k, m);
+    const bytes = await optimise(io, path.join(RAW, `${t}.glb`), path.join(OUT, `${t}.glb`), {
+      materialNames: (role) => (roles[role] ? { role, ...roles[role] } : { role }),
+      nodeExtras: (name) => nodeMeta(t, modules, name),
+    });
     const A = meta.atlas;
     const I = meta.impostor;
     const tex = (kind, which) => `tex/${t}_${kind}_${which}.webp`;
@@ -206,8 +222,11 @@ async function main() {
   const cmeta = JSON.parse(fs.readFileSync(path.join(RAW, 'common.json'), 'utf8'));
   const commonRoles = {};
   for (const [role, spec] of Object.entries(TYPES_PY.__common__.materials)) commonRoles[role] = roleInfo(role, spec);
+  const cm0 = {};
+  for (const [k, m] of Object.entries(cmeta.modules)) cm0[k] = convModule(k, m);
   const cbytes = await optimise(io, path.join(RAW, 'common.glb'), path.join(OUT, 'common.glb'), {
     texMax: 256,
+    nodeExtras: (name) => nodeMeta('common', cm0, name),
     materialNames: (role) => (commonRoles[role] ? { role, ...commonRoles[role], retint: 'use the building\'s own role tint' } : { role, source: 'embedded textures' }),
   });
   total += cbytes;

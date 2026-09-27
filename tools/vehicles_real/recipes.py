@@ -93,70 +93,66 @@ def kombi(v):
     UID = 'bbb17dc295be4acf92acf09aa0148dc2'
     L, W, H = 4.695, 1.69, 2.2
     R = 0.345
-    lod = v.lod
-    objs = vr.import_glb(v.raw(UID))
-    ob = vr.join(objs, 'body')
-    vr.weld(ob, 1e-6)
-    vr.recalc_normals(ob)
-    img = vr.src_image(ob.data.materials[0])
-    src_tex = extract_texture(v.raw(UID), v.tex('kombi_src.jpg'))
-    # front is +x in the download: turn it to +y
-    vr.transform_all([ob], Matrix.Rotation(math.radians(90), 4, 'Z'))
-    mn, mx = vr.bounds([ob])
-    co = vr.verts_np(ob)
-    Ls = mx.y - mn.y
-    Hs = mx.z - mn.z
-    mid = (co[:, 1] > mn.y + 0.2 * Ls) & (co[:, 1] < mx.y - 0.3 * Ls)
-    Ws = 2 * np.percentile(np.abs(co[mid, 0] - (mn.x + mx.x) / 2), 99.5)
-    sL, sW, sH = L / Ls, W / Ws, H / Hs
-    v.stats['source_dims'] = [round(float(Ws), 4), round(float(Ls), 4), round(float(Hs), 4)]
-    v.stats['scale'] = [round(float(sW), 3), round(float(sL), 3), round(float(sH), 3)]
-    # centre: x on the body centre line, y mid-length, z on the ground
-    cx, cy = (mn.x + mx.x) / 2, (mn.y + mx.y) / 2
-    vr.transform_all([ob], Matrix.Translation((-cx, -cy, -mn.z)))
-    co = vr.verts_np(ob)
-    # --- wheels (source units): contact patches give the axle positions, radius from the real tyre
-    r_s = R / sH
-    hubs = {}
-    for fr, ysg in (('f', 1), ('r', -1)):
-        sel = (np.sign(co[:, 1]) == ysg) & (co[:, 2] < 0.012 * Hs)
-        yc = float((co[sel, 1].min() + co[sel, 1].max()) / 2)
-        hubs[fr] = Vector((0, yc, r_s))
-    x_in = (W / 2 - 0.235) / sW
-    cen, nor, area, mi, uvc = vr.face_data(ob)
-    wheel_objs = {}
-    for fr in ('f', 'r'):
-        for side, sgn in (('r', 1), ('l', -1)):
-            m = vr.cylinder_mask(cen, hubs[fr], r_s * 0.985, sgn, x_in)
-            w = vr.split_faces(ob, m, f'w_{fr}{side}')
-            wheel_objs[fr + side] = w
-            cen, nor, area, mi, uvc = vr.face_data(ob)
-    # --- decimate body + the canonical wheel (front right)
-    body_target = 36000 if lod == 0 else 2400
-    vr.decimate(ob, body_target)
-    wheel = wheel_objs['fr']
-    for k, w in wheel_objs.items():
-        if k != 'fr':
-            bpy.data.objects.remove(w)
-    vr.decimate(wheel, 1400 if lod == 0 else 140)
-    # --- scale to the real size (body non-uniform, wheel uniform so it stays round)
-    vr.transform_all([ob], Matrix.Diagonal((sW, sL, sH, 1)))
-    hub_f = Vector((0, hubs['f'].y * sL, R))
-    hub_r = Vector((0, hubs['r'].y * sL, R))
-    # wheel: move its hub to the origin, scale by sH (round), outer face stays +x
-    wco = vr.verts_np(wheel)
-    wx_out = float(wco[:, 0].max())
-    vr.transform_all([wheel], Matrix.Translation((0, -hubs['f'].y, -hubs['f'].z)))
-    vr.transform_all([wheel], Matrix.Diagonal((sH, sH, sH, 1)))
-    wco = vr.verts_np(wheel)
-    x_outer = wx_out * sW                      # where the tyre face sits on the scaled body
-    tyre_x = x_outer - 0.195 / 2 - 0.005       # hub x so the scaled wheel's outer face meets the body side
-    w_off = float(wco[:, 0].max())
-    vr.transform_all([wheel], Matrix.Translation((-(w_off - 0.195 / 2), 0, 0)))  # outer face at +0.0975
+    TW = 0.195
+    cache = v.cache('s1')
+    info = vr.blend_state_load(cache)
+    if info is None:
+        objs = vr.import_glb(v.raw(UID))
+        ob = vr.join(objs, 'body')
+        vr.weld(ob, 1e-6)
+        vr.recalc_normals(ob)
+        extract_texture(v.raw(UID), v.tex('kombi_src.jpg'))
+        # front is +x in the download: turn it to +y
+        vr.transform_all([ob], Matrix.Rotation(math.radians(90), 4, 'Z'))
+        mn, mx = vr.bounds([ob])
+        co = vr.verts_np(ob)
+        Ls, Hs = mx.y - mn.y, mx.z - mn.z
+        mid = (co[:, 1] > mn.y + 0.2 * Ls) & (co[:, 1] < mx.y - 0.3 * Ls)
+        Ws = 2 * np.percentile(np.abs(co[mid, 0] - (mn.x + mx.x) / 2), 99.5)
+        sL, sW, sH = L / Ls, W / Ws, H / Hs
+        vr.transform_all([ob], Matrix.Translation((-(mn.x + mx.x) / 2, -(mn.y + mx.y) / 2, -mn.z)))
+        co = vr.verts_np(ob)
+        # wheels (source units): contact patches give the axles; the radius comes from the real tyre
+        r_s = R / sH
+        hubs = {}
+        for fr, ysg in (('f', 1), ('r', -1)):
+            sel = (np.sign(co[:, 1]) == ysg) & (co[:, 2] < 0.012 * Hs)
+            hubs[fr] = [0.0, float((co[sel, 1].min() + co[sel, 1].max()) / 2), float(r_s)]
+        x_in = (W / 2 - 0.235) / sW
+        wheel_objs = {}
+        for fr in ('f', 'r'):
+            for side, sgn in (('r', 1), ('l', -1)):
+                cen = vr.face_data(ob)[0]
+                m = vr.cylinder_mask(cen, Vector(hubs[fr]), r_s * 0.985, sgn, x_in)
+                wheel_objs[fr + side] = vr.split_faces(ob, m, f'w_{fr}{side}')
+        vr.decimate(ob, 32000)
+        wheel = wheel_objs['fr']
+        for k, w in wheel_objs.items():
+            if k != 'fr':
+                bpy.data.objects.remove(w)
+        vr.decimate(wheel, 1400)
+        # real size: body non-uniform, wheel uniform (stays round)
+        vr.transform_all([ob], Matrix.Diagonal((sW, sL, sH, 1)))
+        wx_out = float(vr.verts_np(wheel)[:, 0].max())
+        vr.transform_all([wheel], Matrix.Translation((0, -hubs['f'][1], -hubs['f'][2])))
+        vr.transform_all([wheel], Matrix.Diagonal((sH, sH, sH, 1)))
+        w_off = float(vr.verts_np(wheel)[:, 0].max())
+        vr.transform_all([wheel], Matrix.Translation((-(w_off - TW / 2), 0, 0)))   # outer face at +TW/2
+        wheel.name = 'wheel'
+        info = {'scale': [sW, sL, sH], 'src_dims': [float(Ws), float(Ls), float(Hs)],
+                'hub_f_y': hubs['f'][1] * sL, 'hub_r_y': hubs['r'][1] * sL, 'tyre_x': wx_out * sW - TW / 2 - 0.005}
+        vr.blend_state_save(cache, info)
+    ob = bpy.data.objects['body']
+    wheel = bpy.data.objects['wheel']
+    src_tex = v.tex('kombi_src.jpg')
+    img = vr.load_image(src_tex)
+    v.stats['scale'] = [round(x, 3) for x in info['scale']]
+    hub_f = Vector((0, info['hub_f_y'], R))
+    hub_r = Vector((0, info['hub_r_y'], R))
+    tyre_x = info['tyre_x']
     track = 2 * tyre_x
-    v.stats['wheel'] = {'hub_f': list(hub_f), 'hub_r': list(hub_r), 'track': round(track, 3)}
     # --- classify body faces from the photo atlas + position
-    cols, uvc = vr.face_colors(ob, img)
+    cols, _ = vr.face_colors(ob, img)
     cen, nor, area, mi, _ = vr.face_data(ob)
     lum = vr.luminance(cols)
     r_, g_, b_ = cols[:, 0], cols[:, 1], cols[:, 2]
@@ -164,29 +160,32 @@ def kombi(v):
     nx, ny, nz = nor[:, 0], nor[:, 1], nor[:, 2]
     yF, yR = L / 2, -L / 2
     lab = np.full(len(cen), 'paint', dtype=object)
-    dark = lum < 0.13
-    lab[dark] = 'trim'
+    lab[lum < 0.13] = 'trim'
     # glass: dark texels in the window band of the sides, plus the whole windscreen / rear-window areas
-    band = (z > 1.1) & (z < 1.98)
-    side_w = band & (np.abs(nx) > 0.55) & (y < yF - 0.45) & (y > yR + 0.08) & (lum < 0.1)
-    front_door_w = band & (np.abs(nx) > 0.55) & (y >= yF - 0.95) & (lum < 0.12)
-    wind = (ny > 0.3) & (y > yF - 1.0) & (z > 1.12) & (z < 1.86) & (np.abs(x) < 0.76) & (lum < 0.5)
-    rear_w = (ny < -0.55) & (y < yR + 0.25) & (z > 1.2) & (z < 1.92) & (np.abs(x) < 0.7) & (lum < 0.3)
-    glass = side_w | front_door_w | wind | rear_w
+    band = (z > 1.13) & (z < 1.86)
+    side_w = band & (np.abs(nx) > 0.5) & (y > yR + 0.08) & (lum < 0.22)
+    wind = (ny > 0.3) & (y > yF - 1.0) & (z > 1.12) & (z < 1.83) & (np.abs(x) < 0.76) & (lum < 0.75)
+    rear_w = (ny < -0.55) & (y < yR + 0.25) & (z > 1.2) & (z < 1.9) & (np.abs(x) < 0.72) & (lum < 0.3)
+    glass = side_w | wind | rear_w
     lab[glass] = 'glass'
     red = (r_ > 0.18) & (r_ > 2.6 * g_) & (r_ > 2.6 * b_)
     amber = (r_ > 0.3) & (g_ > 0.06) & (g_ < 0.55 * r_) & (b_ < 0.25 * g_) & ~red
-    yellow = (r_ > 0.3) & (g_ > 0.22) & (b_ < 0.35 * g_) & ~amber
+    yellow = (r_ > 0.25) & (g_ > 0.18) & (b_ < 0.4 * g_) & ~amber
     lab[red & (y < yR + 0.4)] = 'light_rear'
     lab[amber & ((y > yF - 0.35) | (y < yR + 0.4))] = 'indicator'
+    # the downloaded (Australian-style) plates: cover them with Zimbabwe plates at the same spots
+    plates = {}
+    for key, sel in (('front', yellow & (y > yF - 0.3)), ('rear', yellow & (y < yR + 0.3))):
+        if sel.sum() > 3:
+            plates[key] = (float(np.median(x[sel])), float(np.median(z[sel])))
     lab[yellow] = 'trim'
-    # front: grille band (de-badged: the white TOYOTA letters become black trim) and the headlamps
+    # front: grille band (de-badged: the TOYOTA letters are painted out below) and the headlamps
     front = (ny > 0.45) & (y > yF - 0.35)
     grille = front & (np.abs(x) < 0.36) & (z > 0.55) & (z < 0.93)
     lab[grille] = 'trim'
     head = front & (np.abs(x) > 0.36) & (np.abs(x) < 0.8) & (z > 0.6) & (z < 0.9) & ~amber & (lum > 0.12)
     lab[head] = 'light_front'
-    # wheel classification: dark = tyre, bright = rim (the hubcap)
+    # wheel: dark = tyre, bright = hubcap / steel rim
     wcols, _ = vr.face_colors(wheel, img)
     wl = vr.luminance(wcols)
     wcen = vr.face_data(wheel)[0]
@@ -197,30 +196,39 @@ def kombi(v):
     v.stats['labels'] = {k: int((lab == k).sum()) for k in set(lab)}
     vr.shade(ob, 40)
     vr.shade(wheel, 60)
-    # --- paint atlas: paint texels -> grey detail, the rest keeps its colour
+    # --- atlas: paint texels -> grey detail (tintable); badges painted out
     atlas = v.tex('kombi_atlas.png')
-    if lod == 0 or not os.path.exists(atlas):
-        paint_tris = vr.uv_tris(ob, lab == 'paint')
-        keep = vr.uv_tris(ob, (lab != 'paint') & (lab != 'glass'))
-        white = vr.paint_atlas(src_tex, paint_tris, atlas, keep_uv_tris=keep)
-        v.stats['paint_white'] = round(float(white), 3)
+    white = vr.paint_atlas(src_tex, vr.uv_tris(ob, lab == 'paint'), atlas,
+                           keep_uv_tris=vr.uv_tris(ob, (lab != 'paint') & (lab != 'glass')))
+    vr.atlas_fill(atlas, vr.uv_tris(ob, grille), color=(22, 23, 25))
+    v.stats['paint_white'] = round(float(white), 3)
     v.body = ob
-    wheel.name = 'wheel'
-    v.wheel_meshes['w'] = wheel
+    v.wheel_meshes['wheel'] = wheel
     for wname, hub, sgn in (('wheel_fl', hub_f, -1), ('wheel_fr', hub_f, 1), ('wheel_rl', hub_r, -1), ('wheel_rr', hub_r, 1)):
-        v.wheels[wname] = (Vector((sgn * tyre_x, hub.y, R)), 'w')
-    # wheel wells (close the cut) + inner discs
+        v.wheels[wname] = (Vector((sgn * tyre_x, hub.y, R)), 'wheel')
     mb = vkit.MB()
     for wname, (hub, key) in v.wheels.items():
         sgn = 1 if hub.x > 0 else -1
         wheel_well(mb, hub, R * 1.08, sgn * (abs(hub.x) - 0.12), sgn)
-    wells = mb.to_object('wells', smooth_angle=None)
-    v.extra.append(wells)
-    # interior silhouette (RHD), plates
+    v.extra.append(mb.to_object('wells', smooth_angle=None))
     B.van_interior(v, x_half=W / 2 - 0.1, y_front=yF - 0.55, y_rear=yR + 0.15, z_floor=0.62, z_belt=1.12,
                    z_roof=1.86, y_dash=yF - 0.7, rows=[(yF - 1.05, 'pair'), (yF - 1.9, 'bench'), (yF - 2.65, 'bench'),
                                                         (yF - 3.4, 'bench'), (yF - 4.05, 'bench')])
-    B.add_plates(v, (0, yF, 0.46), (0, yR, 0.5), 'AFV 4417')
+    fp = (0.0, plates.get('front', (0, 0.46))[1])      # plates sit on the centre line of an H100
+    rp = (0.0, plates.get('rear', (0, 0.62))[1])
+    B.add_plates(v, (fp[0], ray_y(ob, fp[0], fp[1], 1), fp[1]), (rp[0], ray_y(ob, rp[0], rp[1], -1), rp[1]), 'AFV 4417',
+                 w=0.48, h=0.125)
+    v.stats['plates'] = plates
+    # --- Harare dressing (toggles): same groups / names as the generated kombi
+    gl = lab == 'glass'
+    wf = gl & (ny > 0.3)
+    wr_ = gl & (ny < -0.5)
+    g = {'y_front': yF, 'y_rear': yR, 'wind_top': float(np.percentile(z[wf], 99)), 'wind_bot': float(np.percentile(z[wf], 1)),
+         'rear_top': float(np.percentile(z[wr_], 99)) if wr_.any() else 1.85, 'stripe_z': 1.02, 'zupco_z': 0.98,
+         'zupco_y': -0.35, 'roof_z': float(z.max()), 'route_x': -0.42, 'rack_front': yF - 1.05, 'rack_x': 0.62,
+         'banner_w': 1.15, 'rear_banner_w': 1.1}
+    v.stats['toggle_geom'] = {k: round(val, 3) for k, val in g.items()}
+    TG.kombi(v, v.ctx(), g)
     setup_materials(v, textured=('paint', 'trim', 'light_front', 'light_rear', 'indicator', 'tyre', 'rim'), tex=atlas)
     meta(v, title='Toyota HiAce H100 Commuter (kombi)',
          real='Toyota HiAce H100 Commuter, long body, high roof (1989-2004)',
@@ -228,6 +236,19 @@ def kombi(v):
          axle_f=hub_f.y, axle_r=hub_r.y, steer=35,
          paints=['#efeee8', '#efeee8', '#efeee8', '#e4e1d8', '#b7bbbf', '#7fa3c7', '#1e2d55', '#5b1b22'],
          source=source_info(v, UID))
+    v.meta['_lod1_body'] = 2300
+
+
+def ray_y(ob, x, z, sgn, start=10.0):
+    """y of the body surface hit by a ray along -sgn*y at (x, z) (front: sgn=1)."""
+    from mathutils.bvhtree import BVHTree
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bvh = BVHTree.FromBMesh(bm)
+    loc, nor, i, d = bvh.ray_cast(Vector((x, sgn * start, z)), Vector((0, -sgn, 0)))
+    bm.free()
+    return loc.y if loc is not None else sgn * 2.0
 
 
 ALL = {

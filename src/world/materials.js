@@ -98,7 +98,7 @@ export function createFacadeMaterial(map, uniforms, layers, res) {
       FACADE_CANYON,
     );
   };
-  mat.customProgramCacheKey = () => `city-facade-4${normals ? 'n' : ''}${interiors ? 'i' : ''}`;
+  mat.customProgramCacheKey = () => `city-facade-4${normals ? 'n' : ''}${interiors ? 'i' : ''}${res.pbr.compressed ? 'c' : ''}`;
   return mat;
 }
 
@@ -133,6 +133,6 @@ export function createGroundMaterial(map, uniforms, layers, urban, opts = {}) {
         .replace('#include <color_fragment>', `#include <color_fragment>\n${GROUND_MAIN}`),
     );
   };
-  mat.customProgramCacheKey = () => `city-ground-3${normals ? 'n' : ''}`;
+  mat.customProgramCacheKey = () => `city-ground-3${normals ? 'n' : ''}${res.ground.compressed ? 'c' : ''}`;
   return mat;
 }

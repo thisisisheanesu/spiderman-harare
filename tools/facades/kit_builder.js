@@ -320,6 +320,13 @@ diffuseColor.rgb *= 1.0 + facMask.r * (vT0 - 1.0) + facMask.g * (vT1 - 1.0) + fa
         H = (h - hc - Hg) / n;
       }
     }
+    if (n && H < 2.9 && hc > 0.7) {
+      // low buildings: thin the parapet before squashing the floors
+      const hc2 = Math.max(0.6, hc * 0.55);
+      H = Math.min(H0, (h - hc2 - Math.max(3.4, Hg)) / n);
+      Hg = h - hc2 - n * H;
+      hc = hc2;
+    }
     if (!n) Hg = h - hc;
     return { Hg, H, n, hc };
   }

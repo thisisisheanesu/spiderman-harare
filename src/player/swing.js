@@ -61,6 +61,9 @@ const RELEASE_BUFFER = 1.0; // s: a jump tapped on the down-swing lets go (boost
 const ALT = 10; // m: preferred lowest point of the feet over the street, when the anchor allows it
 const MIN_ROPE = 9; // never reel shorter than this for ALT
 const REL_ELEV = 0.42; // rad: forward held, let go once the velocity climbs this steeply past the bottom
+const REL_ELEV_SHORT = 0.68; // ...later on short ropes (a street light, a low roof): a longer sweep, and
+const REL_SHORT = 8; // the flight climbs higher for the next web (REL_ELEV_SHORT at ropes up to this
+const REL_LONG_ROPE = 16; // long, REL_ELEV from this long)
 const REL_MIN_T = 0.45; // ...and not before this long on the rope
 const REL_LONG = 1.8; // ...or anywhere on the upswing past the anchor after this long (long ropes)
 const STALL = 8; // m/s: ...or once the upswing slows to this
@@ -103,8 +106,8 @@ const STREET_COS = Math.cos(0.95);
 const STREET_PULL = 0.7;
 const AIM_COS = Math.cos(1.1); // input within this of the swing direction steers along the latter
 const ALIGN_MIN = Math.cos(1.3); // a candidate's release must head within this of the wanted direction...
-const MIN_REL_SPEED = 13; // ...at least this fast (m/s; or 85 % of the speed at the start)...
-const MIN_TRAVEL = 12; // ...having carried you this far along it (m)
+const MIN_REL_SPEED = 10; // ...at least this fast (m/s; or 80 % of the speed at the start)...
+const MIN_TRAVEL = 8; // ...having carried you this far along it (m)
 const HUG = 2.4; // m: a building this close on the anchor's side during the swing counts as hugging it
 // Candidate simulation.
 const SIM_H = 1 / 30;
@@ -125,6 +128,8 @@ const smooth = (a, b, x) => {
   return t * t * (3 - 2 * t);
 };
 const bump = (x, c, w) => Math.max(0, 1 - Math.abs(x - c) / w);
+// Sine of the release elevation for a rope of length L (see REL_ELEV_SHORT).
+const relSin = (L) => Math.sin(REL_ELEV_SHORT + (REL_ELEV - REL_ELEV_SHORT) * clamp((L - REL_SHORT) / (REL_LONG_ROPE - REL_SHORT), 0, 1));
 
 export class SwingMove {
   constructor(ctrl) {
@@ -457,7 +462,7 @@ export class SwingMove {
     const dur = s.tRel - plan.delay;
     // Worth a web: it keeps (most of) the speed and carries you on, not a slow dangle down a wall.
     const travel = (s.x - center.x) * dir.x + (s.z - center.z) * dir.z;
-    if (spd < Math.max(MIN_REL_SPEED, 0.85 * speed0) || travel < MIN_TRAVEL) {
+    if (spd < Math.max(MIN_REL_SPEED, 0.8 * speed0) || travel < MIN_TRAVEL) {
       st.align++;
       return null;
     }
@@ -664,7 +669,7 @@ export class SwingMove {
         const vs = Math.hypot(vx, vy, vz);
         const ahead = (x - point.x) * vx + (z - point.z) * vz > 0;
         const apex = y - ch + (vy * vy) / (2 * G_FLIGHT);
-        if ((ahead && (vy > vs * Math.sin(REL_ELEV) || t - delay > REL_LONG || apex > ceiling)) || vs < STALL || y > point.y - 1) {
+        if ((ahead && (vy > vs * relSin(L) || t - delay > REL_LONG || apex > ceiling)) || vs < STALL || y > point.y - 1) {
           released = true;
           break;
         }
@@ -810,7 +815,7 @@ export class SwingMove {
       if (this.taut > REL_MIN_T && v.y > 0) {
         const ahead = (center.x - this.anchor.x) * v.x + (center.z - this.anchor.z) * v.z > 0;
         const apex = p.position.y + (v.y * v.y) / (2 * G_FLIGHT);
-        if ((ahead && (v.y > sp * Math.sin(REL_ELEV) || this.taut > REL_LONG || apex > this.ceiling)) || sp < STALL) {
+        if ((ahead && (v.y > sp * relSin(this.ropeLen) || this.taut > REL_LONG || apex > this.ceiling)) || sp < STALL) {
           this.release(false);
           return;
         }

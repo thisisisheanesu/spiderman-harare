@@ -1,0 +1,292 @@
+{
+ "_doc": "Verification shots: kit-assembled buildings (real footprints / heights from public/data/harare.json) rendered next to the reference photo they are meant to match. Run tools/facades/verify/run_shots.sh. spec = per-building overrides passed to FacadeKit.build (type, middle, materials, tints, canopy, h). h overrides are only used where harare.json has an estimated height (est:1) that the photo clearly contradicts.",
+ "shots": [
+  {
+   "name": "jasonmoyo_batanai",
+   "photo": "wc_Harare_CBD.jpg",
+   "w": 540,
+   "h": 720,
+   "query": "scene=building&ids=2182,2179,2180&radius=110&cam=-203,1.6,131&look=-248,13,196&fov=62&sunaz=20&sunel=60",
+   "spec": {
+    "2182": {
+     "type": "ribbon",
+     "middle": [
+      "bay_hood"
+     ],
+     "materials": {
+      "accent": [
+       "brick_face_red",
+       "#7e4a3a"
+      ],
+      "trim": [
+       "concrete_painted",
+       "#5f8a74"
+      ]
+     },
+     "tints": {
+      "frame": "#d9d6ce"
+     },
+     "canopy": true
+    },
+    "2179": {
+     "type": "ribbon",
+     "tints": {
+      "accent": "#cdbf9f",
+      "trim": "#d6cdb8",
+      "wall": "#b8ab8f"
+     },
+     "materials": {
+      "wall": [
+       "concrete_painted",
+       "#c9bd9f"
+      ]
+     },
+     "canopy": true
+    },
+    "2180": {
+     "type": "eggcrate",
+     "h": 42,
+     "tints": {
+      "wall": "#d8d0bf",
+      "accent": "#8d7a66"
+     }
+    }
+   },
+   "notes": "Batanai Gardens (brick with sloped green hoods), Edgars (beige ribbon block with canopy), egg-crate tower behind. 2180 is est:1 at 24.6 m; the photo shows ~12 storeys."
+  },
+  {
+   "name": "firststreet_cabs",
+   "photo": "wc_First_Street_Harare_Zimbabwe.jpg",
+   "w": 720,
+   "h": 540,
+   "query": "scene=building&ids=2190&radius=120&cam=-251,1.6,80&look=-266,9,5&fov=60&sunaz=40&sunel=62",
+   "spec": {
+    "2190": {
+     "type": "brick",
+     "h": 30,
+     "canopy": true,
+     "tints": {
+      "wall": "#7a4436",
+      "trim": "#d9d3c6"
+     }
+    },
+    "2187": {
+     "type": "fins",
+     "middle": [
+      "bay_angled"
+     ],
+     "tints": {
+      "accent": "#d8d6d0",
+      "wall": "#cfccc4"
+     }
+    },
+    "2189": {
+     "type": "ribbon",
+     "tints": {
+      "accent": "#d6cda9"
+     }
+    }
+   },
+   "notes": "CABS on First Street Mall: red-brown brick punched grid with white frames and a canopy. 2190 is est:1 at 7.6 m; the photo shows ~9 storeys."
+  },
+  {
+   "name": "jasonmoyo_west",
+   "photo": "wc_Jason_Moyo_ave_Harare.jpg",
+   "w": 800,
+   "h": 450,
+   "query": "scene=building&ids=2200,2202,2203&radius=140&cam=-42,1.6,124&look=-200,10,150&fov=58&sunaz=300&sunel=12",
+   "spec": {
+    "2203": {
+     "type": "glassgranite",
+     "canopy": true
+    },
+    "2200": {
+     "type": "brick",
+     "canopy": true
+    },
+    "2202": {
+     "type": "ribbon",
+     "canopy": true
+    }
+   },
+   "notes": "Jason Moyo Avenue looking west in the late afternoon: canopies, shopfronts, glass and brick blocks."
+  },
+  {
+   "name": "nelsonmandela",
+   "photo": "ov_d706b8c1_Harare_2.jpg",
+   "w": 720,
+   "h": 540,
+   "query": "scene=building&ids=1982,1977,1984&radius=110&cam=-292,1.6,-26&look=-190,9,-40&fov=60&sunaz=30&sunel=45",
+   "spec": {
+    "1982": {
+     "type": "deco",
+     "ground": {
+      "arcade": 1
+     }
+    },
+    "1977": {
+     "type": "deco",
+     "tints": {
+      "wall": "#9d998f"
+     }
+    },
+    "1984": {
+     "type": "fins"
+    }
+   },
+   "notes": "Nelson Mandela Ave: 1930s-50s rendered blocks with arcades and a grey block (typical-street reference photo)."
+  },
+  {
+   "name": "robertmugabe_colonial",
+   "photo": "wc_Stanley_Avenue_Salisbury_1936.jpg",
+   "w": 720,
+   "h": 540,
+   "query": "scene=building&ids=2547,2548,2549,2550&radius=70&cam=-500,1.6,418&look=-440,5,384&fov=60&sunaz=10&sunel=55",
+   "spec": {
+    "2547": {
+     "type": "colonial",
+     "verandah": true
+    },
+    "2548": {
+     "type": "colonial",
+     "verandah": true
+    },
+    "2549": {
+     "type": "colonial",
+     "verandah": true
+    },
+    "2550": {
+     "type": "colonial",
+     "verandah": true
+    }
+   },
+   "notes": "West end of Robert Mugabe Rd (Kopje side): colonial shops with verandahs on cast-iron columns and parapet names."
+  },
+  {
+   "name": "avenues_flats",
+   "photo": "wc_Mapillary_196761335623742_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+   "w": 800,
+   "h": 450,
+   "query": "scene=building&ids=7088&radius=70&view=street&side=0.6&sunaz=30&sunel=50",
+   "spec": {
+    "7088": {
+     "type": "avenues"
+    }
+   },
+   "notes": "Avenues residential block with balconies."
+  },
+  {
+   "name": "rooftop_firststreet",
+   "photo": "wc_HARARE_ZIMBABWE.jpg",
+   "w": 720,
+   "h": 540,
+   "query": "scene=building&ids=2182,2179,2180,2190&radius=170&cam=-150,42,70&look=-250,8,170&fov=60&sunaz=30&sunel=55",
+   "spec": {
+    "2182": {
+     "type": "ribbon",
+     "middle": [
+      "bay_hood"
+     ],
+     "materials": {
+      "accent": [
+       "brick_face_red",
+       "#7e4a3a"
+      ],
+      "trim": [
+       "concrete_painted",
+       "#5f8a74"
+      ]
+     },
+     "canopy": true
+    },
+    "2180": {
+     "type": "eggcrate",
+     "h": 42
+    },
+    "2190": {
+     "type": "brick",
+     "h": 30,
+     "canopy": true
+    }
+   },
+   "notes": "Swing-height view over First Street / Jason Moyo (LOD chosen by distance: LOD0 < 60 m, LOD1 atlas, LOD2 impostor > 220 m)."
+  },
+  {
+   "name": "jasonmoyo_batanai_night",
+   "photo": "wc_Harare_CBD.jpg",
+   "w": 540,
+   "h": 720,
+   "query": "scene=building&ids=2182,2179,2180&radius=110&cam=-203,1.6,131&look=-248,13,196&fov=62&night=1&exposure=1.6",
+   "spec": {
+    "2182": {
+     "type": "ribbon",
+     "middle": [
+      "bay_hood"
+     ],
+     "materials": {
+      "accent": [
+       "brick_face_red",
+       "#7e4a3a"
+      ],
+      "trim": [
+       "concrete_painted",
+       "#5f8a74"
+      ]
+     },
+     "canopy": true
+    },
+    "2179": {
+     "type": "ribbon",
+     "canopy": true
+    },
+    "2180": {
+     "type": "eggcrate",
+     "h": 42
+    }
+   },
+   "notes": "Night: lit rooms through the interior-mapped glass, closed shops with shutters."
+  },
+  {
+   "name": "lod0_cabscentre",
+   "photo": "",
+   "w": 640,
+   "h": 480,
+   "query": "scene=building&ids=2200&radius=0&cam=-40,30,40&look=-116,17,100&fov=45&sunaz=30&sunel=50&lod=0",
+   "spec": {
+    "2200": {
+     "type": "brick",
+     "canopy": true
+    }
+   },
+   "notes": "Cabs Centre (Jason Moyo) as brick type at LOD0, seen from ~95 m: LOD consistency check"
+  },
+  {
+   "name": "lod1_cabscentre",
+   "photo": "",
+   "w": 640,
+   "h": 480,
+   "query": "scene=building&ids=2200&radius=0&cam=-40,30,40&look=-116,17,100&fov=45&sunaz=30&sunel=50&lod=1",
+   "spec": {
+    "2200": {
+     "type": "brick",
+     "canopy": true
+    }
+   },
+   "notes": "Cabs Centre (Jason Moyo) as brick type at LOD1, seen from ~95 m: LOD consistency check"
+  },
+  {
+   "name": "lod2_cabscentre",
+   "photo": "",
+   "w": 640,
+   "h": 480,
+   "query": "scene=building&ids=2200&radius=0&cam=-40,30,40&look=-116,17,100&fov=45&sunaz=30&sunel=50&lod=2",
+   "spec": {
+    "2200": {
+     "type": "brick",
+     "canopy": true
+    }
+   },
+   "notes": "Cabs Centre (Jason Moyo) as brick type at LOD2, seen from ~95 m: LOD consistency check"
+  }
+ ]
+}

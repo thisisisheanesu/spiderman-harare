@@ -13,10 +13,11 @@ import { createVehicleUniforms, createBodyMaterial, createGlassMaterial, FLAG } 
 const ROAD_Y = 0.03;
 const ALWAYS = 22; // m: vehicles this close are drawn even outside the view (their shadows reach in)
 // Distances (m): LOD0 body, wheels at all / LOD0 wheels, drivers, passenger blocks, draw, headlight pools.
+// glass / shadows: beyond these the windows are a pixel or two and the contact shadow is invisible.
 const PRESETS = {
-  high: { lod0: 38, wheels: 170, wheelLod0: 13, figures: 34, riders: 24, draw: 470, beams: 200 },
-  medium: { lod0: 30, wheels: 130, wheelLod0: 10, figures: 28, riders: 18, draw: 400, beams: 160 },
-  low: { lod0: 18, wheels: 80, wheelLod0: 7, figures: 16, riders: 10, draw: 280, beams: 110 },
+  high: { lod0: 38, wheels: 170, wheelLod0: 13, figures: 34, riders: 24, draw: 470, beams: 200, glass: 260, shadows: 180 },
+  medium: { lod0: 30, wheels: 130, wheelLod0: 10, figures: 28, riders: 18, draw: 400, beams: 160, glass: 220, shadows: 150 },
+  low: { lod0: 18, wheels: 80, wheelLod0: 7, figures: 16, riders: 10, draw: 280, beams: 110, glass: 150, shadows: 110 },
 };
 
 const _chassis = new THREE.Matrix4();
@@ -409,18 +410,19 @@ export class VehicleRenderer {
     _col.set(c.r, c.g, c.b, flags);
     const O = this.opaque;
     O.put(g.body, _body, _col);
-    this.glass.put(g.glass, _body, null);
+    const glass = d < cfg.glass;
+    if (glass) this.glass.put(g.glass, _body, null);
     const tg = v.toggles;
     if (tg) {
       for (let i = 0; i < tg.length; i++) {
         const t = g.toggles[tg[i]];
         if (!t) continue;
         O.put(t.geo, _body, _col);
-        if (t.glass >= 0) this.glass.put(t.glass, _body, null);
+        if (glass && t.glass >= 0) this.glass.put(t.glass, _body, null);
       }
     }
 
-    if (this.shadows.count < this.shadows.instanceMatrix.count) {
+    if (d < cfg.shadows && this.shadows.count < this.shadows.instanceMatrix.count) {
       _local.makeScale(v.width * 1.3, 1, v.length * 1.08).setPosition(0, 0.02, 0);
       _out.multiplyMatrices(_chassis, _local);
       this.shadows.setMatrixAt(this.shadows.count++, _out);

@@ -848,6 +848,7 @@ export class ShopSigns {
       this.renderer.copyTextureToTexture(src, this.atlas, null, _dst, 0, lv);
     }
     face.slot = slot;
+    if (this.slotFace[slot] < 0) this.stats.cached++;
     this.slotFace[slot] = fi;
     this._setLookup(fi, slot);
     this.stats.rastered++;

@@ -42,7 +42,7 @@ const WIND_VERTEX = /* glsl */ `
 // Patches a glTF foliage / bark material in place: wind sway from uv1, and (foliage) no normal flip on back
 // faces (the cards carry outward crown normals, so both faces must shade the same), plus mip-aware alpha so
 // alpha-tested leaves do not thin out in the distance.
-export function patchVegetationMaterial(mat, { foliage = mat.alphaTest > 0 || mat.transparent, wind = true } = {}) {
+export function patchVegetationMaterial(mat, { foliage = mat.alphaTest > 0 || mat.transparent, wind = true, keepNormal = foliage } = {}) {
   if (mat.userData.dressingPatched) return mat;
   mat.userData.dressingPatched = true;
   if (foliage) {
@@ -62,10 +62,13 @@ export function patchVegetationMaterial(mat, { foliage = mat.alphaTest > 0 || ma
         .replace('#include <common>', '#include <common>\nuniform float uWindTime;\nuniform vec2 uWindDir;\nuniform float uWindStrength;\n#ifndef USE_UV1\nattribute vec2 uv1;\n#endif')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\n' + WIND_VERTEX);
     }
+    if (foliage && keepNormal) {
+      // keep the outward crown normal on back faces
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\n  normal *= faceDirection;\n#endif');
+    }
     if (foliage) {
       shader.fragmentShader = shader.fragmentShader
-        // keep the outward crown normal on back faces
-        .replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n#ifdef DOUBLE_SIDED\n  normal *= faceDirection;\n#endif')
         // sharpen alpha with distance (mip level estimate) so cards keep their coverage
         .replace('#include <alphatest_fragment>', `
 #ifdef USE_MAP
@@ -79,9 +82,15 @@ export function patchVegetationMaterial(mat, { foliage = mat.alphaTest > 0 || ma
 #include <alphatest_fragment>`);
     }
   };
-  mat.customProgramCacheKey = () => `dressing-veg-${foliage ? 1 : 0}-${wind ? 1 : 0}`;
+  mat.customProgramCacheKey = () => `dressing-veg-${foliage ? 1 : 0}-${wind ? 1 : 0}-${keepNormal ? 1 : 0}`;
   mat.needsUpdate = true;
   return mat;
+}
+
+// Alpha-tested dressing (grilles, razor-wire / gate cards, awning mesh): mip-aware alpha only, so thin strands
+// do not vanish in the distance (their mip-averaged alpha drops under the 0.5 cutoff).
+export function patchCutoutMaterial(mat) {
+  return patchVegetationMaterial(mat, { foliage: true, wind: false, keepNormal: false });
 }
 
 // Camera-facing (cylindrical) billboard impostors from the 8-azimuth atlases (<name>_imp.webp albedo+alpha,
@@ -157,7 +166,8 @@ export function createImpostorMesh(entry, albedoTex, normalTex, count, { lights 
         vec3 col = albedo * (amb + sunColor * ndl);
         gl_FragColor = vec4(col, 1.0);
         #ifdef IMP_DEBUG_NORMAL
-        gl_FragColor = vec4(N * 0.5 + 0.5, 1.0);
+        gl_FragColor = vec4(texture2D(nmap, vUv0).rgb, 1.0);
+        return;
         #endif
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
@@ -199,6 +209,7 @@ export class DressingLibrary {
           const mats = Array.isArray(o.material) ? o.material : [o.material];
           for (const m of mats) {
             if (e.wind) patchVegetationMaterial(m, { foliage: m.alphaTest > 0 || /foliage|frond|leaf/i.test(m.name) });
+            else if (m.alphaTest > 0) patchCutoutMaterial(m);
           }
           o.castShadow = true;
           o.receiveShadow = true;

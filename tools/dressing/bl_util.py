@@ -45,14 +45,17 @@ def base_image(mat):
         return None, False
     img = None
     alpha = False
+    mixed = None
     for n in mat.node_tree.nodes:
         if n.type == 'TEX_IMAGE' and n.image:
             for l in n.outputs['Color'].links:
-                if l.to_socket.name == 'Base Color' or l.to_node.type in ('MIX', 'MIX_RGB', 'SEPARATE_COLOR'):
+                if l.to_socket.name == 'Base Color':
                     img = n.image
+                elif l.to_node.type in ('MIX', 'MIX_RGB'):
+                    mixed = mixed or n.image          # e.g. base colour x vertex colour
             for l in n.outputs['Alpha'].links:
                 alpha = True
-                img = img or n.image
+    img = img or mixed
     if img is None:
         for n in mat.node_tree.nodes:
             if n.type == 'TEX_IMAGE' and n.image:
@@ -364,11 +367,22 @@ def normal_material(name, image=None, alpha=False):
     out = nt.nodes.new('ShaderNodeOutputMaterial')
     em = nt.nodes.new('ShaderNodeEmission')
     geo = nt.nodes.new('ShaderNodeNewGeometry')
+    # Cycles turns the shading normal towards the viewer on back faces; undo that so double-sided cards keep
+    # their authored (outward / upward) normals: N * (1 - 2 * backfacing)
+    flip = nt.nodes.new('ShaderNodeMath')
+    flip.operation = 'MULTIPLY_ADD'
+    flip.inputs[1].default_value = -2.0
+    flip.inputs[2].default_value = 1.0
+    nt.links.new(geo.outputs['Backfacing'], flip.inputs[0])
+    nsgn = nt.nodes.new('ShaderNodeVectorMath')
+    nsgn.operation = 'SCALE'
+    nt.links.new(geo.outputs['Normal'], nsgn.inputs[0])
+    nt.links.new(flip.outputs[0], nsgn.inputs['Scale'])
     vt = nt.nodes.new('ShaderNodeVectorTransform')
     vt.vector_type = 'NORMAL'
     vt.convert_from = 'WORLD'
     vt.convert_to = 'CAMERA'
-    nt.links.new(geo.outputs['Normal'], vt.inputs[0])
+    nt.links.new(nsgn.outputs[0], vt.inputs[0])
     # Cycles camera space: x right, y up, z forwards (away from the viewer) -> flip z so +z faces the camera.
     # Render normal passes with view_transform 'Raw' (see render_normals) so the values are stored linearly.
     sc = nt.nodes.new('ShaderNodeVectorMath')

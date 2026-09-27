@@ -152,7 +152,8 @@ function scoreAnchor(x, y, z, nx, nz, corner, id, kind) {
   const facing = Math.max(0, -(nx * rx + nz * rz) / hd);
   // A rope about as long as the web (d) bottoms out at y - d: ideally at least `alt` over the street
   // without reeling in, so on low buildings shorter, steeper webs are the believable ones.
-  const ideal = Math.min(Q.idealDist, Math.max(14, y - Q.street - Q.alt));
+  // (Low anchors: the longest rope that still swings clear, a little reeling in allowed for.)
+  const ideal = Math.min(Q.idealDist, Math.max(8, y - Q.street - 2.5));
   const score =
     1.2 * fwd -
     ((elev - Q.idealElev) / 0.42) ** 2 -

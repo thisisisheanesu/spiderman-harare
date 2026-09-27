@@ -68,6 +68,7 @@ export function facadeFragmentDecl(pbr, { normals, interiors }) {
   const N = pbr.count;
   const info = [];
   const avg = [];
+  const metal = Array.from(pbr.metal || new Float32Array(N), (m) => f(m));
   for (let i = 0; i < N; i++) {
     const c = CONTRAST[pbr.names[i]] ?? 1;
     info.push(v4([pbr.info[i * 4], pbr.info[i * 4 + 1], pbr.info[i * 4 + 2], c]));
@@ -137,6 +138,8 @@ varying vec3 vWNrm;
 ${defs}
 ${interiors ? '#define CITY_INTERIORS' : ''}
 ${normals ? '#define CITY_NORMALS' : ''}
+${pbr.compressed ? '#define CITY_BC5' : ''}
+const float PBR_METAL[NPBR] = float[NPBR](${metal.join(', ')});
 const vec4 PBR_INFO[NPBR] = ${arr('vec4', N, info)};
 const vec3 PBR_AVG[NPBR] = ${arr('vec3', N, avg)};
 const vec4 ST_WIN[NST] = ${arr('vec4', names.length, win)};
@@ -234,6 +237,10 @@ vec4 cB = textureGrad(pbrB, vec3(cUv, cMat), cUvDx, cUvDy);
 #else
 vec4 cB = vec4(0.5, 0.5, 1.0, 0.0);
 #endif
+#ifdef CITY_BC5
+cB.b = 1.0;
+cB.a = PBR_METAL[cMi];
+#endif
 mat3 cTBN = cityTBN(cN, vWPos, cUv);
 // Derivatives for the analytic layouts (taken here, in uniform control flow).
 vec2 fdU = vec2(dFdx(vFacUv.x), dFdy(vFacUv.x));
@@ -244,7 +251,8 @@ vec2 cFw = vec2(length(fdU), length(fdV)) + 1e-6;
 float cBayW = length(fdS) / cFw.x;
 float cFloorH = length(fdY) / cFw.y;
 float cUSign = dot(fdS, fdU) < 0.0 ? -1.0 : 1.0;
-vec2 cPlanW = vec2(length(fdS), length(fdY));
+vec2 cPlanDx = vec2(fdS.x, fdY.x);
+vec2 cPlanDy = vec2(fdS.y, fdY.y);
 
 // Low-frequency variation so tiles never visibly repeat, plus grime.
 vec4 cNz = texture(noiseMap, cPlan * 0.011 + vec2(cSeed * 0.137, cSeed * 0.071));
@@ -314,7 +322,8 @@ if (cIsVirtual) {
   // Wall / accent / trim albedo.
   vec3 wallAlb = cityAlbedo(cA, cMat, cTint) * cMacro;
   float accMat = cAccX < 254.5 ? cAccX : ST_MAT[cSt].y;
-  vec4 accA = textureGrad(pbrA, vec3(cPlan * PBR_INFO[int(accMat + 0.5)].xy, accMat), cUvDx, cUvDy);
+  vec2 accS = PBR_INFO[int(accMat + 0.5)].xy;
+  vec4 accA = textureGrad(pbrA, vec3(cPlan * accS, accMat), cPlanDx * accS, cPlanDy * accS);
   vec3 trimAlb = cityAlbedo(accA, accMat, mix(cTint, vec3(0.9, 0.89, 0.86), 0.55)) * mix(0.95, 1.03, cNz.g);
   vec3 frameCol = FRAMES[cFrameIdx];
   if (cSt == ST_COLSHOP) frameCol = vec3(0.045, 0.1, 0.06);
@@ -462,9 +471,9 @@ if (cIsVirtual) {
   if (shut > 0.5) lit = 0.0;
 
   // Glass: grime layer, tint, reflectance, a slight per-pane tilt so reflections break up.
-  vec4 gA = textureGrad(pbrA, vec3(cPlan / 3.0, M_GLASS), cUvDx, cUvDy);
+  vec4 gA = textureGrad(pbrA, vec3(cPlan / 3.0, M_GLASS), cPlanDx / 3.0, cPlanDy / 3.0);
 #ifdef CITY_NORMALS
-  vec4 gB = textureGrad(pbrB, vec3(cPlan / 3.0, M_GLASS), cUvDx, cUvDy);
+  vec4 gB = textureGrad(pbrB, vec3(cPlan / 3.0, M_GLASS), cPlanDx / 3.0, cPlanDy / 3.0);
 #else
   vec4 gB = vec4(0.5, 0.5, 1.0, 0.0);
 #endif
@@ -520,7 +529,8 @@ if (cIsVirtual) {
   vec3 shutAlb = vec3(0.0);
   float shutK = 0.0;
   if (shut > 0.5) {
-    vec4 sA = textureGrad(pbrA, vec3(vec2(p.x, p.y) * PBR_INFO[int(M_SHUTTER)].xy, M_SHUTTER), cUvDx, cUvDy);
+    vec2 shS = PBR_INFO[int(M_SHUTTER)].xy;
+    vec4 sA = textureGrad(pbrA, vec3(p * shS, M_SHUTTER), cPlanDx * shS, cPlanDy * shS);
     shutAlb = cityAlbedo(sA, M_SHUTTER, mix(vec3(0.55, 0.57, 0.58), cTint * 0.8, 0.3));
     shutK = open0;
     glassK *= 1.0 - shutK;

@@ -7,7 +7,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
-import { patchVegetationMaterial, createImpostorMesh, windUniforms } from '/repo/tools/dressing/runtime/dressing.js';
+import { patchVegetationMaterial, patchCutoutMaterial, createImpostorMesh, windUniforms } from '/repo/tools/dressing/runtime/dressing.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const q = new URLSearchParams(location.search);
 const W = +(q.get('w') || 960), H = +(q.get('h') || 540);
@@ -21,9 +22,13 @@ renderer.shadowMap.enabled = cfg.shadows !== false;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
+// the game lights PBR materials with a PMREM environment too (src/world/render/environment.js); approximate it
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = cfg.envI ?? 0.8;
 scene.background = new THREE.Color(cfg.sky || '#a9c4e4');
 if (cfg.fog) scene.fog = new THREE.Fog(cfg.sky || '#a9c4e4', cfg.fog[0], cfg.fog[1]);
-const hemi = new THREE.HemisphereLight('#c3d6ee', '#a08868', cfg.hemi ?? 1.1);
+const hemi = new THREE.HemisphereLight('#c3d6ee', '#a08868', cfg.hemi ?? 0.45);  // game by day: 1.1 * 0.35 + environment
 scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff3e2', cfg.sunI ?? 3);
 const el = THREE.MathUtils.degToRad(cfg.sun?.elev ?? 55), az = THREE.MathUtils.degToRad(cfg.sun?.azim ?? 35);
@@ -87,6 +92,9 @@ for (const o of cfg.objects || []) {
           if (fol && m.map) { m.alphaTest = 0.5; m.transparent = false; }
           patchVegetationMaterial(m, { foliage: fol });
           if (fol) c.customDepthMaterial = new THREE.MeshDepthMaterial({ map: m.map, alphaTest: 0.5, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
+        } else if (m.alphaTest > 0) {
+          patchCutoutMaterial(m);
+          c.customDepthMaterial = new THREE.MeshDepthMaterial({ map: m.map, alphaTest: 0.5, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
         }
       }
       tris += (c.geometry.index ? c.geometry.index.count : c.geometry.attributes.position.count) / 3;
