@@ -50,15 +50,15 @@ Wegener; the recordings belong to the radio aporee ::: maps "All Africa Sound Ma
 | `sn-mangwanani-baba` | Mangwanani baba. | Good morning, sir. | greet | 01 |  |
 | `sn-mwarara-here` | Mwarara here? | Did you sleep well? (the usual morning "how are you") | greet | 01 |  |
 | `sn-ndarara-zvangu` | Ndarara zvangu. | I slept well. (reply) | greet | 01 |  |
-| `sn-mangwanani-shewe` | Mangwanani shewe. | Good morning (respectful). | greet | 02 |  |
-| `sn-mangwanani-chirombowe` | Mangwanani chirombowe. | Good morning (respectful, to a man). | greet | 02 |  |
+| `sn-mangwanani-shewe` | Mangwanani shewe. | Good morning (courteous; shewe is the address women use). | greet | 02 | The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue. |
+| `sn-mangwanani-chirombowe` | Mangwanani chirombowe. | Good morning (courteous; chirombowe is the address men use). | greet | 02 |  |
 | `sn-masikati` | Masikati. | Good afternoon. | greet | 10 |  |
 | `sn-masikati-baba` | Masikati baba. | Good afternoon, sir. | greet | 04 |  |
 | `sn-masikati-muzvare` | Masikati muzvare. | Good afternoon, miss. | greet | 03 |  |
 | `sn-masikati-mwanangu` | Masikati mwanangu. | Good afternoon, my child. | greet | 04 |  |
-| `sn-masikati-shewe` | Masikati shewe. | Good afternoon (respectful). | greet | 03 |  |
-| `sn-masikati-chirombowe` | Masikati chirombowe. | Good afternoon (respectful, to a man). | greet | 10 |  |
-| `sn-mwaswera-here-shewe` | Mwaswera here shewe? | How has your day been? (respectful) | greet | 03 |  |
+| `sn-masikati-shewe` | Masikati shewe. | Good afternoon (courteous; shewe is the address women use). | greet | 03 | The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue. |
+| `sn-masikati-chirombowe` | Masikati chirombowe. | Good afternoon (courteous; chirombowe is the address men use). | greet | 10 |  |
+| `sn-mwaswera-here-shewe` | Mwaswera here shewe? | How has your day been? (courteous; shewe is the address women use) | greet | 03 | The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue. |
 | `sn-ndaswera-zvangu` | Ndaswera zvangu kana mwaswerawo. | I've had a good day, if you have too. | greet | 03 |  |
 | `sn-masanga-chirombowe` | Masanga chirombowe. | Hello! (greeting between people meeting on the road) | greet | 05 |  |
 | `sn-mwazviita` | Mwazviita. | Thank you. | greet | 09 |  |

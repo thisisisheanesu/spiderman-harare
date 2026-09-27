@@ -136,14 +136,15 @@
    "kind": "greet",
    "lang": "sn",
    "text": "Mangwanani shewe.",
-   "en": "Good morning (respectful).",
+   "en": "Good morning (courteous; shewe is the address women use).",
    "gender": "male",
    "speaker": "Matthew Mataranyika (FSI tape voice)",
    "author": "Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)",
    "license": "Public domain (work of the U.S. Government)",
    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
    "source": "https://archive.org/details/Shona_201407",
-   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2002.mp3"
+   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2002.mp3",
+   "note": "The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue."
   },
   {
    "id": "sn-mangwanani-chirombowe",
@@ -152,7 +153,7 @@
    "kind": "greet",
    "lang": "sn",
    "text": "Mangwanani chirombowe.",
-   "en": "Good morning (respectful, to a man).",
+   "en": "Good morning (courteous; chirombowe is the address men use).",
    "gender": "male",
    "speaker": "Matthew Mataranyika (FSI tape voice)",
    "author": "Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)",
@@ -232,14 +233,15 @@
    "kind": "greet",
    "lang": "sn",
    "text": "Masikati shewe.",
-   "en": "Good afternoon (respectful).",
+   "en": "Good afternoon (courteous; shewe is the address women use).",
    "gender": "male",
    "speaker": "Matthew Mataranyika (FSI tape voice)",
    "author": "Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)",
    "license": "Public domain (work of the U.S. Government)",
    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
    "source": "https://archive.org/details/Shona_201407",
-   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2003.mp3"
+   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2003.mp3",
+   "note": "The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue."
   },
   {
    "id": "sn-masikati-chirombowe",
@@ -248,7 +250,7 @@
    "kind": "greet",
    "lang": "sn",
    "text": "Masikati chirombowe.",
-   "en": "Good afternoon (respectful, to a man).",
+   "en": "Good afternoon (courteous; chirombowe is the address men use).",
    "gender": "male",
    "speaker": "Matthew Mataranyika (FSI tape voice)",
    "author": "Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)",
@@ -264,14 +266,15 @@
    "kind": "greet",
    "lang": "sn",
    "text": "Mwaswera here shewe?",
-   "en": "How has your day been? (respectful)",
+   "en": "How has your day been? (courteous; shewe is the address women use)",
    "gender": "male",
    "speaker": "Matthew Mataranyika (FSI tape voice)",
    "author": "Foreign Service Institute (U.S. Department of State), Shona Basic Course (1965)",
    "license": "Public domain (work of the U.S. Government)",
    "license_url": "https://creativecommons.org/publicdomain/mark/1.0/",
    "source": "https://archive.org/details/Shona_201407",
-   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2003.mp3"
+   "source_file": "https://archive.org/download/Shona_201407/FSI%20-%20Shona%20Basic%20Course%20-%20Unit%2003.mp3",
+   "note": "The course book glosses 'shewe' as the courteous address used by women (men say 'chirombowe'); the male tape voice reads the woman's line of the dialogue."
   },
   {
    "id": "sn-ndaswera-zvangu",
@@ -356,7 +359,7 @@
   {
    "id": "sn-hunde",
    "start": 33.3,
-   "dur": 0.77,
+   "dur": 0.75,
    "kind": "exclaim",
    "lang": "sn",
    "text": "Hunde.",
@@ -372,7 +375,7 @@
   },
   {
    "id": "sn-hunde-tingaenda",
-   "start": 34.37,
+   "start": 34.35,
    "dur": 1.78,
    "kind": "exclaim",
    "lang": "sn",
@@ -389,7 +392,7 @@
   },
   {
    "id": "sn-munhu-ndiani",
-   "start": 36.45,
+   "start": 36.43,
    "dur": 1.56,
    "kind": "exclaim",
    "lang": "sn",
@@ -405,7 +408,7 @@
   },
   {
    "id": "sn-muri-kutsvaka-ani",
-   "start": 38.31,
+   "start": 38.29,
    "dur": 1.65,
    "kind": "exclaim",
    "lang": "sn",
@@ -421,7 +424,7 @@
   },
   {
    "id": "sn-anoita-marinyi",
-   "start": 40.26,
+   "start": 40.24,
    "dur": 1.87,
    "kind": "exclaim",
    "lang": "sn",
@@ -437,7 +440,7 @@
   },
   {
    "id": "sn-muri-kunyanya-kani",
-   "start": 42.43,
+   "start": 42.41,
    "dur": 2.75,
    "kind": "exclaim",
    "lang": "sn",
@@ -453,7 +456,7 @@
   },
   {
    "id": "sn-ndiri-kutengesa-mahobo",
-   "start": 45.48,
+   "start": 45.46,
    "dur": 2.2,
    "kind": "call",
    "lang": "sn",
@@ -470,7 +473,7 @@
   },
   {
    "id": "sn-ku-harare",
-   "start": 47.98,
+   "start": 47.96,
    "dur": 1.38,
    "kind": "call",
    "lang": "sn",
@@ -487,7 +490,7 @@
   },
   {
    "id": "sn-kwa-mutare",
-   "start": 49.66,
+   "start": 49.64,
    "dur": 1.36,
    "kind": "call",
    "lang": "sn",
@@ -504,7 +507,7 @@
   },
   {
    "id": "sn-ku-marondera",
-   "start": 51.32,
+   "start": 51.3,
    "dur": 1.54,
    "kind": "call",
    "lang": "sn",
@@ -521,7 +524,7 @@
   },
   {
    "id": "sn-ku-kwekwe",
-   "start": 53.16,
+   "start": 53.14,
    "dur": 1.23,
    "kind": "call",
    "lang": "sn",
@@ -538,7 +541,7 @@
   },
   {
    "id": "sn-ku-gweru",
-   "start": 54.69,
+   "start": 54.67,
    "dur": 1.29,
    "kind": "call",
    "lang": "sn",
@@ -555,7 +558,7 @@
   },
   {
    "id": "sn-ku-bhuruwayo",
-   "start": 56.28,
+   "start": 56.26,
    "dur": 1.43,
    "kind": "call",
    "lang": "sn",
@@ -572,7 +575,7 @@
   },
   {
    "id": "sn-ku-chipinga",
-   "start": 58.01,
+   "start": 57.99,
    "dur": 1.38,
    "kind": "call",
    "lang": "sn",
