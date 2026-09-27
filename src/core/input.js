@@ -49,6 +49,9 @@ export class Input {
     this.invertY = false;
     this.keys = new Set();
     this.mouseButtons = new Set();
+    // Presses seen since the last update(), so a tap released before the next frame still registers.
+    this.tappedKeys = new Set();
+    this.tappedMouse = new Set();
     this.virtualButtons = new Set();
     this.padButtons = new Set();
     this.virtualMove = { x: 0, y: 0 };
@@ -64,11 +67,13 @@ export class Input {
       if (e.repeat) return;
       if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'Tab') e.preventDefault();
       this.keys.add(e.code);
+      this.tappedKeys.add(e.code);
       this.usingGamepad = false;
     };
     this._onKeyUp = (e) => this.keys.delete(e.code);
     this._onMouseDown = (e) => {
       this.mouseButtons.add(e.button);
+      this.tappedMouse.add(e.button);
       this.usingGamepad = false;
     };
     this._onMouseUp = (e) => this.mouseButtons.delete(e.button);
@@ -79,6 +84,7 @@ export class Input {
     };
     this._onBlur = () => {
       this.keys.clear();
+      this.tappedKeys.clear();
       this.mouseButtons.clear();
       this.virtualButtons.clear();
     };
@@ -150,9 +156,13 @@ export class Input {
         const a = KEY_ACTIONS[code];
         if (a) next.add(a);
       }
+      for (const code of this.tappedKeys) {
+        const a = KEY_ACTIONS[code];
+        if (a) next.add(a);
+      }
       if (this.pointerLocked) {
-        if (this.mouseButtons.has(0)) next.add('swing');
-        if (this.mouseButtons.has(2)) next.add('zip');
+        if (this.mouseButtons.has(0) || this.tappedMouse.has(0)) next.add('swing');
+        if (this.mouseButtons.has(2) || this.tappedMouse.has(2)) next.add('zip');
       }
       for (const a of this.virtualButtons) next.add(a);
     }
@@ -208,6 +218,8 @@ export class Input {
     this.look.y = this.enabled ? lookY : 0;
     this.pendingLook.x = 0;
     this.pendingLook.y = 0;
+    this.tappedKeys.clear();
+    this.tappedMouse.clear();
     this.curr = next;
   }
 

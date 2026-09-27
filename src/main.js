@@ -9,6 +9,7 @@ import { Traffic } from './traffic/traffic.js';
 import { Npcs } from './npc/npcs.js';
 import { AudioManager } from './audio/audio.js';
 import { Hud } from './ui/hud.js';
+import { storedQuality } from './ui/settings.js';
 
 // URL flags (handy for testing):
 //   ?autostart=1        skip the start screen (headless tests)
@@ -22,7 +23,7 @@ function pickQuality() {
   const forced = params.get('quality');
   const coarse = window.matchMedia?.('(pointer: coarse)').matches;
   const small = Math.min(window.innerWidth, window.innerHeight) < 700;
-  const level = forced || (coarse || small ? 'low' : 'high');
+  const level = forced || storedQuality() || (coarse || small ? 'low' : 'high');
   const presets = {
     low: { level: 'low', antialias: false, shadows: false, shadowMapSize: 1024, maxPixelRatio: 1.25, drawDistance: 1400, crowd: 0.5, traffic: 0.6 },
     medium: { level: 'medium', antialias: true, shadows: true, shadowMapSize: 1024, maxPixelRatio: 1.5, drawDistance: 2200, crowd: 0.8, traffic: 0.8 },

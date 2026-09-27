@@ -119,7 +119,15 @@ export class Game {
         }
       }
     } else {
-      for (const s of this.order) s.pausedUpdate?.(dt, this);
+      for (const s of this.order) {
+        if (!s.pausedUpdate) continue;
+        try {
+          s.pausedUpdate(dt, this);
+        } catch (err) {
+          if (!s._pausedErrored) console.error('[game] system pausedUpdate failed', s, err);
+          s._pausedErrored = true;
+        }
+      }
     }
     this.renderer.render(this.scene, this.camera);
     this.frame++;

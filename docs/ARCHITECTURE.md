@@ -121,13 +121,15 @@ of travel given by `signalAt(nodeIndex, fromNodeIndex)`), `honk(vehicle)`.
 
 **npcs**: `list` [{position, heading, gender:'female'|'male', state}], `npcsNear(x, z, r)`.
 
-**audio**: `unlock()`, `playVoice(clipId, position|null, {volume, onEnd}) → {stop(), duration}|null`,
+**audio**: `unlock()`, `playVoice(clipId, position|null, {volume, onEnd}) → {stop(), duration, setPosition(v)}|null`, `setBusVolume('voices'|'sfx'|'ambience', v)`,
 `voiceClips(filter)` (manifest clips), `playSfx(name, position|null, {volume, pitch})` where name ∈
 `'thwip' 'zip' 'whoosh' 'land' 'landHard' 'horn' 'kombiHoot' 'step' 'ui'`, `setAmbience(key, level 0..1)` with
 key ∈ `'crowd'` (set by npcs from local crowd density; plays the real Shona chatter bed) and `'traffic'` (set by
 traffic from nearby vehicle count), `setMasterVolume(v)`, `muted`.
 
-**hud**: `showSubtitle({speaker, sn, en, ms})`, `toast(text, ms)`, `setObjective(text|null)`, `bigMapOpen` (bool).
+**hud**: `showSubtitle({speaker, sn, en, ms})`, `toast(text, ms)`, `setObjective(text|null)`, `bigMapOpen` (bool),
+`waypoint` ({x, z, label}|null), `setWaypoint(x, z)`, `clearWaypoint()`, `openOverlay('map'|'pause'|'help')`, `closeOverlay()`,
+`settings` (persisted user settings), `inputMode` ('mouse'|'touch'|'gamepad').
 Pause / help / map overlays are HUD-owned and call `game.setPaused(bool)`.
 
 ### Street cross-sections — `src/world/streetMetrics.js` (core)
