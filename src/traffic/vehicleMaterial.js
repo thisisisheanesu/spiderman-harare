@@ -114,6 +114,8 @@ if ( ( trMat == ${MAT.LIVERY} || trMat == ${MAT.LED} ) && trAlbedo.a < 0.5 ) dis
 diffuseColor.rgb = vBase.rgb * trAlbedo.rgb;
 if ( trMat == ${MAT.PAINT} ) diffuseColor.rgb *= trNormal.a * vInst.rgb;`,
       )
+      // The batch colour is instance data here, not a tint (see vInst).
+      .replace('#include <color_fragment>', '')
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vBase.a;')
       .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vMat.w * 0.01;')
       .replace(

@@ -101,7 +101,7 @@ export class PbrSet {
   // Fetch + decode (through the shared asset loader), then resample into the arrays.
   async load(assets, manifest, renderer) {
     const S = this.size;
-    const byName = Object.fromEntries(manifest.materials.map((m) => [m.name, m]));
+    const byName = manifest?.materials ? Object.fromEntries(manifest.materials.map((m) => [m.name, m])) : {};
     const entries = this.names.map((n) => byName[n]);
     const base = 'textures/';
     const jobs = entries.map((e) => {

@@ -17,12 +17,14 @@ export class Vehicle {
     this.height = 1.5;
     this.parked = false;
 
+    // Look (vehicleTypes.js dress): model spec (vehicleAssets.js), paint, visible toggle nodes (liveries,
+    // banners, route card, roof rack, bus destination, cargo), crew figure picks, hwindi, police beacons.
+    this.model = null;
     this.color = new THREE.Color();
-    this.color2 = new THREE.Color();
-    this.rows = 0;
+    this.toggles = null;
+    this.crew = null;
     this.hwindi = false;
-    this.hwindiShirt = new THREE.Color();
-    this.hwindiTrousers = new THREE.Color();
+    this.siren = false;
     this.call = null;
 
     // Route: front bumper at arc length `s` on `path` (lane or connector); `next` is the connector at

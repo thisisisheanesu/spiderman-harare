@@ -6,14 +6,17 @@ import { Signals } from './signals.js';
 import { Simulation, GAP_LEADER, GAP_OBSTACLE } from './simulation.js';
 import { Vehicle } from './vehicle.js';
 import { TrafficMix } from './vehicleTypes.js';
-import { buildStickerAtlas } from './vehicleMaterial.js';
+import { loadVehicleLibrary } from './vehicleAssets.js';
+import { FLAG } from './vehicleMaterial.js';
 import { VehicleRenderer } from './vehicleRenderer.js';
 import { SpeechBubbles } from './bubbles.js';
 import { KombiLife } from './kombi.js';
 import { streetVoices } from '../npc/streetVoices.js';
 
-// Harare traffic: Honda Fits, Corollas, Hiluxes, Land Cruisers, ZUPCO buses and swarms of kombis
-// driving on the LEFT through the real road graph, stopping at robots, loading at ranks.
+// Harare traffic: Honda Fits, Corollas, Mercedes saloons, Wishes, Hiluxes, Land Cruisers, taxis, ZRP
+// Land Cruisers, Isuzu trucks, ZUPCO buses and swarms of kombis (the realistic models in
+// public/models/vehicles, drawn in two batches by vehicleRenderer.js) driving on the LEFT through the real
+// road graph, stopping at robots, loading at ranks.
 //
 // Public API (game.traffic):
 //   vehicles                 [{position, heading, speed, type, length, width, height, parked}] — the active
@@ -46,6 +49,9 @@ const _a = { x: 0, z: 0, dx: 0, dz: 0 };
 const _b = { x: 0, z: 0, dx: 0, dz: 0 };
 const _c = { x: 0, z: 0, dx: 0, dz: 0 };
 const _proj = { s: 0, d2: 0 };
+
+// Relative suspension softness per type (body pitch / roll).
+const SOFTNESS = { kombi: 1.7, bus: 0.8, truck: 0.9, pickup: 1.1, suv: 1.2, police: 1.2, mushikashika: 1.3 };
 
 const DENSITY = TRAFFIC?.densityByHour;
 const DENSITY_HOURS = DENSITY ? Object.keys(DENSITY).map(Number).sort((a, b) => a - b) : [];
@@ -102,17 +108,21 @@ export class Traffic {
     this.signals = new Signals(this.graph, game.data, this.rng);
     this.signals.buildMeshes(game.scene);
     this.sim = new Simulation(this.graph, this.signals, this.rng);
-    this.atlas = buildStickerAtlas();
-    this.mix = new TrafficMix(this.atlas);
     this.target = Math.max(12, Math.round(140 * scale));
     const maxParked = Math.round(120 * scale);
-    this.renderer = new VehicleRenderer(
-      game.scene,
-      this.atlas,
-      { default: this.target, kombi: this.target + maxParked, kombiRack: Math.ceil(this.target * 0.4) + maxParked },
-      !!q.shadows,
-    );
-    this.models = this.renderer.models;
+    const level = q.level || 'high';
+    this.lib = await loadVehicleLibrary(game, { textureSize: level === 'low' ? 256 : 512, anisotropy: level === 'low' ? 2 : 4 });
+    this.mix = new TrafficMix();
+    this.mix.setModels(this.lib.models);
+    this.renderer = new VehicleRenderer(game.scene, this.lib, {
+      renderer: game.renderer,
+      capacity: this.target + maxParked,
+      castShadows: !!q.shadows,
+      receiveShadows: !!q.shadows,
+      level,
+    });
+    this.renderer.setSkyPalette(game.sky?.palette);
+    this.models = this.lib.models;
     this.bubbles = new SpeechBubbles(game.scene, 3);
     this.voices = streetVoices(game);
     this._prepareGround(game);
@@ -162,7 +172,7 @@ export class Traffic {
   update(dt, game) {
     this.focus.copy(game.player?.position ?? game.camera.position);
     game.camera.updateMatrixWorld();
-    this.renderer.begin(game.camera, this.night);
+    this.renderer.begin(game.camera, this.night, dt);
     const teleported = this._lastFocus.distanceToSquared(this.focus) > TELEPORT * TELEPORT;
     this._lastFocus.copy(this.focus);
     this._updateNight(dt);
@@ -240,6 +250,7 @@ export class Traffic {
     const lane = slot.lane;
     for (const u of lane.vehicles) if (Math.abs(u.s - slot.s) < 16) return;
     const def = this.mix.pickType(this.rng, this.kombis.nearRank(slot.x, slot.z) ? 2.5 : 1);
+    if (!def) return;
     const v = new Vehicle();
     this.mix.dress(v, def, this.rng, this.models);
     const s = Math.min(lane.length - 1, Math.max(slot.s, v.length + 1));
@@ -426,6 +437,7 @@ export class Traffic {
       if (v.leaveT > 0) v.leaveT -= dt;
       if (v.blinkT > 0) v.blinkT -= dt;
       if (v.honkCd > 0) v.honkCd -= dt;
+      if (v.sirenT > 0 && (v.sirenT -= dt) <= 0) v.siren = false;
       const pulling = v.dwell > 0 || (v.stopLane === v.path && v.stopS - v.s < 30);
       const want = pulling ? Math.max(0, Math.min(1.5, v.path.kerbSpace - v.width / 2 - 0.25)) : 0;
       v.kerbShift += Math.max(-0.9 * dt, Math.min(0.9 * dt, want - v.kerbShift));
@@ -479,10 +491,14 @@ export class Traffic {
       const k = Math.min(1, dt * 6);
       const steer = Math.max(-0.6, Math.min(0.6, Math.atan((rate * v.wheelbase) / Math.max(v.speed, 1))));
       v.steer += (steer - v.steer) * k;
-      const pitch = Math.max(-0.035, Math.min(0.02, v.acc * 0.005));
-      v.pitch += (pitch - v.pitch) * k;
-      const roll = Math.max(-0.05, Math.min(0.05, -rate * v.speed * (v.type === 'kombi' ? 0.018 : 0.01)));
-      v.roll += (roll - v.roll) * k;
+      // Suspension: the nose dips under braking and lifts a little pulling away (about a degree), the
+      // body leans out of bends (tall, soft kombis most). Eased so it settles rather than snaps.
+      const soft = SOFTNESS[v.type] ?? 1;
+      const pitch = Math.max(-0.022, Math.min(0.012, v.acc * 0.0042 * soft));
+      const ks = Math.min(1, dt * 4.5);
+      v.pitch += (pitch - v.pitch) * ks;
+      const roll = Math.max(-0.045, Math.min(0.045, -rate * v.speed * 0.0095 * soft));
+      v.roll += (roll - v.roll) * ks;
     }
     v.heading = heading;
   }
@@ -501,21 +517,30 @@ export class Traffic {
   _render() {
     const r = this.renderer;
     const time = this.sim.time;
-    const blinkOn = (time * 1.5) % 1 < 0.55 ? 1 : 0;
-    const head = this.night;
+    const blinkOn = (time * 1.5) % 1 < 0.55;
+    const lights = this.night > 0.3 ? FLAG.HEAD | FLAG.TAIL : 0;
+    // ZRP light bar: blue / red double flashes.
+    const ph = (time * 1.6) % 1;
+    const beacon = ph < 0.12 || (ph > 0.2 && ph < 0.32) ? FLAG.BEACON_B : ph > 0.5 && (ph < 0.62 || (ph > 0.7 && ph < 0.82)) ? FLAG.BEACON_R : 0;
     for (const v of this.sim.vehicles) {
-      const brake = v.acc < -1.2 || (v.speed < 0.3 && v.dwell <= 0) ? 1 : 0;
+      let f = lights;
+      if (v.acc < -1.2 || (v.speed < 0.3 && v.dwell <= 0)) f |= FLAG.BRAKE;
       let bl = 0;
       if (v.dwell > 0) bl = v.type === 'kombi' ? 2 : -1;
       else if (v.stopLane === v.path && v.stopS - v.s < 45) bl = -1;
       else if (v.leaveT > 0) bl = 1;
       else if (v.blinkT > 0) bl = v.blink;
       else if (v.next && (v.next.turn === 'left' || v.next.turn === 'right') && this.sim.distToLine(v) < 35) bl = v.next.turn === 'left' ? -1 : 1;
-      const left = bl === -1 || bl === 2 ? blinkOn : 0;
-      const right = bl === 1 || bl === 2 ? blinkOn : 0;
-      r.add(v, head, brake, left, right, v.hwindi ? (v.dwell > 0 ? 2 : 1) : 0, time);
+      if (blinkOn && (bl === -1 || bl === 2)) f |= FLAG.LEFT;
+      if (blinkOn && (bl === 1 || bl === 2)) f |= FLAG.RIGHT;
+      if (v.siren) f |= beacon;
+      if (v.routeGroup) this.mix.routeCard(v, this.rng);
+      r.add(v, f, v.hwindi ? (v.dwell > 0 ? 2 : 1) : 0, time);
     }
-    for (const v of this.kombis.near) r.add(v, 0, 0, 0, 0, v.hwindi ? 2 : 0, time);
+    for (const v of this.kombis.near) {
+      if (v.routeGroup) this.mix.routeCard(v, this.rng);
+      r.add(v, 0, v.hwindi ? 2 : 0, time);
+    }
     r.end();
   }
 
@@ -535,13 +560,19 @@ export class Traffic {
     game.audio?.setAmbience?.('traffic', this._amb);
   }
 
-  // A hard landing next to the road makes the nearest drivers lean on their horns.
+  // A hard landing next to the road makes the nearest drivers lean on their horns, and puts the light
+  // bar on for ZRP vehicles that saw it.
   _onLand(e) {
     if (!e?.hard || !e.pos) return;
     let n = 0;
     for (const v of this.sim.vehicles) {
-      if (n >= 2) break;
-      if (Math.abs(v.position.x - e.pos.x) < 18 && Math.abs(v.position.z - e.pos.z) < 18) {
+      const dx = Math.abs(v.position.x - e.pos.x);
+      const dz = Math.abs(v.position.z - e.pos.z);
+      if (v.type === 'police' && dx < 70 && dz < 70) {
+        v.siren = true;
+        v.sirenT = 30;
+      }
+      if (n < 2 && dx < 18 && dz < 18) {
         v.honkIn = 0.2 + n * 0.5;
         n++;
       }

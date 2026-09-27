@@ -1,101 +1,10 @@
 import * as THREE from 'three';
-import { Painter, noiseTile } from './atlas.js';
+import { Painter } from './atlas.js';
 import { polyArea } from '../core/geo.js';
+import { GROUND_CANVAS_BASE, GROUND_PAINT } from './render/groundShader.js';
 
-// Ground surface layers (UV scale noted per layer: metres per tile).
-// Pale, sun-bleached asphalt with darker repair patches (PHOTOS.md §20).
-function asphalt(p) {
-  p.rect(0, 0, 1, 1, '#83807a');
-  p.grime(0.5, 1);
-  p.speckle(p.S * 60, ['rgba(0,0,0,0.25)', 'rgba(255,255,255,0.12)', 'rgba(120,100,80,0.2)'], p.S / 400);
-  // Patches and cracks.
-  for (let i = 0; i < 4; i++) {
-    const x = p.rng() * 0.8;
-    const y = p.rng() * 0.8;
-    p.rect(x, y, x + 0.1 + p.rng() * 0.15, y + 0.06 + p.rng() * 0.12, `rgba(${p.rng() < 0.7 ? '40,40,40' : '150,148,142'},0.4)`);
-  }
-  for (let i = 0; i < 10; i++) {
-    let x = p.rng();
-    let y = p.rng();
-    p.c.strokeStyle = 'rgba(20,20,20,0.45)';
-    p.c.lineWidth = p.S / 400;
-    p.c.beginPath();
-    p.c.moveTo(x * p.S, y * p.S);
-    for (let k = 0; k < 6; k++) {
-      x += (p.rng() - 0.5) * 0.06;
-      y += (p.rng() - 0.5) * 0.06;
-      p.c.lineTo(x * p.S, y * p.S);
-    }
-    p.c.stroke();
-  }
-  for (let i = 0; i < 3; i++) {
-    const x = p.rng() * p.S;
-    const y = p.rng() * p.S;
-    const g = p.c.createRadialGradient(x, y, 0, x, y, p.S * 0.06);
-    g.addColorStop(0, 'rgba(15,15,15,0.4)');
-    g.addColorStop(1, 'rgba(15,15,15,0)');
-    p.c.fillStyle = g;
-    p.c.fillRect(0, 0, p.S, p.S);
-  }
-}
-
-function paving(p) {
-  // 600 mm grey concrete slabs, cracked here and there, red dust in the joints.
-  p.rect(0, 0, 1, 1, '#a9a39a');
-  const n = 5;
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      const v = Math.round(196 * (0.9 + p.rng() * 0.16));
-      p.rect(i / n + 0.004, j / n + 0.004, (i + 1) / n - 0.004, (j + 1) / n - 0.004, `rgb(${v},${Math.round(v * 0.985)},${Math.round(v * 0.96)})`);
-    }
-  }
-  for (let k = 0; k < 4; k++) {
-    const x = p.rng();
-    const y = p.rng();
-    p.line(x, y, x + (p.rng() - 0.5) * 0.15, y + (p.rng() - 0.5) * 0.15, 'rgba(60,55,50,0.4)', 0.003);
-  }
-  p.grime(0.35, 1);
-  p.speckle(p.S * 30, ['rgba(0,0,0,0.12)', 'rgba(255,255,255,0.1)', 'rgba(150,80,50,0.12)'], p.S / 350);
-}
-
-function bricks(p) {
-  // First Street Mall: terracotta pavers in running bond, divided by grey concrete bands into
-  // ~6 m squares (one tile).
-  p.rect(0, 0, 1, 1, '#7a6358');
-  const tones = ['#a58375', '#977669', '#ad8b7c', '#8f6e62', '#a07f70'];
-  const rows = 40;
-  const cols = 20;
-  for (let r = 0; r < rows; r++) {
-    const off = (r % 2) * 0.5;
-    for (let c = -1; c < cols; c++) {
-      const x = (c + off) / cols;
-      p.rect(x + 0.002, r / rows + 0.002, x + 1 / cols - 0.002, (r + 1) / rows - 0.002, tones[Math.floor(p.rng() * tones.length)]);
-    }
-  }
-  for (const [a, b] of [[0, 0.035], [0.965, 1]]) {
-    p.rect(a, 0, b, 1, '#ada49b');
-    p.rect(0, a, 1, b, '#ada49b');
-  }
-  p.grime(0.3, 1);
-}
-
-function grass(p) {
-  p.rect(0, 0, 1, 1, '#7b8a4c');
-  p.grime(0.5, 1);
-  p.speckle(p.S * 120, ['rgba(50,70,25,0.35)', 'rgba(170,170,95,0.35)', 'rgba(125,135,65,0.35)', 'rgba(180,160,105,0.3)'], p.S / 300);
-}
-
-function dryGrass(p) {
-  p.rect(0, 0, 1, 1, '#b39a67');
-  p.grime(0.5, 1);
-  p.speckle(p.S * 120, ['rgba(90,70,40,0.35)', 'rgba(210,190,130,0.35)', 'rgba(120,110,60,0.3)', 'rgba(160,80,50,0.2)'], p.S / 300);
-}
-
-function dirt(p) {
-  p.rect(0, 0, 1, 1, '#a0644a');
-  p.grime(0.45, 1);
-  p.speckle(p.S * 80, ['rgba(60,30,20,0.3)', 'rgba(200,150,110,0.3)', 'rgba(120,120,110,0.25)'], p.S / 300);
-}
+// Ground surfaces: the CC0 PBR ground set (render/pbrLibrary.js) for roads, pavements, kerbs,
+// grass and soil; a few painted canvas layers for what has no PBR counterpart.
 
 function ballast(p) {
   // u across the track bed (0..1 = 3.2 m), v along it (1 tile = 2.6 m, 4 sleepers).
@@ -109,27 +18,6 @@ function ballast(p) {
   p.rect(0.26, 0, 0.29, 1, 'rgba(90,60,40,0.6)');
   p.rect(0.71, 0, 0.74, 1, 'rgba(90,60,40,0.6)');
   p.grime(0.3, 1);
-}
-
-function concrete(p) {
-  p.rect(0, 0, 1, 1, '#b6b1a8');
-  p.grime(0.4, 1);
-  p.speckle(p.S * 40, ['rgba(0,0,0,0.12)', 'rgba(255,255,255,0.1)'], p.S / 350);
-  p.rect(0, 0.497, 1, 0.503, 'rgba(0,0,0,0.12)');
-  p.rect(0.497, 0, 0.503, 1, 'rgba(0,0,0,0.12)');
-}
-
-function kerb(p) {
-  p.rect(0, 0, 1, 1, '#c9c4ba');
-  p.grime(0.35, 1);
-  for (let x = 0; x < 1; x += 0.25) p.rect(x, 0, x + 0.006, 1, 'rgba(0,0,0,0.25)');
-}
-
-// Kerb painted in alternating black and white 1 m blocks (medians, junction corners).
-function kerbPaint(p) {
-  p.rect(0, 0, 0.5, 1, '#e8e6e0');
-  p.rect(0.5, 0, 1, 1, '#2a2a2a');
-  p.grime(0.35, 1);
 }
 
 function rock(p) {
@@ -148,21 +36,6 @@ function rock(p) {
   }
 }
 
-function macro(p) {
-  const n = noiseTile();
-  p.c.drawImage(n, 0, 0, p.S, p.S);
-  p.c.globalCompositeOperation = 'overlay';
-  p.c.drawImage(n, 0, 0, p.S * 2, p.S * 2);
-  p.c.drawImage(n, -p.S, -p.S, p.S * 2, p.S * 2);
-  p.c.globalCompositeOperation = 'source-over';
-}
-
-function paint(p) {
-  p.rect(0, 0, 1, 1, '#f2f1ec');
-  p.speckle(p.S * 50, ['rgba(80,80,80,0.5)', 'rgba(120,110,100,0.35)'], p.S / 150);
-  p.grime(0.3, 1);
-}
-
 function flowers(p) {
   p.rect(0, 0, 1, 1, '#6b4a33');
   p.grime(0.3, 1);
@@ -170,31 +43,45 @@ function flowers(p) {
   p.speckle(p.S * 6, ['rgba(216,52,74,1)', 'rgba(242,194,48,1)', 'rgba(244,240,232,1)', 'rgba(224,96,154,1)', 'rgba(240,138,48,1)'], p.S / 120);
 }
 
-const GROUND_LAYERS = {
-  asphalt: [asphalt, 7],
-  paving: [paving, 3],
-  bricks: [bricks, 6],
-  grass: [grass, 6],
-  dryGrass: [dryGrass, 9],
-  dirt: [dirt, 6],
+// Canvas-painted ground layers that have no PBR counterpart (UV scale: metres per tile).
+const CANVAS_LAYERS = {
   ballast: [ballast, 2.6],
-  concrete: [concrete, 4],
-  kerb: [kerb, 2],
-  kerbPaint: [kerbPaint, 2],
   rock: [rock, 7],
-  macro: [macro, 173],
-  paint: [paint, 2],
   flowers: [flowers, 3],
 };
 
-export function paintGroundLayers(atlas) {
+// Ground layer names -> PBR ground material (render/pbrLibrary.js GROUND_SET).
+const PBR_LAYERS = {
+  asphalt: 'asphalt_bleached',
+  paving: 'pavement_slabs',
+  bricks: 'pavers_herringbone_red',
+  grass: 'grass_green',
+  dryGrass: 'grass_dry',
+  dirt: 'soil_red',
+  concrete: 'pavers_interlocking',
+  kerb: 'kerb_concrete',
+  kerbPaint: 'kerb_painted_bw',
+};
+
+// Registers the canvas layers on `atlas` and returns {G: name -> ground layer code (see
+// render/groundShader.js), scale: name -> metres per uv unit for canvas layers (PBR layers take
+// world-space metres)}.
+export function paintGroundLayers(atlas, set) {
   const scale = {};
+  const G = {};
   let seed = 501;
-  for (const [name, [draw, s]] of Object.entries(GROUND_LAYERS)) {
-    atlas.add(name, (c, m, S) => draw(new Painter(c, m, S, seed++)));
+  for (const [name, [draw, s]] of Object.entries(CANVAS_LAYERS)) {
+    const i = atlas.add(name, (c, m, S) => draw(new Painter(c, m, S, seed++)));
+    G[name] = GROUND_CANVAS_BASE + i;
     scale[name] = s;
   }
-  return scale;
+  for (const [name, mat] of Object.entries(PBR_LAYERS)) {
+    G[name] = set.id(mat);
+    scale[name] = 1;
+  }
+  G.paint = GROUND_PAINT;
+  scale.paint = 1;
+  return { G, scale };
 }
 
 // Low-res "how urban is it here" mask over the map (1 = paved city block, 0 = dry veld/gardens).

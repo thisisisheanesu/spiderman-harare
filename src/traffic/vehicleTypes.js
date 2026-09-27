@@ -1,7 +1,9 @@
 import { VEHICLE_TYPES, TRAFFIC, HWINDI_CALLS } from '../data/streetlife.js';
 
 // Traffic mix and driver temperament, from the researched VEHICLE_TYPES (src/data/streetlife.js) with
-// built-in fallbacks. Each entry maps a type onto a procedural model and IDM driving parameters.
+// built-in fallbacks. Each entry maps a type onto one of the realistic models (vehicleAssets.js), picks
+// its paint and toggle variants (kombi liveries, banners, route cards, roof racks; bus stripes and
+// destination; Hilux cargo) and its IDM driving parameters.
 
 const kmh = (v) => v / 3.6;
 
@@ -14,29 +16,45 @@ const FALLBACK_TYPES = [
   { type: 'bus', weight: 0.03, maxSpeed: kmh(60), accel: 1.0, brakeDecel: 4, aggression: 0.35, colors: ['#f3f3f0'] },
 ];
 
+// streetlife type (and subtype) -> model in public/models/vehicles.
 const MODEL = {
-  kombi: (rng, def) => (rng() < (def.roofRackChance ?? 0.12) ? 'kombiRack' : 'kombi'),
-  hatch: () => 'hatch',
-  mushikashika: () => 'hatch',
-  sedan: (rng, def, sub) => (sub?.id === 'german_exec' ? 'merc' : 'sedan'),
-  wagon: () => 'wagon',
-  pickup: (rng, def, sub) => (sub && sub.id !== 'double_cab' ? 'bakkie' : 'pickup'),
-  suv: () => 'suv',
+  kombi: () => 'kombi',
+  hatch: () => 'hatch_fit',
+  mushikashika: () => 'hatch_fit',
+  sedan: (sub) => (sub?.id === 'german_exec' ? 'sedan_mercedes' : 'sedan_corolla'),
+  wagon: () => 'wagon_wish',
+  pickup: () => 'pickup_hilux',
+  suv: () => 'suv_landcruiser',
   taxi: () => 'taxi',
-  bus: () => 'bus',
-  truck: () => 'truck',
+  police: () => 'police_landcruiser',
+  bus: () => 'bus_zupco',
+  truck: () => 'truck_isuzu',
 };
+
+// Kombi route cards in the model (route_0..7) and the destinations they read.
+const ROUTE_CARDS = [
+  ['mbare'],
+  ['chitown', 'chitungwiza', 'zengeza', 'seke'],
+  ['town'],
+  ['glen view'],
+  ['warren'],
+  ['kuwadzana'],
+  ['budiriro', 'budiro'],
+  ['highfield', 'machipisa'],
+];
 
 // Vehicles that pull over at ranks and kerbs to load.
 const STOPPERS = { kombi: 0.2, mushikashika: 0.12, bus: 0.1 };
 const WILD = new Set(['kombi', 'mushikashika']);
-const CARGO = ['#cdb88c', '#ece8dc', '#c8b27c', '#6f8f4f', '#9c7a52'];
-const SHIRTS = ['#c0392b', '#1f5fa8', '#e2b019', '#2e7d4f', '#ececec', '#222222', '#7b3fa0', '#d9661f'];
-const TROUSERS = ['#20242c', '#2d3a55', '#4a3c2c', '#1b1b1b'];
+
+export function routeCardFor(call) {
+  const t = (call?.text || '').toLowerCase();
+  for (let i = 0; i < ROUTE_CARDS.length; i++) if (ROUTE_CARDS[i].some((w) => t.includes(w))) return i;
+  return -1;
+}
 
 export class TrafficMix {
-  constructor(atlas) {
-    this.atlas = atlas;
+  constructor() {
     const src = Array.isArray(VEHICLE_TYPES) && VEHICLE_TYPES.length ? VEHICLE_TYPES : FALLBACK_TYPES;
     this.types = src.filter((t) => MODEL[t.type] && (t.weight ?? 0) > 0);
     const behaviour = TRAFFIC?.behaviour || {};
@@ -50,6 +68,11 @@ export class TrafficMix {
     if (!this.destCalls.length) this.destCalls = this.calls;
   }
 
+  // Only the types whose model loaded take part.
+  setModels(models) {
+    this.types = this.types.filter((t) => models[MODEL[t.type]()]);
+  }
+
   pickType(rng, kombiBoost = 1) {
     let total = 0;
     for (const t of this.types) total += t.weight * (t.type === 'kombi' ? kombiBoost : 1);
@@ -61,22 +84,19 @@ export class TrafficMix {
     return this.types[0];
   }
 
-  // Fills a Vehicle's look and temperament for the given type definition.
+  // Fills a Vehicle's look (model, paint, toggles, crew) and temperament for the type definition.
   dress(v, def, rng, models) {
     const sub = def.subtypes ? rng.weighted(def.subtypes) : null;
-    const modelKey = MODEL[def.type](rng, def, sub);
-    const model = models[modelKey];
+    const model = models[MODEL[def.type](sub)];
     v.type = def.type;
     v.def = def;
-    v.modelKey = modelKey;
+    v.sub = sub?.id || null;
     v.model = model;
     v.length = model.length;
     v.width = model.width;
     v.height = model.height;
-    const wf = model.wheels[0];
-    const wr = model.wheels[1];
-    v.frontAxle = v.length / 2 - wf.u;
-    v.wheelbase = wf.u - wr.u;
+    v.frontAxle = model.frontAxle;
+    v.wheelbase = model.wheelbase;
 
     const aggr = def.aggression ?? 0.5;
     v.wild = WILD.has(def.type);
@@ -91,42 +111,66 @@ export class TrafficMix {
     v.runRedChance = (this.runRed.get(def.type) ?? 0.05) * 0.3;
     v.stopChance = STOPPERS[def.type] ?? 0;
 
-    const colors = sub?.colors || def.colors || ['#eeeeea'];
+    const toggles = [];
+    const groups = model.toggleGroups || {};
+    const pickOf = (group) => (groups[group]?.length ? rng.pick(groups[group]) : null);
+    const colors = sub?.colors || def.colors || model.paints;
     v.color.set(rng.pick(colors));
-    v.color2.copy(v.color);
-    let rowA = this.atlas.row('none');
-    let rowB = this.atlas.row('none');
+    v.hwindi = false;
+    v.siren = false;
     if (def.type === 'kombi') {
       const liv = def.liveries?.length ? rng.weighted(def.liveries) : { id: 'plain_white', body: '#efeee8' };
+      v.livery = liv.id;
       v.color.set(Array.isArray(liv.body) ? rng.pick(liv.body) : liv.body || '#efeee8');
-      v.color2.copy(v.color);
-      if (liv.id === 'zupco_franchise') {
-        v.color2.set('#1c3f94');
-        rowA = this.atlas.row('ZUPCO');
-      } else if (Array.isArray(liv.stripe)) v.color2.set(rng.pick(liv.stripe));
-      else if (liv.lower) v.color2.set(liv.lower);
-      if (liv.banner || liv.id === 'slogan_banner') rowA = rng.pick(this.atlas.slogans);
+      if (liv.id === 'zupco_franchise' && groups.livery_zupco) toggles.push(groups.livery_zupco[0]);
+      else if (liv.id === 'factory_stripes' && groups.livery_stripe) toggles.push(groups.livery_stripe[0]);
+      // Slogan banners on the slogan liveries, and on a good share of the rest too.
+      if ((liv.banner || liv.id === 'slogan_banner' || rng() < 0.3) && groups.banner) toggles.push(rng.pick(groups.banner));
+      if (rng() < (def.roofRackChance ?? 0.12) && groups.roof_rack) toggles.push(groups.roof_rack[0]);
       const dirt = liv.dirt ?? 0.4;
       v.color.multiplyScalar(1 - dirt * 0.12);
       v.hwindi = rng() < 0.8;
       v.call = rng.pick(this.destCalls);
+      v.routeGroup = groups.route || null;
+      v.routeCall = null;
+      this.routeCard(v, rng);
     } else if (def.type === 'bus') {
-      const liv = def.liveries?.length ? rng.weighted(def.liveries) : { body: '#f3f3f0', stripe: '#1c3f94' };
+      const liv = def.liveries?.length ? rng.weighted(def.liveries) : { id: 'zupco_white_blue', body: '#f3f3f0' };
       v.color.set(liv.body || '#f3f3f0');
-      v.color2.set(liv.stripe || '#1c3f94');
-      rowA = this.atlas.row('ZUPCO');
-      rowB = rng.pick(this.atlas.destinations);
+      if (liv.id !== 'zupco_white_plain' && groups.livery_stripes) toggles.push(groups.livery_stripes[0]);
+      const dest = pickOf('dest');
+      if (dest) toggles.push(dest);
     } else if (def.type === 'taxi') {
-      rowA = this.atlas.row('TAXI');
-    } else if (def.type === 'truck') {
-      v.color2.set(rng.pick(def.bodyColors || ['#e8e8e2']));
-    } else if (modelKey === 'bakkie') {
-      v.color2.set(rng.pick(CARGO));
+      // Harare cabs: mostly the yellow livery, some white / silver.
+      v.color.set(rng() < 0.6 ? model.paints[0] : rng.pick(model.paints));
+    } else if (def.type === 'police') {
+      v.color.set(model.paints[0]);
+      v.siren = rng() < 0.5;
+    } else if (def.type === 'pickup') {
+      if (v.sub === 'single_cab_load' && groups.cargo) toggles.push(groups.cargo[0]);
+      else if (rng() < 0.3 && groups.sports_bar) toggles.push(groups.sports_bar[0]);
     }
-    v.rows = rowA + 64 * rowB;
-    if (v.hwindi) {
-      v.hwindiShirt.set(rng.pick(SHIRTS));
-      v.hwindiTrousers.set(rng.pick(TROUSERS));
-    }
+    v.toggles = toggles;
+
+    // Who is on board (indices into the baked figure variants; -1 = nobody).
+    const busy = def.type === 'kombi' || def.type === 'bus';
+    v.crew = {
+      driver: Math.floor(rng() * 64),
+      mate: !busy && rng() < 0.35 ? Math.floor(rng() * 64) : -1,
+      passengers: busy && rng() < 0.9 ? Math.floor(rng() * 64) : -1,
+    };
+  }
+
+  // The kombi's yellow route card follows its destination call (which kombi.js may later replace with
+  // a recorded one); unknown destinations keep a random card.
+  routeCard(v, rng = Math.random) {
+    if (!v.routeGroup || v.routeCall === v.call) return;
+    v.routeCall = v.call;
+    const i = routeCardFor(v.call);
+    const card = i >= 0 ? v.routeGroup.find((n) => n.endsWith(`_${i}`)) : null;
+    const next = card || v.routeGroup[Math.floor(rng() * v.routeGroup.length)];
+    const k = v.toggles.findIndex((n) => v.routeGroup.includes(n));
+    if (k >= 0) v.toggles[k] = next;
+    else v.toggles.push(next);
   }
 }

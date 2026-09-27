@@ -1,19 +1,20 @@
 import * as THREE from 'three';
-import { buildSpiderManMesh, PIVOT_Y, B } from './model.js';
-import { SuitMaterial, SUITS } from './suits.js';
+import { loadSpiderMan, buildStandIn, PIVOT_Y } from './model.js';
+import { SuitSwitcher, SUITS } from './suits.js';
 import { Animator } from './animator.js';
 import { Controller } from './controller.js';
 import { Webs } from './web.js';
 import { roofEdgeFacing } from './anchors.js';
 
-// Spider-Man: procedural skinned model, traversal controller, animation and web visuals.
+// Spider-Man: the rigged model (model.js) animated from the traversal state (animator.js), the
+// traversal controller, suits and web visuals.
 //
 // Public API (game.player):
 //   position   THREE.Vector3  feet position, world metres
 //   velocity   THREE.Vector3  m/s
 //   state      'ground' | 'air' | 'swing' | 'zip' | 'wall' | 'perch' | 'dive'
 //   heading    radians, 0 = facing north (-z), CCW positive: forward = (-sin h, 0, -cos h)
-//   object     THREE.Object3D visual root (pivot at the hips; the rig hangs below it)
+//   object     THREE.Object3D visual root (pivot at the hips; the rigged model hangs below it)
 //   suit       'classic' | 'symbiote' (F toggles; setSuit(name) to force)
 //   radius, height, speed (m/s getter)
 //   teleport(x, y, z)
@@ -27,7 +28,6 @@ import { roofEdgeFacing } from './anchors.js';
 //              0 off the ground. (controller.skid is true while reversing at speed skids.)
 // Emits player:jump / land / webShot / swingStart / swingEnd / zip / wallStart / perch / suit.
 
-const PALM = new THREE.Vector3(0, -0.09, -0.012);
 const AIM_INTERVAL = 0.1;
 const SKY_Y = 1500; // above anything in the city: start of the "is this spot enclosed" ray casts
 
@@ -83,21 +83,26 @@ export class Player {
 
   async init(game) {
     this.game = game;
-    this.suitMaterial = new SuitMaterial(game.renderer, game.quality);
-    this.rig = buildSpiderManMesh(this.suitMaterial.material);
-    this.rig.mesh.position.y = -PIVOT_Y;
-    this.rig.mesh.castShadow = game.quality.shadows;
     this.object = new THREE.Group();
     this.object.name = 'player';
-    this.object.add(this.rig.mesh);
     game.scene.add(this.object);
+    this.model = await loadSpiderMan(game);
+    if (this.model) {
+      this.object.add(this.model.root);
+      this.animator = new Animator(this.model, this.object);
+      this.suits = new SuitSwitcher(this.model.mesh, this.model.materials, this.model.bones.spine_03, game.renderer, game.scene, game.camera);
+    } else {
+      this.standIn = buildStandIn();
+      this.standIn.position.y = -PIVOT_Y;
+      this.object.add(this.standIn);
+    }
 
     this.webs = new Webs(game.scene);
     this.controller = new Controller(this, game);
-    this.animator = new Animator(this.rig, this.object);
     this._spawnOnRBZ(game.data);
-    // A long first step settles the rig into the perch crouch instead of blending there on screen.
-    this._syncVisual(1);
+    // Settle straight into the perch crouch instead of blending there on screen.
+    this._snap = true;
+    this._syncVisual(0);
   }
 
   // Start crouched on the outer lip of the Reserve Bank's crown, on the facet that faces Africa Unity
@@ -128,6 +133,7 @@ export class Player {
     this.state = 'air';
     this.controller.reset();
     this.webs.clear();
+    this._snap = true;
     this.game.cameraRig?.snap?.();
   }
 
@@ -174,12 +180,12 @@ export class Player {
   setSuit(name) {
     if (!SUITS.includes(name) || name === this.suit) return;
     this.suit = name;
-    this.suitMaterial.set(name);
+    this.suits?.set(name);
     this.game.events.emit('player:suit', { suit: name });
   }
 
   update(dt, game) {
-    if (game.input.pressed('suit') && !this.suitMaterial.transitioning) {
+    if (game.input.pressed('suit') && !this.suits?.transitioning) {
       this.setSuit(this.suit === 'classic' ? 'symbiote' : 'classic');
     }
     this.controller.update(dt);
@@ -194,11 +200,21 @@ export class Player {
   }
 
   _syncVisual(dt) {
-    this.suitMaterial.update(dt);
-    this.animator.update(dt, this, this.controller);
-    this.object.updateMatrixWorld(true);
-    const bones = this.rig.bones;
-    this.hands.L.copy(PALM).applyMatrix4(bones[B.handL].matrixWorld);
-    this.hands.R.copy(PALM).applyMatrix4(bones[B.handR].matrixWorld);
+    if (this.animator) {
+      if (this._snap) this.animator.snap(this, this.controller);
+      else this.animator.update(dt, this, this.controller);
+      this.animator.palms(this.hands.L, this.hands.R);
+      this.suits.update(dt);
+    } else {
+      // Stand-in body: hands at the shoulders.
+      const o = this.object;
+      o.position.copy(this.position);
+      o.position.y += PIVOT_Y;
+      o.rotation.set(0, this.heading, 0);
+      o.updateMatrixWorld(true);
+      this.hands.L.set(-0.3, 0.5, 0).applyMatrix4(o.matrixWorld);
+      this.hands.R.set(0.3, 0.5, 0).applyMatrix4(o.matrixWorld);
+    }
+    this._snap = false;
   }
 }

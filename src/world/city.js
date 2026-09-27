@@ -15,11 +15,15 @@ import { Kopje } from './terrain.js';
 import { createFlame, createFountainJets } from './effects.js';
 import { treeHeight } from './treeModels.js';
 import { PointGrid } from './pointGrid.js';
+import { PbrSet, FACADE_SET, FACADE_SET_LOW, GROUND_SET, GROUND_SET_LOW, loadInteriors } from './render/pbrLibrary.js';
+import { makeNoiseTexture } from './render/noise.js';
 
+// tex: canvas layers (signs, painted artwork); pbr: PBR texture-array size; normals: normal /
+// AO / metalness array; smallInteriors: the 1024 x 512 interior atlas.
 const QUALITY = {
-  low: { tex: 256, props: 0.5, trees: 0.4, signs: 48 },
-  medium: { tex: 384, props: 0.8, trees: 0.7, signs: 80 },
-  high: { tex: 384, props: 1, trees: 1, signs: 112 },
+  low: { tex: 256, props: 0.5, trees: 0.4, signs: 48, pbr: 512, normals: false, smallInteriors: true, low: true },
+  medium: { tex: 384, props: 0.8, trees: 0.7, signs: 80, pbr: 512, normals: true, smallInteriors: true },
+  high: { tex: 384, props: 1, trees: 1, signs: 112, pbr: 512, normals: true, smallInteriors: false },
 };
 
 const NONE = [];
@@ -70,15 +74,25 @@ export class City {
     const roadHeightAt = (x, z) => kopje.roadHeightAt(x, z);
     const skipArea = (a) => a === kopje.area;
 
-    // Textures: one texture array for everything built (facades, roofs, props, signs, billboards)
-    // and one for the ground surfaces.
+    // Textures. PBR materials (public/textures) load in the background while the geometry is built:
+    // one set of texture arrays for everything built (walls, roofs, frames, glass, props) and one for
+    // the ground. Canvas layers hold signs and painted landmark artwork.
+    const assets = game.assets;
+    const facadeSet = new PbrSet(quality.low ? FACADE_SET_LOW : FACADE_SET, { size: quality.pbr, normals: quality.normals });
+    const groundSet = new PbrSet(quality.low ? GROUND_SET_LOW : GROUND_SET, { size: quality.pbr, normals: quality.normals });
+    const texturesReady = assets.json('textures/materials.json').then((man) =>
+      Promise.all([facadeSet.load(assets, man, game.renderer), groundSet.load(assets, man, game.renderer)]),
+    );
+    const interiorsReady = loadInteriors(assets, quality.smallInteriors).catch((err) => {
+      console.warn('[city] interior atlas unavailable', err);
+      return null;
+    });
     const facadeAtlas = new LayerAtlas(quality.tex);
     const tileW = paintFacadeLayers(facadeAtlas);
     const signs = new SignPainter(facadeAtlas, quality.signs);
-    const groundAtlas = new LayerAtlas(quality.tex);
-    const groundScale = paintGroundLayers(groundAtlas);
+    const groundAtlas = new LayerAtlas(Math.min(256, quality.tex));
+    const { G, scale: groundScale } = paintGroundLayers(groundAtlas, groundSet);
     const L = facadeAtlas.index;
-    const G = groundAtlas.index;
     const urban = buildUrbanMask(data.buildings, data.meta.bounds);
 
     const chunks = new ChunkGrid();
@@ -93,7 +107,7 @@ export class City {
     const landmarks = new Landmarks(data, signs);
     const landmarkStyles = new Map((data.meta.landmarks || []).map((l) => [l.key, l.style || {}]));
     const ctx = {
-      game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks,
+      game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, pbr: facadeSet,
       streets: new StreetIndex(data), carriageways: new CarriagewayIndex(data.roads), obstacles: [],
     };
     const frontages = [];
@@ -149,9 +163,16 @@ export class City {
     // Materials + meshes.
     const facadeTex = facadeAtlas.build(game.renderer);
     const groundTex = groundAtlas.build(game.renderer);
-    this.textureBytes = facadeAtlas.bytes + groundAtlas.bytes;
-    this.facadeMat = createFacadeMaterial(facadeTex, this.uniforms, L);
-    const ground = (offset) => createGroundMaterial(groundTex, this.uniforms, G, urban, { offset });
+    await texturesReady;
+    const interiors = await interiorsReady;
+    const noise = makeNoiseTexture();
+    this.textureBytes = facadeAtlas.bytes + groundAtlas.bytes + facadeSet.bytes + groundSet.bytes + (interiors?.bytes || 0) + noise.bytes;
+    this.textureReport = {
+      canvasFacade: facadeAtlas.bytes, canvasGround: groundAtlas.bytes, pbrFacade: facadeSet.bytes, pbrGround: groundSet.bytes,
+      interiors: interiors?.bytes || 0, noise: noise.bytes,
+    };
+    this.facadeMat = createFacadeMaterial(facadeTex, this.uniforms, L, { pbr: facadeSet, interiors, noise });
+    const ground = (offset) => createGroundMaterial(groundTex, this.uniforms, G, urban, { offset, res: { ground: groundSet, noise } });
     const mats = { base: ground(3), landuse: ground(2), areas: ground(1), paths: ground(0), roads: ground(-1), marks: ground(-2) };
 
     this.chunks = [];
@@ -204,6 +225,10 @@ export class City {
     const u = this.uniforms;
     u.uNight.value = t;
     u.uShutterFrac.value = 0.18 + 0.5 * t;
+    // Rooms behind the glass: dim by day (the street is far brighter), lit ones glow at night.
+    u.uInterior.value.set(THREE.MathUtils.lerp(0.5, 1.15, t), 0.035, 1 - 0.85 * t);
+    const dir = this.game?.sky?.lightDirection;
+    if (dir) u.uSunDir.value.copy(dir);
     if (this.lightPools) {
       this.lightPools.material.opacity = 0.85 * t;
       this.lightPools.visible = t > 0.02;
@@ -218,6 +243,8 @@ export class City {
 
   update(dt, game) {
     this.uniforms.uTime.value += dt;
+    const ld = game.sky?.lightDirection;
+    if (ld) this.uniforms.uSunDir.value.copy(ld);
     const cam = game.camera.position;
     this.vegetation.update(cam);
     // Chunk LOD: drop the detail layer away from the camera and whole chunks beyond the fog.
