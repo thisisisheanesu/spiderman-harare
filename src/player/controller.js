@@ -538,7 +538,8 @@ export class Controller {
 
   // ---------------------------------------------------------------- vault & perch
 
-  // Scripted hop along a curve (ledges, wall tops, zip arrivals); physics resumes at the end.
+  // Scripted hop along a curve (ledges, wall tops, zip arrivals, round overhangs); physics resumes at
+  // the end in state `then` ('ground' | 'perch' | 'wall').
   startVault(to, dur, then, exitVel) {
     const p = this.p;
     const vt = this.vault;
@@ -568,6 +569,8 @@ export class Controller {
     vt.active = false;
     p.velocity.copy(vt.exit);
     if (vt.then === 'perch') this.perchAt(vt.to, this.perchOut);
+    // (Out round an overhang: carry on climbing the face wall.normal already points out of.)
+    else if (vt.then === 'wall') p.state = 'wall';
     else p.state = 'ground';
   }
 

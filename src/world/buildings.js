@@ -451,9 +451,10 @@ function emitCanopy(f, spec, gb, col, L, rng, depth) {
     gb.quad(x - 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 + 0.2, x - 0.2, y - 0.01, depth * 0.55 + 0.2, 0, -1, 0, u0, v0, u1, v1);
   }
   gb.clearTransform();
-  // Physics: the slab plus the upstand along its front edge (a face, not a box: 2 triangles).
+  // Physics: the slab (with its underside, where heads and climbs meet it) plus the upstand along its
+  // front edge (a face, not a box: 2 triangles).
   col.setTransform(mx, 0, mz, rot);
-  col.box(0, y, depth / 2, w, t, depth, 1);
+  col.box(0, y, depth / 2, w, t, depth, 1, true);
   col.quad(-w / 2, y + t, depth - 0.1, w / 2, y + t, depth - 0.1, w / 2, y + t + 0.45, depth - 0.1, -w / 2, y + t + 0.45, depth - 0.1, 0, 0, 1, 0, 0, 1, 1);
   col.clearTransform();
   return { depth, top: y + t, front: depth - 0.1, rot, mx, mz };
