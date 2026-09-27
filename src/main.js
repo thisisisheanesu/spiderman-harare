@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './core/game.js';
+import { Assets } from './core/assets.js';
 import { CollisionWorld } from './world/collision.js';
 import { Sky } from './world/sky.js';
 import { City } from './world/city.js';
@@ -70,6 +71,7 @@ async function boot() {
   const game = new Game({ container, data, voices, quality });
   window.__game = game;
 
+  game.assets = new Assets(game.renderer);
   game.world = new CollisionWorld(data);
   const labels = {
     sky: 'Lighting the highveld sky…',
@@ -92,10 +94,20 @@ async function boot() {
 
   const names = Object.keys(game.systems);
   let i = 0;
+  let stage = 0;
+  let stageLabel = labels[names[0]];
+  // Systems start downloading models/textures while they initialise; show those counts as well.
+  const offAssets = game.assets.onProgress((done, total) => {
+    const extra = total ? ` (${done}/${total} files)` : '';
+    setProgress(0.25 + stage * 0.7, `${stageLabel || 'Almost there…'}${extra}`);
+  });
   await game.init((frac) => {
     const next = names[++i];
+    stage = frac;
+    stageLabel = labels[next];
     setProgress(0.25 + frac * 0.7, labels[next] || 'Almost there…');
   });
+  offAssets();
 
   const spawn = params.get('spawn');
   if (spawn) {

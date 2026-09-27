@@ -80,7 +80,11 @@ Reference research (produced alongside the code):
 
 ## Game & systems (`src/core/game.js`, wired in `src/main.js`)
 
-`game` fields: `renderer, scene, camera, input, events, data, voices (manifest or null), quality, time, paused, fps`
+`game` fields: `renderer, scene, camera, input, events, assets, data, voices (manifest or null), quality, time, paused, fps`.
+`game.assets` (`src/core/assets.js`, core) is the shared cached loader for static files: `gltf(url)` (meshopt supported —
+clone with `SkeletonUtils.clone` before reusing a skinned scene), `texture(url, {srgb, repeat, anisotropy, flipY})`,
+`textureAsync(url, opts)`, `hdr(url)`, `json(url)`, `onProgress(fn)`, `whenIdle()`; URLs are page-relative
+(`'models/humans/npc_man_overalls.glb'`, `'textures/brick/…_albedo.webp'`)
 and every system by name. Systems are registered in this order and updated every frame in this order:
 
 | name        | class          | file(s)                 | owner   |
