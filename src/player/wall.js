@@ -1,17 +1,26 @@
 import * as THREE from 'three';
 import { probeLedge } from './anchors.js';
 
-// Wall crawling and running: W runs up (sprinting after a second), A/D run sideways relative to the
-// camera, S slides down. Wraps around outer corners, turns into inner corners, gets round overhangs
-// (onto a shop canopy, over a cornice, out onto an overhanging storey such as Joina City's drum),
-// vaults onto the roof at the top and drops back to the street at the bottom. Jump kicks off
-// (towards the camera's view).
+// Wall running and crawling: W runs up the wall (sprinting after a second; A/D steer the run
+// diagonally); A/D alone crawl sideways relative to the camera, S crawls down. Arriving fast (a sprint
+// or a swing into the facade) carries the momentum on up the wall as a wall-run that sheds its extra
+// speed like a run slowing down, instead of stopping dead. Wraps around outer corners, turns into
+// inner corners, gets round overhangs (onto a shop canopy, over a cornice, out onto an overhanging
+// storey such as Joina City's drum), vaults onto the roof at the top and drops back to the street at
+// the bottom. Jump kicks off (towards the camera's view).
 
 const UP_SPEED = 9;
 const UP_SPRINT = 12;
-const SIDE_SPEED = 7.5;
-const DOWN_SPEED = 9;
+const SIDE_RUN = 6; // sideways part of a diagonal wall-run (W + A/D)
+const SIDE_CRAWL = 2.4; // A/D alone: the crawl
+const DOWN_SPEED = 2.6; // S: crawling down
 const GRIP = 10;
+const MOMENTUM_MAX = 18; // m/s: most speed an arrival carries up the wall
+const MOMENTUM_UP = 0.8; // share of the speed into the wall turned upwards (the legs take it)...
+const MOMENTUM_ALONG = 0.45; // ...and of the speed along it
+const SHED_RUN = 7; // m/s² a wall-run sheds speed above the wanted one (W held)...
+const SHED_IDLE = 15; // ...and with no input
+const SHED_SIDE = 12;
 const TOP_REACH = 2.1;
 const SNAP = 0.2; // max facade-hugging correction per step (m)
 const CORNICE_REACH = 3.4; // blocked from above: a roof top this far above the feet is still vaulted
@@ -24,7 +33,6 @@ const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _c = new THREE.Vector3();
 const _side = new THREE.Vector3();
-const _want = new THREE.Vector3();
 const _ledge = new THREE.Vector3();
 
 const smooth = (a, b, x) => {
@@ -49,8 +57,9 @@ export class WallMove {
     return impact > 1.5 || c.wish.dot(n) < -0.3;
   }
 
-  // Stick to the wall facing normal n, if there is one to hold at chest height.
-  enter(n) {
+  // Stick to the wall facing normal n, if there is one to hold at chest height. `impact`: the speed
+  // the body was carrying into the wall (collide() has already taken it out of the velocity).
+  enter(n, impact = 0) {
     const c = this.c;
     const p = c.p;
     const v = p.velocity;
@@ -62,7 +71,17 @@ export class WallMove {
     this.normal.set(hit.normal.x, 0, hit.normal.z).normalize();
     p.position.addScaledVector(this.normal, p.radius + 0.05 - hit.distance);
     v.addScaledVector(this.normal, -v.dot(this.normal));
-    v.y = Math.min(Math.max(v.y, -6), 14);
+    // Momentum: a run or swing into the facade carries on up it (a wall-run), not a dead stop.
+    const along = Math.hypot(v.x, v.z);
+    const carry = Math.min(MOMENTUM_MAX, MOMENTUM_UP * impact + MOMENTUM_ALONG * along);
+    if (carry > v.y) {
+      v.y = carry;
+      // (The speed along the wall that went upwards.)
+      const keep = along > 1e-3 ? Math.max(0, along - carry * 0.5) / along : 0;
+      v.x *= keep;
+      v.z *= keep;
+    }
+    v.y = Math.min(Math.max(v.y, -6), MOMENTUM_MAX);
     const was = p.state;
     p.state = 'wall';
     this.climbTime = 0;
@@ -88,13 +107,22 @@ export class WallMove {
     const my = c.move.y;
     if (my > 0.1) this.climbTime += h;
     else this.climbTime = 0;
+    const running = my > 0.3;
     const up = my > 0 ? UP_SPEED + (UP_SPRINT - UP_SPEED) * smooth(0.8, 1.6, this.climbTime) : DOWN_SPEED;
-    _want.copy(UP).multiplyScalar(my * up).addScaledVector(side, c.move.x * SIDE_SPEED);
+    const sideWant = c.move.x * (running ? SIDE_RUN : SIDE_CRAWL);
+    const upWant = my * up;
     const k = 1 - Math.exp(-GRIP * h);
-    v.x += (_want.x - v.x) * k;
-    v.y += (_want.y - v.y) * k;
-    v.z += (_want.z - v.z) * k;
-    v.addScaledVector(n, -v.dot(n));
+    // Up: speed beyond what is wanted (momentum from the arrival) is shed at a run's rate.
+    if (v.y > upWant + 0.3 && v.y > 0) v.y = Math.max(upWant, v.y - (running ? SHED_RUN : SHED_IDLE) * h);
+    else v.y += (upWant - v.y) * k;
+    // Along the wall: the same.
+    const vs = v.dot(side);
+    let vs1;
+    if (Math.abs(vs) > Math.abs(sideWant) + 0.3 && vs * sideWant >= 0) vs1 = vs - Math.sign(vs) * Math.min(Math.abs(vs) - Math.abs(sideWant), SHED_SIDE * h);
+    else vs1 = vs + (sideWant - vs) * k;
+    // (The wall plane is spanned by `side` and up: nothing else horizontal remains.)
+    v.x = side.x * vs1;
+    v.z = side.z * vs1;
     p.position.addScaledVector(v, h);
 
     // Top of the wall within reach while climbing: vault onto the roof.
@@ -128,7 +156,7 @@ export class WallMove {
       this.overhangWait = OVERHANG_RETRY;
     }
     // Ran into an inner corner: carry on up the new face.
-    if (res.wall && res.wallNormal.dot(n) < 0.5 && c.wallImpact > 0.5) this.enter(res.wallNormal);
+    if (res.wall && res.wallNormal.dot(n) < 0.5 && c.wallImpact > 0.5) this.enter(res.wallNormal, c.wallImpact);
   }
 
   // Blocked from above while climbing. A roof edge within CORNICE_REACH (a cornice / cap overhangs

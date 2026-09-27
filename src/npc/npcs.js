@@ -13,7 +13,9 @@ import { Flashes } from './flashes.js';
 import { streetVoices } from './streetVoices.js';
 
 // Pedestrians of Harare CBD: pavements, crossings, First Street Mall, the parks and the kombi ranks,
-// with vendors at their stalls and people who speak with real Zimbabwean (Shona) voices.
+// with vendors at their stalls and people who speak with real Zimbabwean (Shona) voices. Everyone is one of
+// the 23 realistic rigged variants (public/models/humans) dressed for their role and gender, animated from
+// the shared clip library and drawn by GPU skinning in one draw call per LOD (humans.js, bodies.js).
 //
 // Public API (game.npcs):
 //   list                 active people [{position: Vector3, heading, gender: 'female'|'male', state, name, role}]
@@ -22,15 +24,20 @@ import { streetVoices } from './streetVoices.js';
 //   crossers             people out on a carriageway this frame (crossing, or fleeing across it), each
 //                        with crossRoad = index of the road being crossed (traffic brakes for them)
 //   walkways             the pedestrian network (walkways.js)
+//   humans               the loaded variants and baked clips (humans.js; null if the models failed)
+//   objects              the scene objects this system draws (people LODs, contact shadows, flashes, stalls)
+// Each person also has look.variant / look.height, anim {clip, t, ...}, headY / mouthY (world heights of the
+// head joint and mouth in the current frame) and forceClip (testing: play this clip whatever they do).
 // Emits 'npc:speak' {npc, clip, text}; drives audio.playVoice / playExtra (real recorded greetings and
 // calls, streetVoices.js) / setAmbience('crowd') and hud.showSubtitle.
 
-// Draw distances (m): LOD0 (full mesh, real shadows) out to lod0 for at most cap0 people, LOD1 out to lod1,
-// nobody beyond (humans README: desktop 22 / 90 m, phones 12 / 55 m). atlas = LOD0 texture array size.
+// Draw distances (m): LOD0 (full mesh, real shadows) out to lod0 for at most cap0 people, LOD1 out to lod1
+// (humans README: desktop 22 / 90 m, phones 12 / 55 m), the clustered LOD2 out to lod2, nobody beyond.
+// atlas = LOD0 texture array size.
 const LOD = {
-  low: { lod0: 12, lod1: 58, cap0: 10, atlas: 512 },
-  medium: { lod0: 18, lod1: 75, cap0: 16, atlas: 512 },
-  high: { lod0: 22, lod1: 90, cap0: 24, atlas: 1024 },
+  low: { lod0: 12, lod1: 45, lod2: 100, cap0: 10, atlas: 512 },
+  medium: { lod0: 18, lod1: 70, lod2: 130, cap0: 16, atlas: 512 },
+  high: { lod0: 22, lod1: 90, lod2: 160, cap0: 24, atlas: 1024 },
 };
 
 export class Npcs {
@@ -48,7 +55,16 @@ export class Npcs {
     // Ground height from the city (the Kopje hill), looked up live in case the city swaps it.
     this.walkways = new Walkways(game.world, game.data, (x, z) => game.city?.heightAt?.(x, z) ?? 0);
     await this.walkways.build(() => new Promise((r) => setTimeout(r, 0)));
-    await humansReady;
+    // Without the models (a failed download) the street still lives (voices, traffic stopping for
+    // crossers); nobody is drawn.
+    const ok = await humansReady.then(
+      () => true,
+      (e) => {
+        console.error('[npc] people models failed to load', e);
+        return false;
+      },
+    );
+    if (!ok) this.humans = null;
     useHumans(this.humans);
     Agent.humans = this.humans;
     this.vendors = new Vendors(game, this.walkways);
@@ -64,9 +80,9 @@ export class Npcs {
     this.population = new Population(game, this.walkways, this.vendors, this.crowd, this.voices);
     this.list = this.population.list;
     this.social = new Social(game, this.crowd, this.population, this.voices, this.bubbles);
-    this.renderer = new CrowdRenderer(game, this.humans, this.population.max, { shadows: !!game.quality.shadows });
+    this.renderer = this.humans ? new CrowdRenderer(game, this.humans, this.population.max, { shadows: !!game.quality.shadows }) : null;
     this.flashes = new Flashes(game.scene);
-    this.objects = [...this.renderer.objects, this.flashes.points, this.vendors.group].filter(Boolean);
+    this.objects = [...(this.renderer?.objects || []), this.flashes.points, this.vendors.group].filter(Boolean);
     this._lod0 = [];
     this.ctx = {
       focus: new THREE.Vector3(),
@@ -118,17 +134,32 @@ export class Npcs {
     ctx.nearGround = p.y - ground < 6;
     ctx.traffic = game.traffic;
 
+    // (this.prof = {} from the console collects ms per stage.)
+    const P = this.prof;
+    let t0 = P ? performance.now() : 0;
+    const lap = P
+      ? (k) => {
+          const t = performance.now();
+          P[k] = (P[k] || 0) + t - t0;
+          t0 = t;
+        }
+      : null;
     game.camera.updateMatrixWorld();
     if ((game.frame & 31) === 0) this._takeCityObstacles();
     this.street.update();
     this.population.update(dt, ctx);
+    lap?.('population');
     this.crowd.rebuildHash(this.list);
     this.crowd.update(dt, ctx);
+    lap?.('crowd');
     this.social.update(dt, ctx);
     this.voices.update(dt, ctx, this.crowd.near(p.x, p.z, 15, this._near));
     this._ambience(dt, ctx);
+    lap?.('social');
     this._render(dt);
+    lap?.('render');
     this.bubbles.update(dt);
+    lap?.('bubbles');
   }
 
   pausedUpdate(dt) {
@@ -153,10 +184,11 @@ export class Npcs {
 
   _render(dt) {
     const r = this.renderer;
+    if (!r) return;
     const t = this.game.time;
     const cam = this.game.camera.position;
     const frustum = this.population.frustum;
-    const { lod0, lod1, cap0 } = this.lod;
+    const { lod0, lod1, lod2, cap0 } = this.lod;
     const sphere = this._sphere;
     const near = this._lod0;
     near.length = 0;
@@ -166,13 +198,14 @@ export class Npcs {
       const dy = a.position.y - cam.y;
       const dz = a.position.z - cam.z;
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 > lod1 * lod1 || !a.anim.clip) continue;
+      if (d2 > lod2 * lod2 || !a.anim.clip) continue;
       sphere.center.set(a.position.x, a.position.y + 0.9, a.position.z);
       if (!frustum.intersectsSphere(sphere)) continue;
       if (d2 < lod0 * lod0) {
         a._d2 = d2;
         near.push(a);
-      } else r.push(a, 1, true);
+      } else if (d2 < lod1 * lod1) r.push(a, 1, true);
+      else r.push(a, 2, false);
       // People filming Spider-Man: the odd phone flash.
       if (a.state === 'react' && a.react.type === 'photo' && t > a.react.start && Math.random() < dt * 0.7) this.flashes.fire(a);
     }

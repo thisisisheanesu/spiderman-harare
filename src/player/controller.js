@@ -24,7 +24,10 @@ import { WallMove } from './wall.js';
 //                                                    (only a hold begun standing still web-launches)
 // Speed eases in and out (ACCEL / BRAKE, exponential near the target), the turn rate is limited by a
 // lateral acceleration (LAT_ACCEL), so the turning radius grows with speed, and reversing at speed
-// skids to a stop and pivots. Exposed for animation: player.locomotion ('idle' | 'walk' | 'run' |
+// skids to a stop and pivots.
+// Vehicles (traffic.vehiclesNear: oriented boxes with a roof): the capsule lands and stands on car,
+// kombi and bus roofs (riding along), is pushed out of their sides, and running or sprinting into a
+// car or kombi vaults over it (a sprint into a bus vaults up onto its roof). Exposed for animation: player.locomotion ('idle' | 'walk' | 'run' |
 // 'sprint'), player.groundSpeed (m/s), player.turnRate (rad/s, + = turning left / CCW).
 
 const G = 26;
@@ -73,6 +76,12 @@ const PLUNGE_DRIFT = 3.5; // ...and the least
 const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
 const PLUNGE_RUN_HS = 10; // running / jumping off a tower's roof: the plunge keeps up to this drift
 const DROP_WAIT = 0.1; // s over a big drop after leaving a roof before that plunge starts
+const ROLL_TIME = 0.62; // s: a landing roll (the roll clip's floor part, time-scaled to this)
+// Vehicles.
+const VEH_REACH = 7; // m (+ the distance covered this frame): vehicles gathered per frame
+const VEH_STEP = 0.5; // m: a roof this close above the feet is stepped / landed onto
+const VEH_VAULT_MAX = 2.6; // m: taller than this (buses, trucks) is vaulted onto, not over
+const VEH_EDGE = 0.25; // m inside the footprint edge the feet can stand
 
 // Keys the game uses (movement + actions): with Alt held (walking) their browser shortcuts are
 // blocked, see _listenKeys.
@@ -86,6 +95,7 @@ const smooth = (a, b, x) => {
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
+const _c = new THREE.Vector3();
 const _down = new THREE.Vector3(0, -1, 0);
 const _segA = new THREE.Vector3();
 const _segB = new THREE.Vector3();
@@ -156,7 +166,10 @@ export class Controller {
     this.plungeHs = PLUNGE_HS;
     this.fromRoof = false; // airborne straight off a roof / the ground (not a swing, zip or wall)
     this.dropTime = 0;
+    this.vehicles = []; // gathered once per frame (see _gatherVehicles)
+    this.onVehicle = null; // standing on its roof (riding along)
     this.contact = {
+      vehicle: null,
       hit: false,
       ground: false,
       wall: false,
@@ -206,6 +219,7 @@ export class Controller {
     this.wallTime = p.state === 'wall' ? this.wallTime + dt : 0;
 
     this._buttons(this.game.input);
+    this._gatherVehicles(dt);
 
     if (this.vault.active) {
       this._updateVault(dt);
@@ -312,7 +326,7 @@ export class Controller {
         this.wall.jump();
         break;
       case 'swing':
-        this.swing.release(true);
+        this.swing.jumpPressed();
         break;
       case 'zip':
         this.zip.launch = true;
@@ -458,6 +472,7 @@ export class Controller {
     _segB.set(p.position.x, p.position.y + p.height - r, p.position.z);
     const hit = this.world.collideCapsule(_segA, _segB, r);
     const res = this.contact;
+    res.vehicle = null;
     res.hit = hit.hit;
     res.ground = hit.ground;
     res.wall = hit.wall;
@@ -465,28 +480,165 @@ export class Controller {
     res.delta.copy(hit.delta);
     res.groundNormal.copy(hit.groundNormal);
     res.wallNormal.copy(hit.wallNormal);
-    if (!res.hit) return res;
-    p.position.set(_segA.x, _segA.y - r, _segA.z);
-    const v = p.velocity;
-    this.impactVy = -v.y;
-    // Feet on a convex edge (an eave, a kerb-like step, a roof lip) push out diagonally, which the
-    // world reads as a wall below 53 degrees; mostly-upwards pushes while coming down are footing.
-    if (!res.ground && v.y <= 0 && res.delta.y > EDGE_FOOTING * res.delta.length()) res.ground = true;
-    if (res.ground && v.y < 0) v.y = 0;
-    if (res.ceiling && v.y > 0) v.y = 0;
-    this.wallImpact = 0;
-    // A wall contact from something below the knee (a step's edge) is not a wall to stop at: the
-    // capsule rides up over it. (Still needed with push-direction contacts: the edge of a 0.2-0.3 m
-    // step pushes out at ~30 degrees, which would otherwise stop a run dead.)
-    if (res.wall && !this._wallAtKnee(res.wallNormal)) res.wall = false;
-    if (res.wall) {
-      const into = v.dot(res.wallNormal);
-      if (into < 0) {
-        this.wallImpact = -into;
-        v.addScaledVector(res.wallNormal, -into);
+    if (res.hit) {
+      p.position.set(_segA.x, _segA.y - r, _segA.z);
+      const v = p.velocity;
+      this.impactVy = -v.y;
+      // Feet on a convex edge (an eave, a kerb-like step, a roof lip) push out diagonally, which the
+      // world reads as a wall below 53 degrees; mostly-upwards pushes while coming down are footing.
+      if (!res.ground && v.y <= 0 && res.delta.y > EDGE_FOOTING * res.delta.length()) res.ground = true;
+      if (res.ground && v.y < 0) v.y = 0;
+      if (res.ceiling && v.y > 0) v.y = 0;
+      this.wallImpact = 0;
+      // A wall contact from something below the knee (a step's edge) is not a wall to stop at: the
+      // capsule rides up over it. (Still needed with push-direction contacts: the edge of a 0.2-0.3 m
+      // step pushes out at ~30 degrees, which would otherwise stop a run dead.)
+      if (res.wall && !this._wallAtKnee(res.wallNormal)) res.wall = false;
+      if (res.wall) {
+        const into = v.dot(res.wallNormal);
+        if (into < 0) {
+          this.wallImpact = -into;
+          v.addScaledVector(res.wallNormal, -into);
+        }
       }
     }
+    if (this.vehicles.length) this._vehicleContact(res);
     return res;
+  }
+
+  // ---------------------------------------------------------------- vehicles
+
+  // Vehicles near enough to touch this frame (a copy: traffic's list is rebuilt per call).
+  _gatherVehicles(dt) {
+    const list = this.vehicles;
+    list.length = 0;
+    const traffic = this.game.traffic;
+    if (!traffic?.vehiclesNear) return;
+    const pos = this.p.position;
+    const near = traffic.vehiclesNear(pos.x, pos.z, VEH_REACH + this.p.velocity.length() * dt);
+    for (let i = 0; i < near.length; i++) {
+      const veh = near[i];
+      if (veh?.position && veh.length > 0 && veh.width > 0) list.push(veh);
+    }
+    if (this.onVehicle && !list.includes(this.onVehicle)) this.onVehicle = null;
+  }
+
+  // The capsule against the vehicles' boxes: onto a roof (ground) when the feet are at or just below
+  // it over the footprint and not rising, else pushed out of the nearest side (a wall).
+  _vehicleContact(res) {
+    const p = this.p;
+    const pos = p.position;
+    const v = p.velocity;
+    const r = p.radius;
+    let standing = null;
+    for (let i = 0; i < this.vehicles.length; i++) {
+      const veh = this.vehicles[i];
+      const base = veh.position.y;
+      const roof = base + (veh.height || 1.5);
+      if (pos.y > roof + 0.02 || pos.y + p.height < base + 0.15) continue;
+      const sh = Math.sin(veh.heading);
+      const ch = Math.cos(veh.heading);
+      const dx = pos.x - veh.position.x;
+      const dz = pos.z - veh.position.z;
+      const f = -(dx * sh + dz * ch); // along its nose
+      const sd = dx * ch - dz * sh; // along its right
+      const hl = veh.length / 2;
+      const hw = veh.width / 2;
+      const pf = hl + r - Math.abs(f);
+      const ps = hw + r - Math.abs(sd);
+      if (pf <= 0 || ps <= 0) continue;
+      const up = roof - pos.y;
+      const over = Math.abs(f) < hl - VEH_EDGE + r * 0.6 && Math.abs(sd) < hw - VEH_EDGE + r * 0.6;
+      if (over && up <= VEH_STEP + Math.max(0, -v.y) * 0.05 && v.y <= 1) {
+        // On the roof.
+        if (!res.ground || !res.hit) this.impactVy = -v.y;
+        pos.y = roof;
+        if (v.y < 0) v.y = 0;
+        res.hit = true;
+        res.ground = true;
+        res.groundNormal.set(0, 1, 0);
+        res.delta.set(0, Math.max(0, up), 0);
+        res.vehicle = veh;
+        standing = veh;
+        continue;
+      }
+      // Out of the nearest side.
+      let nx;
+      let nz;
+      let depth;
+      if (pf < ps) {
+        const sg = f >= 0 ? 1 : -1;
+        nx = -sh * sg;
+        nz = -ch * sg;
+        depth = pf;
+      } else {
+        const sg = sd >= 0 ? 1 : -1;
+        nx = ch * sg;
+        nz = -sh * sg;
+        depth = ps;
+      }
+      pos.x += nx * depth;
+      pos.z += nz * depth;
+      res.hit = true;
+      res.wall = true;
+      res.wallNormal.set(nx, 0, nz);
+      res.delta.set(nx * depth, 0, nz * depth);
+      res.vehicle = veh;
+      const into = v.x * nx + v.z * nz;
+      if (into < 0) {
+        this.wallImpact = -into;
+        v.x -= nx * into;
+        v.z -= nz * into;
+      } else this.wallImpact = 0;
+    }
+    this.onVehicle = standing;
+  }
+
+  // Running or sprinting into a vehicle's side (normal n, out of it): vault over a car or kombi (onto
+  // a bus when sprinting); walking into one just stops. True if a vault started.
+  _vaultVehicle(veh, n, speed, sprint) {
+    const p = this.p;
+    const pos = p.position;
+    const roof = veh.position.y + (veh.height || 1.5);
+    const rise = roof - pos.y;
+    if (rise > VEH_VAULT_MAX && !sprint) return false;
+    // Across the box along the run (or straight in), out the far side.
+    const d = _a.set(-n.x, 0, -n.z);
+    const hs = Math.hypot(p.velocity.x, p.velocity.z);
+    if (hs > 1 && (p.velocity.x * d.x + p.velocity.z * d.z) / hs > 0.3) d.set(p.velocity.x / hs, 0, p.velocity.z / hs);
+    const sh = Math.sin(veh.heading);
+    const ch = Math.cos(veh.heading);
+    const dx = pos.x - veh.position.x;
+    const dz = pos.z - veh.position.z;
+    const f0 = -(dx * sh + dz * ch);
+    const s0 = dx * ch - dz * sh;
+    const df = -(d.x * sh + d.z * ch);
+    const ds = d.x * ch - d.z * sh;
+    const exitF = Math.abs(df) > 1e-3 ? (Math.sign(df) * (veh.length / 2 + p.radius) - f0) / df : Infinity;
+    const exitS = Math.abs(ds) > 1e-3 ? (Math.sign(ds) * (veh.width / 2 + p.radius) - s0) / ds : Infinity;
+    const across = Math.min(exitF, exitS);
+    if (!Number.isFinite(across) || across <= 0 || across > 14) return false;
+    const out = Math.max(speed, 6);
+    if (rise > VEH_VAULT_MAX) {
+      // A bus: up onto its roof, a stride in from the edge.
+      const inF = f0 + df * (p.radius + 0.9);
+      const inS = s0 + ds * (p.radius + 0.9);
+      if (Math.abs(inF) > veh.length / 2 - 0.3 || Math.abs(inS) > veh.width / 2 - 0.3) return false;
+      _b.set(pos.x + d.x * (p.radius + 0.9), roof, pos.z + d.z * (p.radius + 0.9));
+      this.startVault(_b, 0.34, 'ground', _c.copy(d).multiplyScalar(Math.min(out, 7)));
+      return true;
+    }
+    // Over it: land a stride past the far side, unless a wall is in the way (then onto the roof).
+    const reach = across + 0.6;
+    _c.set(pos.x, roof + 0.6, pos.z);
+    const block = this.world.raycast(_c, d, reach + p.radius);
+    if (block) return false;
+    _b.set(pos.x + d.x * reach, pos.y, pos.z + d.z * reach);
+    const dur = Math.min(0.62, Math.max(0.3, reach / out));
+    this.startVault(_b, dur, 'ground', _c.copy(d).multiplyScalar(out));
+    // (The Bezier's apex is halfway to its control point: this one clears the roof by ~0.3 m.)
+    this.vault.ctrl.set(pos.x + d.x * reach * 0.5, 2 * (roof + 0.3) - pos.y, pos.z + d.z * reach * 0.5);
+    return true;
   }
 
   _wallAtKnee(n) {
@@ -500,6 +652,8 @@ export class Controller {
   // false: running without the sprint only vaults).
   obstacle(n, speed, climb = true) {
     const p = this.p;
+    // (A vehicle's side: see _vaultVehicle; there is nothing to climb.)
+    if (this.contact.vehicle && this.contact.wall) return;
     const ledge = probeLedge(this.world, p.position, n, p.radius, VAULT_MAX, _ledge);
     if (ledge) {
       const rise = ledge.y - p.position.y;
@@ -508,8 +662,8 @@ export class Controller {
       return;
     }
     if (!climb) return;
-    this.wall.enter(n);
-    if (p.state === 'wall' && this.move.y > 0.3) p.velocity.y = Math.max(p.velocity.y, speed * 0.85);
+    // (The arrival's momentum carries on up the wall: see WallMove.enter.)
+    this.wall.enter(n, this.wallImpact);
     // Sprinting into a lip too low to climb with nothing to stand on beyond it (a roof's parapet
     // over the street): hop it and fly on, off the roof (the sprint otherwise stalls against it).
     if (p.state === 'ground') this._hopLip(n, speed);
@@ -600,6 +754,12 @@ export class Controller {
     v.z = dir.z * speed;
     v.y = -4;
     p.position.addScaledVector(v, h);
+    // Standing on a moving vehicle's roof: ride along.
+    const ride = this.onVehicle;
+    if (ride && ride.speed) {
+      p.position.x -= Math.sin(ride.heading) * ride.speed * h;
+      p.position.z -= Math.cos(ride.heading) * ride.speed * h;
+    }
     const x = p.position.x;
     const y = p.position.y;
     const z = p.position.z;
@@ -624,9 +784,13 @@ export class Controller {
         return;
       }
     }
+    // Into a vehicle at a run or sprint: over it (onto a bus).
+    if (res.vehicle && res.wall && !hard && gait && gait !== 'walk' && mag > 0.3 && this.wish.dot(res.wallNormal) < -0.3 * mag) {
+      if (this._vaultVehicle(res.vehicle, res.wallNormal, Math.max(speed, this.wallImpact), gait === 'sprint')) return;
+    }
     // Into a wall: walking just stops (sliding along it); running vaults low obstacles; the sprint
     // also runs up walls.
-    if (res.wall && !hard && gait && gait !== 'walk' && mag > 0.3 && this.wish.dot(res.wallNormal) < -0.45 * mag) {
+    if (res.wall && !res.vehicle && !hard && gait && gait !== 'walk' && mag > 0.3 && this.wish.dot(res.wallNormal) < -0.45 * mag) {
       this.obstacle(res.wallNormal, Math.max(Math.hypot(v.x, v.z), this.wallImpact), gait === 'sprint');
       if (p.state !== 'ground') return;
     }
@@ -637,7 +801,7 @@ export class Controller {
       if (moved < speed * 0.6) {
         // Running into a lip / parapet: vault it (as with a wall) rather than stall against it.
         const dl = Math.hypot(d.x, d.z);
-        if (gait && gait !== 'walk' && dl > 1e-4 && !hard) {
+        if (gait && gait !== 'walk' && dl > 1e-4 && !hard && !res.vehicle) {
           this.obstacle(_b.set(d.x / dl, 0, d.z / dl), speed, false);
           if (this.vault.active) return;
         }
@@ -733,7 +897,7 @@ export class Controller {
     const res = this.collide();
     if (res.ground && this.impactVy >= -0.5) {
       this.land(Math.max(0, this.impactVy));
-    } else if (res.wall && !res.ground && this.wall.wantsToGrab(res.wallNormal, this.wallImpact)) {
+    } else if (res.wall && !res.ground && !res.vehicle && this.wall.wantsToGrab(res.wallNormal, this.wallImpact)) {
       this.obstacle(res.wallNormal, this.wallImpact);
     }
   }
@@ -760,7 +924,7 @@ export class Controller {
       v.z *= 0.2;
     } else if (vy > 13 && hs > 6) {
       this.landMode = 'roll';
-      this.landDur = 0.5;
+      this.landDur = ROLL_TIME;
     } else if (vy > 4) {
       this.landMode = 'soft';
       this.landDur = 0.28;

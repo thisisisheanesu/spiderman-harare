@@ -1,0 +1,5251 @@
+{
+ "version": 1,
+ "generator": "tools/facades (fetch_assets.py, kit_blender.py, atlas_post.py, optimize_kit.cjs)",
+ "conventions": {
+  "units": "metres. Module space = glTF space: x along the wall to the right (seen from the street), y up, +z outward (towards the street). The wall plane / footprint line is z = 0: projections have z > 0, recesses z < 0.",
+  "pivot": "every module node sits at the file origin with identity transform; its pivot is the bottom-left corner of its tiling rectangle [0, width] x [0, height] on the wall plane (corner modules: the footprint corner).",
+  "stretch": "scale a module by (targetWidth / width, targetHeight / height, 1) within stretch.x / stretch.y (metres). UVs of role materials are in metres: recompute them after stretching (tools/facades/kit_builder.js does: front / top faces u = u * sx + offsetAlongWall, front / side faces v = v * sy + floorBase) so textures stay continuous across bays and floors.",
+  "materials": "glTF materials are named by ROLE (wall, trim, accent, plinth, frame, glass, glass_spandrel, metal, roof_sheet, sign, atlas) and hold no textures. types[t].materials[role] gives the PBR set from public/textures/materials.json (texture.repeat = 1 / tileSizeMetres) and the default tint; factor = tintLinear / avgColorLinear is the colour multiplier (may exceed 1; the GLB preview colour is clamped). Palettes list alternative tints seen in the photos.",
+  "glass": "role glass = interior-mapped window (tools/materials/interior_glass.js). TEXCOORD_0 = wall metres (grime), TEXCOORD_1 (three.js uv1) = room coordinates: x = 2 * roomIndex + u (u 0..1 across the room behind the window), y = 0..1 floor to ceiling. winUv = (fract(uv1.x / 2) * 2 ... ) i.e. roomIndex = floor(uv1.x / 2), winUv = (uv1.x - 2 * roomIndex, uv1.y). winData (cell, mirror, light, depth) is chosen per room by the builder (types[t].glassCells, roomDepth).",
+  "sign": "role sign = fascia boards / name panels / canopy fascias: TEXCOORD_0 is 0..1 across the board, for shop-sign textures (anchors.sign gives the rectangle).",
+  "lod": "LOD0 = the module node (<= ~60 m). LOD1 = <node>.lod1: a flat quad (or 2-quad box for corners) UV-mapped into types[t].atlas (orthographic bake of LOD0: albedo, normal, ORM, mask). LOD2 = impostor: types[t].impostor, a tileable 2-bay elevation (ground / 2 middle floors / cap) for plain extruded walls far away.",
+  "atlasTextures": "albedo sRGB RGB (AO partly baked in); normal tangent-space OpenGL (+Y up) RGB, alpha = height above the wall plane (h = (a - 0.5) * 3 m); orm R=AO G=roughness B=metalness; mask R/G/B = weights of the tintable roles wall/trim/accent, A = glass (lossless). Re-tint: albedo_lin * (1 + sum_i mask_i * (factor_i / defaultFactor_i - 1)).",
+  "anchors": "attachment points in module space: ac [[x, y, z]] = bottom-centre of an air-conditioner (place common.ac_window there), bars [{x0, y0, x1, y1, z}] = window rectangles for burglar bars, shutter [{...}] = shop opening for common.shutter, sign [{...}] = sign board rectangle, canopy [[x, y, z]] = underside of a pavement canopy, verandah [[x, y, z]].",
+  "compression": "EXT_meshopt_compression (GLTFLoader.setMeshoptDecoder(MeshoptDecoder)), NORMAL int8 via KHR_mesh_quantization, POSITION/TEXCOORD float32; common.glb textures are WebP (EXT_texture_webp)."
+ },
+ "budget": {
+  "totalBytes": 1269976,
+  "note": "GLBs + atlas / impostor textures of public/models/facades (the shared PBR textures of public/textures are not counted)"
+ },
+ "materials": {
+  "brick_face_red": {
+   "files": {
+    "albedo": "brick/brick_face_red_albedo.webp",
+    "normal": "brick/brick_face_red_normal.webp",
+    "orm": "brick/brick_face_red_orm.webp"
+   },
+   "tileSizeMetres": [
+    1.8,
+    0.9
+   ],
+   "avgColor": "#8a7059",
+   "avgColorLinear": [
+    0.2555,
+    0.1616,
+    0.0991
+   ]
+  },
+  "concrete_painted": {
+   "files": {
+    "albedo": "concrete/concrete_painted_albedo.webp",
+    "normal": "concrete/concrete_painted_normal.webp",
+    "orm": "concrete/concrete_painted_orm.webp"
+   },
+   "tileSizeMetres": [
+    2,
+    2
+   ],
+   "avgColor": "#aba39f",
+   "avgColorLinear": [
+    0.4092,
+    0.367,
+    0.3481
+   ]
+  },
+  "granite_dark_tiles": {
+   "files": {
+    "albedo": "stone/granite_dark_tiles_albedo.webp",
+    "normal": "stone/granite_dark_tiles_normal.webp",
+    "orm": "stone/granite_dark_tiles_orm.webp"
+   },
+   "tileSizeMetres": [
+    2.3,
+    2.3
+   ],
+   "avgColor": "#4e4f4f",
+   "avgColorLinear": [
+    0.0761,
+    0.0779,
+    0.0776
+   ]
+  },
+  "window_frame_aluminium": {
+   "files": {
+    "albedo": "metal/window_frame_aluminium_albedo.webp",
+    "normal": "metal/window_frame_aluminium_normal.webp",
+    "orm": "metal/window_frame_aluminium_orm.webp"
+   },
+   "tileSizeMetres": [
+    1,
+    1
+   ],
+   "avgColor": "#929598",
+   "avgColorLinear": [
+    0.2888,
+    0.2995,
+    0.3157
+   ]
+  },
+  "window_glass": {
+   "files": {
+    "albedo": "glass/window_glass_albedo.webp",
+    "normal": "glass/window_glass_normal.webp",
+    "orm": "glass/window_glass_orm.webp"
+   },
+   "tileSizeMetres": [
+    3,
+    3
+   ],
+   "avgColor": "#b5afa6",
+   "avgColorLinear": [
+    0.4613,
+    0.4293,
+    0.3822
+   ]
+  },
+  "metal_panel": {
+   "files": {
+    "albedo": "metal/metal_panel_albedo.webp",
+    "normal": "metal/metal_panel_normal.webp",
+    "orm": "metal/metal_panel_orm.webp"
+   },
+   "tileSizeMetres": [
+    4.8,
+    4.8
+   ],
+   "avgColor": "#a3a8ad",
+   "avgColorLinear": [
+    0.3671,
+    0.3891,
+    0.4182
+   ]
+  },
+  "concrete_weathered": {
+   "files": {
+    "albedo": "concrete/concrete_weathered_albedo.webp",
+    "normal": "concrete/concrete_weathered_normal.webp",
+    "orm": "concrete/concrete_weathered_orm.webp"
+   },
+   "tileSizeMetres": [
+    2.16,
+    2.16
+   ],
+   "avgColor": "#8b836e",
+   "avgColorLinear": [
+    0.2576,
+    0.2259,
+    0.1566
+   ]
+  },
+  "granite_cladding_light": {
+   "files": {
+    "albedo": "stone/granite_cladding_light_albedo.webp",
+    "normal": "stone/granite_cladding_light_normal.webp",
+    "orm": "stone/granite_cladding_light_orm.webp"
+   },
+   "tileSizeMetres": [
+    2.4,
+    2.4
+   ],
+   "avgColor": "#b4b3ad",
+   "avgColorLinear": [
+    0.4579,
+    0.4484,
+    0.418
+   ]
+  },
+  "corrugated_weathered": {
+   "files": {
+    "albedo": "roof/corrugated_weathered_albedo.webp",
+    "normal": "roof/corrugated_weathered_normal.webp",
+    "orm": "roof/corrugated_weathered_orm.webp"
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#797876",
+   "avgColorLinear": [
+    0.1927,
+    0.1882,
+    0.1801
+   ]
+  },
+  "_note": "files are relative to public/textures/ (shared with the city; not duplicated here)"
+ },
+ "types": {
+  "ribbon": {
+   "title": "Ribbon-window office slab (1950s-70s)",
+   "file": "ribbon.glb",
+   "bay": 3,
+   "floor": 3.4,
+   "groundFloor": 4.4,
+   "cap": 1,
+   "materials": {
+    "wall": {
+     "pbr": "brick_face_red",
+     "tint": "#7e4a3a",
+     "tintLinear": [
+      0.2086,
+      0.0685,
+      0.0423
+     ],
+     "factor": [
+      0.8164,
+      0.4239,
+      0.4268
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "concrete_painted",
+     "tint": "#d9d5cc",
+     "tintLinear": [
+      0.6939,
+      0.6654,
+      0.6038
+     ],
+     "factor": [
+      1.6957,
+      1.8131,
+      1.7346
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "concrete_painted",
+     "tint": "#7fa39c",
+     "tintLinear": [
+      0.2122,
+      0.3663,
+      0.3325
+     ],
+     "factor": [
+      0.5186,
+      0.9981,
+      0.9552
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#e4e2dc",
+     "tintLinear": [
+      0.7758,
+      0.7605,
+      0.7157
+     ],
+     "factor": [
+      2.6863,
+      2.5392,
+      2.267
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#5f7480",
+     "tintLinear": [
+      0.1144,
+      0.1746,
+      0.2159
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3a3d40",
+     "tintLinear": [
+      0.0423,
+      0.0467,
+      0.0513
+     ],
+     "factor": [
+      0.1465,
+      0.1559,
+      0.1625
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "accent": [
+     "#7fa39c",
+     "#8eaec2",
+     "#c8935e",
+     "#d6cda9",
+     "#9fb59a"
+    ],
+    "trim": [
+     "#d9d5cc",
+     "#cfc6b4",
+     "#e3dfd6"
+    ],
+    "wall": [
+     "#7e4a3a",
+     "#8e8d88",
+     "#a58f76"
+    ]
+   },
+   "glassCells": [
+    0,
+    1,
+    1,
+    7
+   ],
+   "roomDepth": 1.6,
+   "rules": {
+    "middle": {
+     "bay": 6,
+     "bay_hood": 0
+    },
+    "middle_alt": {
+     "bay_hood": 1
+    },
+    "ground": {
+     "shop": 6,
+     "entrance": 1,
+     "ground_blank": 0.5
+    },
+    "top": "cap",
+    "end_wall": "blank",
+    "corner": "corner",
+    "canopy": 0.8,
+    "attachments": {
+     "ac": 0.28,
+     "bars": 0,
+     "pipe": 18
+    }
+   },
+   "references": [
+    {
+     "photo": "wc_Harare_Zimbabwe_04.jpg",
+     "shows": "Throgmorton House: mint-teal spandrel panels under continuous white aluminium ribbon windows, face-brick end wall with vertical letters, window AC units, pavement canopy",
+     "title": "Harare, Zimbabwe. 04.JPG",
+     "author": "Suesen",
+     "licence": "CC BY-SA 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._04.JPG",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_e504fe94_Harare_4.jpg",
+     "shows": "slab tower with orange-tan spandrel bands and grey mosaic end walls",
+     "title": "Harare 4",
+     "author": "SqueakyMarmot",
+     "licence": "CC BY-SA 2.0",
+     "url": "https://www.flickr.com/photos/37804160@N00/14685506386",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_8b8ae35f_Harare_3.jpg",
+     "shows": "tan ribbon-window slab tower above the jacaranda canopy",
+     "title": "Harare 3",
+     "author": "SqueakyMarmot",
+     "licence": "CC BY-SA 2.0",
+     "url": "https://www.flickr.com/photos/37804160@N00/14521848209",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_CBD.jpg",
+     "shows": "Batanai Gardens (Jason Moyo / First St): continuous sloped green sunshade hoods over ribbon windows (bay_hood)",
+     "title": "Harare CBD.jpg",
+     "author": "Agororo1",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare_CBD.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Mapillary_138205998291259_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+     "shows": "beige office slab with sloped hoods, AC units and a cantilevered pavement canopy",
+     "title": "Mapillary (138205998291259, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H13M11S000.jpg",
+     "author": "rubynikki",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(138205998291259,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H13M11S000.jpg",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "ribbon_bay",
+     "lod1Node": "ribbon_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.07,
+      "in": 0.1
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "accent",
+      "metal",
+      "frame",
+      "glass"
+     ],
+     "tris": [
+      66,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        0.5,
+        1.012,
+        -0.1
+       ],
+       [
+        2.5,
+        1.012,
+        -0.1
+       ]
+      ]
+     },
+     "notes": "ribbon window bay: spandrel panels (accent) under continuous aluminium ribbon glazing",
+     "interior": "office"
+    },
+    "bay_hood": {
+     "node": "ribbon_bay_hood",
+     "lod1Node": "ribbon_bay_hood_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.62,
+      "in": 0.1
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "accent",
+      "metal",
+      "frame",
+      "glass"
+     ],
+     "tris": [
+      78,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        0.5,
+        1.012,
+        -0.1
+       ],
+       [
+        2.5,
+        1.012,
+        -0.1
+       ]
+      ]
+     },
+     "notes": "ribbon window bay: spandrel panels (accent) under continuous aluminium ribbon glazing, sloped sunshade hood",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "ribbon_cap",
+     "lod1Node": "ribbon_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3,
+     "height": 1,
+     "depth": {
+      "out": 0.07,
+      "in": 0.25
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       0.6,
+       2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "accent"
+     ],
+     "tris": [
+      16,
+      2
+     ],
+     "anchors": {},
+     "notes": "slab band + spandrel-coloured parapet + coping"
+    },
+    "blank": {
+     "node": "ribbon_blank",
+     "lod1Node": "ribbon_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "pier": {
+     "node": "ribbon_pier",
+     "lod1Node": "ribbon_pier_lod1",
+     "kind": "pier",
+     "floor": "any",
+     "width": 0.6,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.15,
+       2.4
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "narrow filler strip to absorb leftover edge length"
+    },
+    "corner": {
+     "node": "ribbon_corner",
+     "lod1Node": "ribbon_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.45,
+     "height": 3.4,
+     "depth": {
+      "out": 0.05,
+      "in": 0.45
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "shop": {
+     "node": "ribbon_shop",
+     "lod1Node": "ribbon_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "sign",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 2.825,
+        "y1": 3.35,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 3.8,
+        "x1": 2.825,
+        "y1": 4.4,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        3.85,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "ribbon_entrance",
+     "lod1Node": "ribbon_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.6,
+     "height": 4.4,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.88,
+       5.04
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    },
+    "ground_blank": {
+     "node": "ribbon_ground_blank",
+     "lod1Node": "ribbon_ground_blank_lod1",
+     "kind": "blank",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.03,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall"
+     ],
+     "tris": [
+      6,
+      2
+     ],
+     "anchors": {},
+     "notes": "blank ground-floor wall with plinth"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/ribbon_atlas_albedo.webp",
+    "normal": "tex/ribbon_atlas_normal.webp",
+    "orm": "tex/ribbon_atlas_orm.webp",
+    "mask": "tex/ribbon_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 10.8649,
+    "pxPerMetre": 94.2485,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       273.86,
+       282.75,
+       320.44
+      ],
+      "uv": [
+       0.0049,
+       0.2674,
+       0.281,
+       0.5804
+      ]
+     },
+     "bay_hood": {
+      "px": [
+       297.75,
+       273.86,
+       282.75,
+       320.44
+      ],
+      "uv": [
+       0.2908,
+       0.2674,
+       0.5669,
+       0.5804
+      ]
+     },
+     "cap": {
+      "px": [
+       5,
+       169.61,
+       282.75,
+       94.25
+      ],
+      "uv": [
+       0.0049,
+       0.1656,
+       0.281,
+       0.2577
+      ]
+     },
+     "blank": {
+      "px": [
+       590.49,
+       273.86,
+       282.75,
+       320.44
+      ],
+      "uv": [
+       0.5767,
+       0.2674,
+       0.8528,
+       0.5804
+      ]
+     },
+     "pier": {
+      "px": [
+       883.24,
+       273.86,
+       56.55,
+       320.44
+      ],
+      "uv": [
+       0.8625,
+       0.2674,
+       0.9178,
+       0.5804
+      ]
+     },
+     "corner": {
+      "px": [
+       949.79,
+       273.86,
+       47.12,
+       320.44
+      ],
+      "uv": [
+       0.9275,
+       0.2674,
+       0.9735,
+       0.5804
+      ]
+     },
+     "shop": {
+      "px": [
+       5,
+       604.31,
+       282.75,
+       414.69
+      ],
+      "uv": [
+       0.0049,
+       0.5901,
+       0.281,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       297.75,
+       604.31,
+       339.29,
+       414.69
+      ],
+      "uv": [
+       0.2908,
+       0.5901,
+       0.6221,
+       0.9951
+      ]
+     },
+     "ground_blank": {
+      "px": [
+       647.04,
+       604.31,
+       282.75,
+       414.69
+      ],
+      "uv": [
+       0.6319,
+       0.5901,
+       0.908,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/ribbon_imp_albedo.webp",
+    "normal": "tex/ribbon_imp_normal.webp",
+    "orm": "tex/ribbon_imp_orm.webp",
+    "mask": "tex/ribbon_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6,
+    "heightMetres": 12.2,
+    "rows": {
+     "ground": [
+      0.6393,
+      1
+     ],
+     "middle": [
+      0.082,
+      0.6393
+     ],
+     "cap": [
+      0,
+      0.082
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.4
+     ],
+     "middle": [
+      4.4,
+      11.2
+     ],
+     "cap": [
+      11.2,
+      12.2
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "shop",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 51848,
+    "textures": {
+     "atlas": {
+      "albedo": 67872,
+      "normal": 41464,
+      "orm": 25516,
+      "mask": 16258
+     },
+     "impostor": {
+      "albedo": 7348,
+      "normal": 4940,
+      "orm": 3928,
+      "mask": 20162
+     }
+    }
+   }
+  },
+  "fins": {
+   "title": "Vertical-fin / brise-soleil office block (1960s-70s)",
+   "file": "fins.glb",
+   "bay": 3,
+   "floor": 3.4,
+   "groundFloor": 4.4,
+   "cap": 1.2,
+   "materials": {
+    "wall": {
+     "pbr": "concrete_painted",
+     "tint": "#d3cab8",
+     "tintLinear": [
+      0.6514,
+      0.5906,
+      0.4793
+     ],
+     "factor": [
+      1.5919,
+      1.6093,
+      1.3769
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "concrete_weathered",
+     "tint": "#bdb5a4",
+     "tintLinear": [
+      0.5089,
+      0.4621,
+      0.3712
+     ],
+     "factor": [
+      1.9755,
+      2.0456,
+      2.3704
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "concrete_painted",
+     "tint": "#e2ddd0",
+     "tintLinear": [
+      0.7605,
+      0.7231,
+      0.6308
+     ],
+     "factor": [
+      1.8585,
+      1.9703,
+      1.8121
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#8f9396",
+     "tintLinear": [
+      0.2747,
+      0.2918,
+      0.305
+     ],
+     "factor": [
+      0.9512,
+      0.9743,
+      0.9661
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#56646c",
+     "tintLinear": [
+      0.0931,
+      0.1274,
+      0.15
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3a3d40",
+     "tintLinear": [
+      0.0423,
+      0.0467,
+      0.0513
+     ],
+     "factor": [
+      0.1465,
+      0.1559,
+      0.1625
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "accent": [
+     "#e2ddd0",
+     "#c9c8c2",
+     "#d8c49c",
+     "#b9a585"
+    ],
+    "wall": [
+     "#d3cab8",
+     "#c4c2bb",
+     "#cdb891"
+    ],
+    "trim": [
+     "#bdb5a4",
+     "#a9a79f"
+    ]
+   },
+   "glassCells": [
+    0,
+    1,
+    0,
+    7
+   ],
+   "roomDepth": 1.6,
+   "rules": {
+    "middle": {
+     "bay": 1
+    },
+    "middle_alt": {
+     "bay_angled": 1
+    },
+    "ground": {
+     "shop": 6,
+     "entrance": 1,
+     "ground_blank": 0.5
+    },
+    "top": "cap",
+    "end_wall": "blank",
+    "corner": "corner",
+    "canopy": 0.7,
+    "attachments": {
+     "ac": 0.12,
+     "pipe": 20
+    }
+   },
+   "references": [
+    {
+     "photo": "ov_7ee7b21e_P1000988.jpg",
+     "shows": "left: beige office block with close full-height concrete fins; right: tan block with deep fins",
+     "title": "P1000988",
+     "author": "damien_farrell",
+     "licence": "Public Domain Mark",
+     "url": "https://www.flickr.com/photos/92094658@N00/7661984166",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_First_Street_Harare_Zimbabwe.jpg",
+     "shows": "left: grey 1970s block with angled sawtooth fins (bay_angled)",
+     "title": "First Street, Harare, Zimbabwe.jpg",
+     "author": "Gary Bembridge",
+     "licence": "CC BY 2.0",
+     "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_Downtown1.jpg",
+     "shows": "left: grey office block with fins and deep spandrels (Samora Machel)",
+     "title": "Harare Downtown1.jpg",
+     "author": "Macvivo at English Wikipedia (Original text: Samwise Gamgee)",
+     "licence": "CC BY-SA 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare_Downtown1.jpg",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "fins_bay",
+     "lod1Node": "fins_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.6,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "glass",
+      "frame",
+      "accent"
+     ],
+     "tris": [
+      74,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        1.5,
+        0.95,
+        -0.12
+       ]
+      ]
+     },
+     "notes": "bay with two full-height fins 0.6 m deep",
+     "interior": "office"
+    },
+    "bay_angled": {
+     "node": "fins_bay_angled",
+     "lod1Node": "fins_bay_angled_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.55,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "glass",
+      "frame",
+      "accent"
+     ],
+     "tris": [
+      82,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        1.5,
+        0.95,
+        -0.12
+       ]
+      ]
+     },
+     "notes": "bay with two angled (sawtooth) fins",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "fins_cap",
+     "lod1Node": "fins_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3,
+     "height": 1.2,
+     "depth": {
+      "out": 0.65,
+      "in": 0.2
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       0.8,
+       2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "accent",
+      "trim",
+      "wall"
+     ],
+     "tris": [
+      32,
+      2
+     ],
+     "anchors": {},
+     "notes": "cap: fins stop under a deep beam"
+    },
+    "blank": {
+     "node": "fins_blank",
+     "lod1Node": "fins_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "pier": {
+     "node": "fins_pier",
+     "lod1Node": "fins_pier_lod1",
+     "kind": "pier",
+     "floor": "any",
+     "width": 0.6,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.15,
+       2.4
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "narrow filler strip to absorb leftover edge length"
+    },
+    "corner": {
+     "node": "fins_corner",
+     "lod1Node": "fins_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.5,
+     "height": 3.4,
+     "depth": {
+      "out": 0.05,
+      "in": 0.5
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "shop": {
+     "node": "fins_shop",
+     "lod1Node": "fins_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "accent",
+      "sign",
+      "trim",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 2.825,
+        "y1": 3.35,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 3.8,
+        "x1": 2.825,
+        "y1": 4.4,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        3.85,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "fins_entrance",
+     "lod1Node": "fins_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.6,
+     "height": 4.4,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.88,
+       5.04
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "plinth",
+      "glass",
+      "frame",
+      "trim"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    },
+    "ground_blank": {
+     "node": "fins_ground_blank",
+     "lod1Node": "fins_ground_blank_lod1",
+     "kind": "blank",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.03,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall"
+     ],
+     "tris": [
+      6,
+      2
+     ],
+     "anchors": {},
+     "notes": "blank ground-floor wall with plinth"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/fins_atlas_albedo.webp",
+    "normal": "tex/fins_atlas_normal.webp",
+    "orm": "tex/fins_atlas_orm.webp",
+    "mask": "tex/fins_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 10.9173,
+    "pxPerMetre": 93.7958,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       277.39,
+       281.39,
+       318.91
+      ],
+      "uv": [
+       0.0049,
+       0.2709,
+       0.2797,
+       0.5823
+      ]
+     },
+     "bay_angled": {
+      "px": [
+       296.39,
+       277.39,
+       281.39,
+       318.91
+      ],
+      "uv": [
+       0.2894,
+       0.2709,
+       0.5642,
+       0.5823
+      ]
+     },
+     "cap": {
+      "px": [
+       5,
+       154.84,
+       281.39,
+       112.55
+      ],
+      "uv": [
+       0.0049,
+       0.1512,
+       0.2797,
+       0.2611
+      ]
+     },
+     "blank": {
+      "px": [
+       587.77,
+       277.39,
+       281.39,
+       318.91
+      ],
+      "uv": [
+       0.574,
+       0.2709,
+       0.8488,
+       0.5823
+      ]
+     },
+     "pier": {
+      "px": [
+       879.16,
+       277.39,
+       56.28,
+       318.91
+      ],
+      "uv": [
+       0.8586,
+       0.2709,
+       0.9135,
+       0.5823
+      ]
+     },
+     "corner": {
+      "px": [
+       945.44,
+       277.39,
+       51.59,
+       318.91
+      ],
+      "uv": [
+       0.9233,
+       0.2709,
+       0.9737,
+       0.5823
+      ]
+     },
+     "shop": {
+      "px": [
+       5,
+       606.3,
+       281.39,
+       412.7
+      ],
+      "uv": [
+       0.0049,
+       0.5921,
+       0.2797,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       296.39,
+       606.3,
+       337.66,
+       412.7
+      ],
+      "uv": [
+       0.2894,
+       0.5921,
+       0.6192,
+       0.9951
+      ]
+     },
+     "ground_blank": {
+      "px": [
+       644.05,
+       606.3,
+       281.39,
+       412.7
+      ],
+      "uv": [
+       0.629,
+       0.5921,
+       0.9037,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/fins_imp_albedo.webp",
+    "normal": "tex/fins_imp_normal.webp",
+    "orm": "tex/fins_imp_orm.webp",
+    "mask": "tex/fins_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6,
+    "heightMetres": 12.4,
+    "rows": {
+     "ground": [
+      0.6452,
+      1
+     ],
+     "middle": [
+      0.0968,
+      0.6452
+     ],
+     "cap": [
+      0,
+      0.0968
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.4
+     ],
+     "middle": [
+      4.4,
+      11.2
+     ],
+     "cap": [
+      11.2,
+      12.399999999999999
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "shop",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 55248,
+    "textures": {
+     "atlas": {
+      "albedo": 34410,
+      "normal": 37674,
+      "orm": 11106,
+      "mask": 18234
+     },
+     "impostor": {
+      "albedo": 8490,
+      "normal": 8512,
+      "orm": 5388,
+      "mask": 23778
+     }
+    }
+   }
+  },
+  "eggcrate": {
+   "title": "Deep egg-crate concrete sunshade grid (1960s-70s)",
+   "file": "eggcrate.glb",
+   "bay": 3.3,
+   "floor": 3.4,
+   "groundFloor": 4.4,
+   "cap": 1.1,
+   "materials": {
+    "wall": {
+     "pbr": "concrete_painted",
+     "tint": "#e4e0d7",
+     "tintLinear": [
+      0.7758,
+      0.7454,
+      0.6795
+     ],
+     "factor": [
+      1.8959,
+      2.0311,
+      1.952
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "concrete_painted",
+     "tint": "#dcd7cc",
+     "tintLinear": [
+      0.7157,
+      0.6795,
+      0.6038
+     ],
+     "factor": [
+      1.749,
+      1.8515,
+      1.7346
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "concrete_weathered",
+     "tint": "#8d7a66",
+     "tintLinear": [
+      0.2664,
+      0.1946,
+      0.1329
+     ],
+     "factor": [
+      1.0342,
+      0.8614,
+      0.8487
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#9a9d9f",
+     "tintLinear": [
+      0.3231,
+      0.3372,
+      0.3467
+     ],
+     "factor": [
+      1.1188,
+      1.1259,
+      1.0982
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#56646c",
+     "tintLinear": [
+      0.0931,
+      0.1274,
+      0.15
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3a3d40",
+     "tintLinear": [
+      0.0423,
+      0.0467,
+      0.0513
+     ],
+     "factor": [
+      0.1465,
+      0.1559,
+      0.1625
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "wall": [
+     "#e4e0d7",
+     "#d9cdb5",
+     "#cfc9bf"
+    ],
+    "accent": [
+     "#8d7a66",
+     "#6f7478",
+     "#a8583f",
+     "#c9c2b3"
+    ]
+   },
+   "glassCells": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "roomDepth": 1.5,
+   "rules": {
+    "middle": {
+     "bay": 3,
+     "bay_divided": 1
+    },
+    "ground": {
+     "shop": 6,
+     "entrance": 1
+    },
+    "top": "cap",
+    "end_wall": "blank",
+    "corner": "corner",
+    "canopy": 0.7,
+    "attachments": {
+     "ac": 0.1,
+     "pipe": 0
+    }
+   },
+   "references": [
+    {
+     "photo": "wc_Harare_CBD.jpg",
+     "shows": "tower behind Edgars: deep concrete egg-crate grid of shelves and fins",
+     "title": "Harare CBD.jpg",
+     "author": "Agororo1",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare_CBD.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_First_Street_Harare_Zimbabwe_2.jpg",
+     "shows": "white egg-crate grid (top right, First Street Mall)",
+     "title": "First Street, Harare, Zimbabwe 2.jpg",
+     "author": "Gary Bembridge",
+     "licence": "CC BY 2.0",
+     "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe_2.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare.jpg",
+     "shows": "left: white grid block with brick end walls (1995)",
+     "title": "Harare.jpg",
+     "author": "No machine-readable author provided. Greenmnm69 assumed (based on copyright claims).",
+     "licence": "CC BY-SA 2.5",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Mapillary_138205998291259_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+     "shows": "left: white balcony / grid tower on a brick base",
+     "title": "Mapillary (138205998291259, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H13M11S000.jpg",
+     "author": "rubynikki",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(138205998291259,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H13M11S000.jpg",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "eggcrate_bay",
+     "lod1Node": "eggcrate_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.8,
+      "in": 0.08
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "wall",
+      "accent",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      60,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        0.825,
+        0.95,
+        -0.08
+       ]
+      ]
+     },
+     "notes": "egg-crate bay: 0.8 m deep shelf + fins",
+     "interior": "office"
+    },
+    "bay_divided": {
+     "node": "eggcrate_bay_divided",
+     "lod1Node": "eggcrate_bay_divided_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.4,
+     "depth": {
+      "out": 0.8,
+      "in": 0.08
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "wall",
+      "accent",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      66,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        0.825,
+        0.95,
+        -0.08
+       ]
+      ]
+     },
+     "notes": "egg-crate bay: 0.8 m deep shelf + fins + central blade",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "eggcrate_cap",
+     "lod1Node": "eggcrate_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3.3,
+     "height": 1.1,
+     "depth": {
+      "out": 0.8,
+      "in": 0.25
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       0.6,
+       2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "wall",
+      "accent"
+     ],
+     "tris": [
+      24,
+      2
+     ],
+     "anchors": {},
+     "notes": "egg-crate cap: last shelf, fins and top slab"
+    },
+    "blank": {
+     "node": "eggcrate_blank",
+     "lod1Node": "eggcrate_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "pier": {
+     "node": "eggcrate_pier",
+     "lod1Node": "eggcrate_pier_lod1",
+     "kind": "pier",
+     "floor": "any",
+     "width": 0.6,
+     "height": 3.4,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.15,
+       2.4
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "narrow filler strip to absorb leftover edge length"
+    },
+    "corner": {
+     "node": "eggcrate_corner",
+     "lod1Node": "eggcrate_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.4,
+     "height": 3.4,
+     "depth": {
+      "out": 0.8,
+      "in": 0.4
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "shop": {
+     "node": "eggcrate_shop",
+     "lod1Node": "eggcrate_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "sign",
+      "trim",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 3.125,
+        "y1": 3.35,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 3.8,
+        "x1": 3.125,
+        "y1": 4.4,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        3.85,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "eggcrate_entrance",
+     "lod1Node": "eggcrate_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.96,
+     "height": 4.4,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       3.168,
+       5.544
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "plinth",
+      "glass",
+      "frame",
+      "trim"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    },
+    "ground_blank": {
+     "node": "eggcrate_ground_blank",
+     "lod1Node": "eggcrate_ground_blank_lod1",
+     "kind": "blank",
+     "floor": "ground",
+     "width": 3.3,
+     "height": 4.4,
+     "depth": {
+      "out": 0.03,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall"
+     ],
+     "tris": [
+      6,
+      2
+     ],
+     "anchors": {},
+     "notes": "blank ground-floor wall with plinth"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/eggcrate_atlas_albedo.webp",
+    "normal": "tex/eggcrate_atlas_normal.webp",
+    "orm": "tex/eggcrate_atlas_orm.webp",
+    "mask": "tex/eggcrate_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 11.5462,
+    "pxPerMetre": 88.6869,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       317.24,
+       292.67,
+       301.54
+      ],
+      "uv": [
+       0.0049,
+       0.3098,
+       0.2907,
+       0.6043
+      ]
+     },
+     "bay_divided": {
+      "px": [
+       307.67,
+       317.24,
+       292.67,
+       301.54
+      ],
+      "uv": [
+       0.3005,
+       0.3098,
+       0.5863,
+       0.6043
+      ]
+     },
+     "cap": {
+      "px": [
+       121.42,
+       209.69,
+       292.67,
+       97.56
+      ],
+      "uv": [
+       0.1186,
+       0.2048,
+       0.4044,
+       0.3
+      ]
+     },
+     "blank": {
+      "px": [
+       610.33,
+       317.24,
+       292.67,
+       301.54
+      ],
+      "uv": [
+       0.596,
+       0.3098,
+       0.8818,
+       0.6043
+      ]
+     },
+     "pier": {
+      "px": [
+       913,
+       317.24,
+       53.21,
+       301.54
+      ],
+      "uv": [
+       0.8916,
+       0.3098,
+       0.9436,
+       0.6043
+      ]
+     },
+     "corner": {
+      "px": [
+       5,
+       5.71,
+       106.42,
+       301.54
+      ],
+      "uv": [
+       0.0049,
+       0.0056,
+       0.1088,
+       0.3
+      ]
+     },
+     "shop": {
+      "px": [
+       5,
+       628.78,
+       292.67,
+       390.22
+      ],
+      "uv": [
+       0.0049,
+       0.614,
+       0.2907,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       307.67,
+       628.78,
+       351.2,
+       390.22
+      ],
+      "uv": [
+       0.3005,
+       0.614,
+       0.6434,
+       0.9951
+      ]
+     },
+     "ground_blank": {
+      "px": [
+       668.87,
+       628.78,
+       292.67,
+       390.22
+      ],
+      "uv": [
+       0.6532,
+       0.614,
+       0.939,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/eggcrate_imp_albedo.webp",
+    "normal": "tex/eggcrate_imp_normal.webp",
+    "orm": "tex/eggcrate_imp_orm.webp",
+    "mask": "tex/eggcrate_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6.6,
+    "heightMetres": 12.3,
+    "rows": {
+     "ground": [
+      0.6423,
+      1
+     ],
+     "middle": [
+      0.0894,
+      0.6423
+     ],
+     "cap": [
+      0,
+      0.0894
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.4
+     ],
+     "middle": [
+      4.4,
+      11.2
+     ],
+     "cap": [
+      11.2,
+      12.299999999999999
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "shop",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 56924,
+    "textures": {
+     "atlas": {
+      "albedo": 34186,
+      "normal": 35364,
+      "orm": 10684,
+      "mask": 16478
+     },
+     "impostor": {
+      "albedo": 7264,
+      "normal": 7458,
+      "orm": 4724,
+      "mask": 16762
+     }
+    }
+   }
+  },
+  "curtain": {
+   "title": "Blue / teal curtain-wall glass tower with granite piers (1980s-2000s)",
+   "file": "curtain.glb",
+   "bay": 3,
+   "floor": 3.6,
+   "groundFloor": 4.8,
+   "cap": 1.5,
+   "materials": {
+    "wall": {
+     "pbr": "granite_cladding_light",
+     "tint": "#b8b5b1",
+     "tintLinear": [
+      0.4793,
+      0.4621,
+      0.4397
+     ],
+     "factor": [
+      1.0467,
+      1.0306,
+      1.0519
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "granite_cladding_light",
+     "tint": "#9ea09e",
+     "tintLinear": [
+      0.3419,
+      0.3515,
+      0.3419
+     ],
+     "factor": [
+      0.7467,
+      0.7839,
+      0.8179
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "metal_panel",
+     "tint": "#8b9399",
+     "tintLinear": [
+      0.2582,
+      0.2918,
+      0.3185
+     ],
+     "factor": [
+      0.7034,
+      0.7499,
+      0.7616
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#9aa3a8",
+     "tintLinear": [
+      0.3231,
+      0.3663,
+      0.3916
+     ],
+     "factor": [
+      1.1188,
+      1.223,
+      1.2404
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#5177a4",
+     "tintLinear": [
+      0.0823,
+      0.1845,
+      0.3712
+     ],
+     "uv": "metres"
+    },
+    "glass_spandrel": {
+     "pbr": "window_glass",
+     "tint": "#3d5a78",
+     "tintLinear": [
+      0.0467,
+      0.1022,
+      0.1878
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3a3d40",
+     "tintLinear": [
+      0.0423,
+      0.0467,
+      0.0513
+     ],
+     "factor": [
+      0.1465,
+      0.1559,
+      0.1625
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "glass": [
+     "#5177a4",
+     "#5b808c",
+     "#4f7a88",
+     "#3f6f9a",
+     "#5a7189"
+    ],
+    "wall": [
+     "#b8b5b1",
+     "#c9c4ba",
+     "#9d9e9c"
+    ]
+   },
+   "glassCells": [
+    0,
+    0,
+    1,
+    0
+   ],
+   "roomDepth": 2,
+   "rules": {
+    "middle": {
+     "bay": 1
+    },
+    "ground": {
+     "lobby": 3,
+     "shop": 2,
+     "entrance": 1
+    },
+    "top": "cap",
+    "end_wall": "pier",
+    "corner": "corner",
+    "pier_every": 4,
+    "canopy": 0.2,
+    "attachments": {
+     "ac": 0,
+     "pipe": 0
+    }
+   },
+   "references": [
+    {
+     "photo": "wc_Harare_Zimbabwe_04.jpg",
+     "shows": "blue reflective curtain-wall tower with wide light-grey corner piers",
+     "title": "Harare, Zimbabwe. 04.JPG",
+     "author": "Suesen",
+     "licence": "CC BY-SA 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._04.JPG",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_The_Avenues_Harare.jpg",
+     "shows": "blue-glass tower with a white needle spire (probably Karigamombe Centre)",
+     "title": "The Avenues, Harare.jpg",
+     "author": "Maipo",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:The_Avenues,_Harare.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_7ee7b21e_P1000988.jpg",
+     "shows": "Reserve Bank: teal curtain glass between slim granite piers",
+     "title": "P1000988",
+     "author": "damien_farrell",
+     "licence": "Public Domain Mark",
+     "url": "https://www.flickr.com/photos/92094658@N00/7661984166",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_Zimbabwe_02.jpg",
+     "shows": "curved blue curtain-wall office on Samora Machel Ave",
+     "title": "Harare, Zimbabwe. 02.JPG",
+     "author": "Suesen",
+     "licence": "CC BY-SA 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._02.JPG",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Downtown_Harare.jpg",
+     "shows": "dark glass curtain-wall block (left)",
+     "title": "Downtown Harare.jpg",
+     "author": "Croquant",
+     "licence": "CC BY 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Downtown_Harare.jpg",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "curtain_bay",
+     "lod1Node": "curtain_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.6,
+     "depth": {
+      "out": 0.09,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "glass_spandrel",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      30,
+      2
+     ],
+     "anchors": {},
+     "notes": "stick curtain wall: vision glass over opaque spandrel glass, mullion caps",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "curtain_cap",
+     "lod1Node": "curtain_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3,
+     "height": 1.5,
+     "depth": {
+      "out": 0.2,
+      "in": 0.2
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       0.8,
+       3
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "glass_spandrel",
+      "frame",
+      "wall",
+      "trim"
+     ],
+     "tris": [
+      42,
+      2
+     ],
+     "anchors": {},
+     "notes": "curtain-wall crown: spandrel glass + granite coping band"
+    },
+    "pier": {
+     "node": "curtain_pier",
+     "lod1Node": "curtain_pier_lod1",
+     "kind": "pier",
+     "floor": "middle",
+     "width": 1.2,
+     "height": 3.6,
+     "depth": {
+      "out": 0.155,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.5,
+       2.6
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim"
+     ],
+     "tris": [
+      8,
+      2
+     ],
+     "anchors": {},
+     "notes": "granite-clad pier (1.2 m nominal): between curtain-wall runs, at ends"
+    },
+    "blank": {
+     "node": "curtain_blank",
+     "lod1Node": "curtain_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3,
+     "height": 3.6,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "corner": {
+     "node": "curtain_corner",
+     "lod1Node": "curtain_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.9,
+     "height": 3.6,
+     "depth": {
+      "out": 0.15,
+      "in": 0.9
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "lobby": {
+     "node": "curtain_lobby",
+     "lod1Node": "curtain_lobby_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.8,
+     "depth": {
+      "out": 0.1,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      30,
+      2
+     ],
+     "anchors": {},
+     "notes": "full-height glazed lobby / showroom bay",
+     "interior": "lobby"
+    },
+    "shop": {
+     "node": "curtain_shop",
+     "lod1Node": "curtain_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3,
+     "height": 4.8,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.55,
+       3.75
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "sign",
+      "trim",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 2.825,
+        "y1": 3.75,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 4.2,
+        "x1": 2.825,
+        "y1": 4.8,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        4.25,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "curtain_entrance",
+     "lod1Node": "curtain_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.6,
+     "height": 4.8,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.88,
+       5.04
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "plinth",
+      "glass",
+      "frame",
+      "trim"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    },
+    "ground_pier": {
+     "node": "curtain_ground_pier",
+     "lod1Node": "curtain_ground_pier_lod1",
+     "kind": "pier",
+     "floor": "ground",
+     "width": 1.2,
+     "height": 4.8,
+     "depth": {
+      "out": 0.155,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.5,
+       2.6
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim"
+     ],
+     "tris": [
+      8,
+      2
+     ],
+     "anchors": {},
+     "notes": "granite-clad pier (1.2 m nominal): between curtain-wall runs, at ends"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/curtain_atlas_albedo.webp",
+    "normal": "tex/curtain_atlas_normal.webp",
+    "orm": "tex/curtain_atlas_orm.webp",
+    "mask": "tex/curtain_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 11.2973,
+    "pxPerMetre": 90.6413,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       247.61,
+       271.92,
+       326.31
+      ],
+      "uv": [
+       0.0049,
+       0.2418,
+       0.2704,
+       0.5605
+      ]
+     },
+     "cap": {
+      "px": [
+       5,
+       101.65,
+       271.92,
+       135.96
+      ],
+      "uv": [
+       0.0049,
+       0.0993,
+       0.2704,
+       0.232
+      ]
+     },
+     "pier": {
+      "px": [
+       286.92,
+       247.61,
+       108.77,
+       326.31
+      ],
+      "uv": [
+       0.2802,
+       0.2418,
+       0.3864,
+       0.5605
+      ]
+     },
+     "blank": {
+      "px": [
+       405.69,
+       247.61,
+       271.92,
+       326.31
+      ],
+      "uv": [
+       0.3962,
+       0.2418,
+       0.6617,
+       0.5605
+      ]
+     },
+     "corner": {
+      "px": [
+       687.62,
+       247.61,
+       95.17,
+       326.31
+      ],
+      "uv": [
+       0.6715,
+       0.2418,
+       0.7644,
+       0.5605
+      ]
+     },
+     "lobby": {
+      "px": [
+       5,
+       583.92,
+       271.92,
+       435.08
+      ],
+      "uv": [
+       0.0049,
+       0.5702,
+       0.2704,
+       0.9951
+      ]
+     },
+     "shop": {
+      "px": [
+       286.92,
+       583.92,
+       271.92,
+       435.08
+      ],
+      "uv": [
+       0.2802,
+       0.5702,
+       0.5457,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       568.85,
+       583.92,
+       326.31,
+       435.08
+      ],
+      "uv": [
+       0.5555,
+       0.5702,
+       0.8742,
+       0.9951
+      ]
+     },
+     "ground_pier": {
+      "px": [
+       905.16,
+       583.92,
+       108.77,
+       435.08
+      ],
+      "uv": [
+       0.8839,
+       0.5702,
+       0.9902,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/curtain_imp_albedo.webp",
+    "normal": "tex/curtain_imp_normal.webp",
+    "orm": "tex/curtain_imp_orm.webp",
+    "mask": "tex/curtain_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6,
+    "heightMetres": 13.5,
+    "rows": {
+     "ground": [
+      0.6444,
+      1
+     ],
+     "middle": [
+      0.1111,
+      0.6444
+     ],
+     "cap": [
+      0,
+      0.1111
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.8
+     ],
+     "middle": [
+      4.8,
+      12
+     ],
+     "cap": [
+      12,
+      13.5
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "lobby",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 59372,
+    "textures": {
+     "atlas": {
+      "albedo": 94778,
+      "normal": 33492,
+      "orm": 11510,
+      "mask": 15882
+     },
+     "impostor": {
+      "albedo": 7930,
+      "normal": 3254,
+      "orm": 2944,
+      "mask": 19370
+     }
+    }
+   }
+  },
+  "glassgranite": {
+   "title": "1990s glass-and-granite office",
+   "file": "glassgranite.glb",
+   "bay": 3.3,
+   "floor": 3.5,
+   "groundFloor": 4.6,
+   "cap": 1.2,
+   "materials": {
+    "wall": {
+     "pbr": "granite_cladding_light",
+     "tint": "#c2c0ba",
+     "tintLinear": [
+      0.5395,
+      0.5271,
+      0.491
+     ],
+     "factor": [
+      1.1782,
+      1.1755,
+      1.1746
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "granite_cladding_light",
+     "tint": "#8e908e",
+     "tintLinear": [
+      0.2705,
+      0.2789,
+      0.2705
+     ],
+     "factor": [
+      0.5907,
+      0.622,
+      0.6471
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "granite_dark_tiles",
+     "tint": "#6e7271",
+     "tintLinear": [
+      0.1559,
+      0.1683,
+      0.1651
+     ],
+     "factor": [
+      2.0486,
+      2.1605,
+      2.1276
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3d4146",
+     "tintLinear": [
+      0.0467,
+      0.0529,
+      0.0612
+     ],
+     "factor": [
+      0.1617,
+      0.1766,
+      0.1939
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#4b79a8",
+     "tintLinear": [
+      0.0704,
+      0.1912,
+      0.3916
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#9aa0a4",
+     "tintLinear": [
+      0.3231,
+      0.3515,
+      0.3712
+     ],
+     "factor": [
+      1.1188,
+      1.1736,
+      1.1758
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "wall": [
+     "#c2c0ba",
+     "#cbc3b4",
+     "#b3aea6"
+    ],
+    "glass": [
+     "#4b79a8",
+     "#5b808c",
+     "#4a6f86"
+    ]
+   },
+   "glassCells": [
+    0,
+    1,
+    0,
+    7
+   ],
+   "roomDepth": 1.8,
+   "rules": {
+    "middle": {
+     "bay": 4,
+     "bay_gallery": 1
+    },
+    "ground": {
+     "lobby": 2,
+     "shop": 3,
+     "entrance": 1
+    },
+    "top": "cap",
+    "end_wall": "blank",
+    "corner": "corner",
+    "canopy": 0.3,
+    "attachments": {
+     "ac": 0.04,
+     "pipe": 0
+    }
+   },
+   "references": [
+    {
+     "photo": "ov_70b81282_Harare_5.jpg",
+     "shows": "grey granite piers and spandrels with recessed blue glass ribbons and set-back galleries",
+     "title": "Harare 5",
+     "author": "SqueakyMarmot",
+     "licence": "CC BY-SA 2.0",
+     "url": "https://www.flickr.com/photos/37804160@N00/14708114552",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_2024_6.jpg",
+     "shows": "right: beige panel spandrels + blue glass, 1990s office",
+     "title": "Harare 2024 6.jpg",
+     "author": "Peter in s",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare_2024_6.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_4dff88b3_P1000987.jpg",
+     "shows": "banded white / dark-glass offices along Samora Machel",
+     "title": "P1000987",
+     "author": "damien_farrell",
+     "licence": "Public Domain Mark",
+     "url": "https://www.flickr.com/photos/92094658@N00/7661982950",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_6ef347af_P1000984.jpg",
+     "shows": "Kingdom Bank block: granite, glass and a fan canopy",
+     "title": "P1000984",
+     "author": "damien_farrell",
+     "licence": "Public Domain Mark",
+     "url": "https://www.flickr.com/photos/92094658@N00/7661980608",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "glassgranite_bay",
+     "lod1Node": "glassgranite_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.5,
+     "depth": {
+      "out": 0.105,
+      "in": 0.2
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "accent",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      56,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        1.65,
+        1.05,
+        -0.2
+       ]
+      ]
+     },
+     "notes": "granite piers + spandrel, recessed blue glass ribbon",
+     "interior": "office"
+    },
+    "bay_gallery": {
+     "node": "glassgranite_bay_gallery",
+     "lod1Node": "glassgranite_bay_gallery_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.5,
+     "depth": {
+      "out": 0.13,
+      "in": 1.4
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "accent",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      94,
+      2
+     ],
+     "anchors": {},
+     "notes": "recessed gallery (1.4 m) behind a granite balustrade + rail",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "glassgranite_cap",
+     "lod1Node": "glassgranite_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3.3,
+     "height": 1.2,
+     "depth": {
+      "out": 0.14,
+      "in": 0.25
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       0.6,
+       2.4
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "accent"
+     ],
+     "tris": [
+      14,
+      2
+     ],
+     "anchors": {},
+     "notes": "granite parapet with dark band"
+    },
+    "blank": {
+     "node": "glassgranite_blank",
+     "lod1Node": "glassgranite_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3.3,
+     "height": 3.5,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "pier": {
+     "node": "glassgranite_pier",
+     "lod1Node": "glassgranite_pier_lod1",
+     "kind": "pier",
+     "floor": "any",
+     "width": 0.8,
+     "height": 3.5,
+     "depth": {
+      "out": 0.1,
+      "in": -0.1
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.15,
+       2.4
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "narrow filler strip to absorb leftover edge length"
+    },
+    "corner": {
+     "node": "glassgranite_corner",
+     "lod1Node": "glassgranite_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.6,
+     "height": 3.5,
+     "depth": {
+      "out": 0.1,
+      "in": 0.6
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "lobby": {
+     "node": "glassgranite_lobby",
+     "lod1Node": "glassgranite_lobby_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.3,
+     "height": 4.6,
+     "depth": {
+      "out": 0.1,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      30,
+      2
+     ],
+     "anchors": {},
+     "notes": "full-height glazed lobby / showroom bay",
+     "interior": "lobby"
+    },
+    "shop": {
+     "node": "glassgranite_shop",
+     "lod1Node": "glassgranite_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.3,
+     "height": 4.6,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.8,
+       4.12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "sign",
+      "trim",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 3.125,
+        "y1": 3.55,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 4,
+        "x1": 3.125,
+        "y1": 4.6,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        4.05,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "glassgranite_entrance",
+     "lod1Node": "glassgranite_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.96,
+     "height": 4.6,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       3.168,
+       5.544
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "accent",
+      "glass",
+      "frame",
+      "plinth",
+      "trim"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/glassgranite_atlas_albedo.webp",
+    "normal": "tex/glassgranite_atlas_normal.webp",
+    "orm": "tex/glassgranite_atlas_orm.webp",
+    "mask": "tex/glassgranite_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 12.0609,
+    "pxPerMetre": 84.9021,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       321.29,
+       280.18,
+       297.16
+      ],
+      "uv": [
+       0.0049,
+       0.3138,
+       0.2785,
+       0.604
+      ]
+     },
+     "bay_gallery": {
+      "px": [
+       295.18,
+       321.29,
+       280.18,
+       297.16
+      ],
+      "uv": [
+       0.2883,
+       0.3138,
+       0.5619,
+       0.604
+      ]
+     },
+     "cap": {
+      "px": [
+       5,
+       209.41,
+       280.18,
+       101.88
+      ],
+      "uv": [
+       0.0049,
+       0.2045,
+       0.2785,
+       0.304
+      ]
+     },
+     "blank": {
+      "px": [
+       585.35,
+       321.29,
+       280.18,
+       297.16
+      ],
+      "uv": [
+       0.5716,
+       0.3138,
+       0.8452,
+       0.604
+      ]
+     },
+     "pier": {
+      "px": [
+       875.53,
+       321.29,
+       67.92,
+       297.16
+      ],
+      "uv": [
+       0.855,
+       0.3138,
+       0.9213,
+       0.604
+      ]
+     },
+     "corner": {
+      "px": [
+       953.45,
+       321.29,
+       59.43,
+       297.16
+      ],
+      "uv": [
+       0.9311,
+       0.3138,
+       0.9891,
+       0.604
+      ]
+     },
+     "lobby": {
+      "px": [
+       5,
+       628.45,
+       280.18,
+       390.55
+      ],
+      "uv": [
+       0.0049,
+       0.6137,
+       0.2785,
+       0.9951
+      ]
+     },
+     "shop": {
+      "px": [
+       295.18,
+       628.45,
+       280.18,
+       390.55
+      ],
+      "uv": [
+       0.2883,
+       0.6137,
+       0.5619,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       585.35,
+       628.45,
+       336.21,
+       390.55
+      ],
+      "uv": [
+       0.5716,
+       0.6137,
+       0.9,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/glassgranite_imp_albedo.webp",
+    "normal": "tex/glassgranite_imp_normal.webp",
+    "orm": "tex/glassgranite_imp_orm.webp",
+    "mask": "tex/glassgranite_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6.6,
+    "heightMetres": 12.8,
+    "rows": {
+     "ground": [
+      0.6406,
+      1
+     ],
+     "middle": [
+      0.0938,
+      0.6406
+     ],
+     "cap": [
+      0,
+      0.0938
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.6
+     ],
+     "middle": [
+      4.6,
+      11.6
+     ],
+     "cap": [
+      11.6,
+      12.799999999999999
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "shop",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 67536,
+    "textures": {}
+   }
+  },
+  "brick": {
+   "title": "Face-brick block with punched steel windows (1930s-60s)",
+   "file": "brick.glb",
+   "bay": 3.2,
+   "floor": 3.3,
+   "groundFloor": 4.2,
+   "cap": 0.9,
+   "materials": {
+    "wall": {
+     "pbr": "brick_face_red",
+     "tint": "#86503f",
+     "tintLinear": [
+      0.2384,
+      0.0802,
+      0.0497
+     ],
+     "factor": [
+      0.9331,
+      0.4963,
+      0.5015
+     ],
+     "uv": "metres"
+    },
+    "trim": {
+     "pbr": "concrete_painted",
+     "tint": "#e0dbd0",
+     "tintLinear": [
+      0.7454,
+      0.7084,
+      0.6308
+     ],
+     "factor": [
+      1.8216,
+      1.9302,
+      1.8121
+     ],
+     "uv": "metres"
+    },
+    "accent": {
+     "pbr": "concrete_painted",
+     "tint": "#d8d2c6",
+     "tintLinear": [
+      0.6867,
+      0.6445,
+      0.5647
+     ],
+     "factor": [
+      1.6782,
+      1.7561,
+      1.6222
+     ],
+     "uv": "metres"
+    },
+    "plinth": {
+     "pbr": "granite_dark_tiles",
+     "uv": "metres"
+    },
+    "frame": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#ebe9e3",
+     "tintLinear": [
+      0.8308,
+      0.8148,
+      0.7682
+     ],
+     "factor": [
+      2.8767,
+      2.7205,
+      2.4333
+     ],
+     "uv": "metres"
+    },
+    "glass": {
+     "pbr": "window_glass",
+     "tint": "#58666d",
+     "tintLinear": [
+      0.0976,
+      0.1329,
+      0.1529
+     ],
+     "uv": "metres"
+    },
+    "metal": {
+     "pbr": "window_frame_aluminium",
+     "tint": "#3a3d40",
+     "tintLinear": [
+      0.0423,
+      0.0467,
+      0.0513
+     ],
+     "factor": [
+      0.1465,
+      0.1559,
+      0.1625
+     ],
+     "uv": "metres"
+    },
+    "sign": {
+     "pbr": "metal_panel",
+     "tint": "#e8e4d8",
+     "tintLinear": [
+      0.807,
+      0.7758,
+      0.6867
+     ],
+     "uv": "unit"
+    }
+   },
+   "palette": {
+    "wall": [
+     "#86503f",
+     "#7a4436",
+     "#9a6a52",
+     "#8d5a45"
+    ],
+    "trim": [
+     "#e0dbd0",
+     "#d5cbb6",
+     "#c9c6be"
+    ]
+   },
+   "glassCells": [
+    1,
+    0,
+    1,
+    7
+   ],
+   "roomDepth": 1.5,
+   "rules": {
+    "middle": {
+     "bay": 5,
+     "bay_surround": 1,
+     "bay_pair": 1
+    },
+    "ground": {
+     "shop": 6,
+     "entrance": 1,
+     "ground_blank": 0.5
+    },
+    "top": "cap",
+    "end_wall": "blank",
+    "corner": "corner",
+    "canopy": 0.8,
+    "attachments": {
+     "ac": 0.3,
+     "bars": 0.15,
+     "pipe": 16
+    }
+   },
+   "references": [
+    {
+     "photo": "wc_First_Street_Harare_Zimbabwe.jpg",
+     "shows": "CABS building on First Street Mall: red-brown face brick, punched grid of white-framed windows, light concrete corner piers, blade signs",
+     "title": "First Street, Harare, Zimbabwe.jpg",
+     "author": "Gary Bembridge",
+     "licence": "CC BY 2.0",
+     "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe.jpg",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_Zimbabwe_03.jpg",
+     "shows": "Union Buildings: brown face brick, white steel windows with AC units, concrete window surround bay",
+     "title": "Harare, Zimbabwe. 03.JPG",
+     "author": "Suesen",
+     "licence": "CC BY-SA 3.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._03.JPG",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_8b8ae35f_Harare_3.jpg",
+     "shows": "large red-brown brick slab with punched windows",
+     "title": "Harare 3",
+     "author": "SqueakyMarmot",
+     "licence": "CC BY-SA 2.0",
+     "url": "https://www.flickr.com/photos/37804160@N00/14521848209",
+     "reference_only": false
+    },
+    {
+     "photo": "ov_e504fe94_Harare_4.jpg",
+     "shows": "brick towers with punched windows (right)",
+     "title": "Harare 4",
+     "author": "SqueakyMarmot",
+     "licence": "CC BY-SA 2.0",
+     "url": "https://www.flickr.com/photos/37804160@N00/14685506386",
+     "reference_only": false
+    },
+    {
+     "photo": "wc_Harare_2024_5.jpg",
+     "shows": "two-storey face-brick shops with a first-floor gallery and pavement canopy",
+     "title": "Harare 2024 5.jpg",
+     "author": "Peter in s",
+     "licence": "CC BY-SA 4.0",
+     "url": "https://commons.wikimedia.org/wiki/File:Harare_2024_5.jpg",
+     "reference_only": false
+    }
+   ],
+   "modules": {
+    "bay": {
+     "node": "brick_bay",
+     "lod1Node": "brick_bay_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.2,
+     "height": 3.3,
+     "depth": {
+      "out": 0.055,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.72,
+       4
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      70,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        1.6,
+        0.9,
+        -0.12
+       ]
+      ],
+      "bars": [
+       {
+        "x0": 0.75,
+        "y0": 0.9,
+        "x1": 2.45,
+        "y1": 2.55,
+        "z": 0
+       }
+      ]
+     },
+     "notes": "punched window: white steel frame with glazing bars, concrete sill + lintel",
+     "interior": "office"
+    },
+    "bay_surround": {
+     "node": "brick_bay_surround",
+     "lod1Node": "brick_bay_surround_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.2,
+     "height": 3.3,
+     "depth": {
+      "out": 0.07,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.72,
+       4
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        1.6,
+        0.9,
+        -0.12
+       ]
+      ],
+      "bars": [
+       {
+        "x0": 0.75,
+        "y0": 0.9,
+        "x1": 2.45,
+        "y1": 2.55,
+        "z": 0
+       }
+      ]
+     },
+     "notes": "punched window with a projecting concrete surround",
+     "interior": "office"
+    },
+    "bay_pair": {
+     "node": "brick_bay_pair",
+     "lod1Node": "brick_bay_pair_lod1",
+     "kind": "bay",
+     "floor": "middle",
+     "width": 3.2,
+     "height": 3.3,
+     "depth": {
+      "out": 0.055,
+      "in": 0.12
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.72,
+       4
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      122,
+      2
+     ],
+     "anchors": {
+      "ac": [
+       [
+        0.975,
+        0.9,
+        -0.12
+       ]
+      ],
+      "bars": [
+       {
+        "x0": 0.5,
+        "y0": 0.9,
+        "x1": 1.45,
+        "y1": 2.55,
+        "z": 0
+       },
+       {
+        "x0": 1.75,
+        "y0": 0.9,
+        "x1": 2.7,
+        "y1": 2.55,
+        "z": 0
+       }
+      ]
+     },
+     "notes": "two narrow punched windows",
+     "interior": "office"
+    },
+    "cap": {
+     "node": "brick_cap",
+     "lod1Node": "brick_cap_lod1",
+     "kind": "cap",
+     "floor": "top",
+     "width": 3.2,
+     "height": 0.9,
+     "depth": {
+      "out": 0.05,
+      "in": 0.25
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.72,
+       4
+      ],
+      "y": [
+       0.5,
+       2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim"
+     ],
+     "tris": [
+      16,
+      2
+     ],
+     "anchors": {},
+     "notes": "brick parapet, concrete band + coping"
+    },
+    "blank": {
+     "node": "brick_blank",
+     "lod1Node": "brick_blank_lod1",
+     "kind": "blank",
+     "floor": "middle",
+     "width": 3.2,
+     "height": 3.3,
+     "depth": {
+      "out": 0,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       2.9,
+       4.2
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "solid wall bay (end walls, party walls, fill)"
+    },
+    "pier": {
+     "node": "brick_pier",
+     "lod1Node": "brick_pier_lod1",
+     "kind": "pier",
+     "floor": "any",
+     "width": 0.6,
+     "height": 3.3,
+     "depth": {
+      "out": 0.04,
+      "in": -0.04
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.15,
+       2.4
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim"
+     ],
+     "tris": [
+      2,
+      2
+     ],
+     "anchors": {},
+     "notes": "narrow filler strip to absorb leftover edge length"
+    },
+    "corner": {
+     "node": "brick_corner",
+     "lod1Node": "brick_corner_lod1",
+     "kind": "corner",
+     "floor": "any",
+     "width": 0.5,
+     "height": 3.3,
+     "depth": {
+      "out": 0.04,
+      "in": 0.5
+     },
+     "pivot": "the footprint corner; x along the OUTGOING wall (the next wall to the right seen from outside), the incoming wall lies along -z",
+     "stretch": {
+      "x": [
+       0.2,
+       1.5
+      ],
+      "y": [
+       2.6,
+       5.6
+      ]
+     },
+     "lod1": "box",
+     "materials": [
+      "trim"
+     ],
+     "tris": [
+      4,
+      4
+     ],
+     "anchors": {},
+     "notes": "outer corner pier for ~90 deg corners: origin at the footprint corner, x along the outgoing wall; covers x,z in [-proj, a] (the incoming wall lies along -x of the outgoing wall normal)"
+    },
+    "shop": {
+     "node": "brick_shop",
+     "lod1Node": "brick_shop_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.2,
+     "height": 4.2,
+     "depth": {
+      "out": 0.06,
+      "in": 0.26
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       2.72,
+       4
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "trim",
+      "sign",
+      "metal",
+      "plinth",
+      "glass",
+      "frame"
+     ],
+     "tris": [
+      88,
+      2
+     ],
+     "anchors": {
+      "shutter": [
+       {
+        "x0": 0.175,
+        "y0": 0,
+        "x1": 3.025,
+        "y1": 3.15,
+        "z": -0.1
+       }
+      ],
+      "sign": [
+       {
+        "x0": 0.175,
+        "y0": 3.6,
+        "x1": 3.025,
+        "y1": 4.2,
+        "z": 0.06
+       }
+      ],
+      "canopy": [
+       [
+        0,
+        3.65,
+        0
+       ]
+      ]
+     },
+     "notes": "shopfront: display window + glazed door, riser, shutter box, fascia sign board (role sign, UV 0..1)",
+     "interior": "shop"
+    },
+    "entrance": {
+     "node": "brick_entrance",
+     "lod1Node": "brick_entrance_lod1",
+     "kind": "ground",
+     "floor": "ground",
+     "width": 3.84,
+     "height": 4.2,
+     "depth": {
+      "out": 1.3,
+      "in": 0.6
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       3.072,
+       5.376
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "wall",
+      "trim",
+      "glass",
+      "frame",
+      "plinth"
+     ],
+     "tris": [
+      84,
+      2
+     ],
+     "anchors": {},
+     "notes": "entrance bay: recessed glazed doors, steps, canopy",
+     "interior": "lobby"
+    },
+    "ground_blank": {
+     "node": "brick_ground_blank",
+     "lod1Node": "brick_ground_blank_lod1",
+     "kind": "blank",
+     "floor": "ground",
+     "width": 3.2,
+     "height": 4.2,
+     "depth": {
+      "out": 0.03,
+      "in": 0
+     },
+     "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+     "stretch": {
+      "x": [
+       0.3,
+       12
+      ],
+      "y": [
+       3.4,
+       5.6
+      ]
+     },
+     "lod1": "quad",
+     "materials": [
+      "plinth",
+      "wall"
+     ],
+     "tris": [
+      6,
+      2
+     ],
+     "anchors": {},
+     "notes": "blank ground-floor wall with plinth"
+    }
+   },
+   "atlas": {
+    "albedo": "tex/brick_atlas_albedo.webp",
+    "normal": "tex/brick_atlas_normal.webp",
+    "orm": "tex/brick_atlas_orm.webp",
+    "mask": "tex/brick_atlas_mask.webp",
+    "size": [
+     1024,
+     1024
+    ],
+    "metres": 11.335,
+    "pxPerMetre": 90.3399,
+    "rects": {
+     "bay": {
+      "px": [
+       5,
+       331.45,
+       289.09,
+       298.12
+      ],
+      "uv": [
+       0.0049,
+       0.3237,
+       0.2872,
+       0.6148
+      ]
+     },
+     "bay_surround": {
+      "px": [
+       304.09,
+       331.45,
+       289.09,
+       298.12
+      ],
+      "uv": [
+       0.297,
+       0.3237,
+       0.5793,
+       0.6148
+      ]
+     },
+     "bay_pair": {
+      "px": [
+       603.18,
+       331.45,
+       289.09,
+       298.12
+      ],
+      "uv": [
+       0.589,
+       0.3237,
+       0.8714,
+       0.6148
+      ]
+     },
+     "cap": {
+      "px": [
+       427.08,
+       240.14,
+       289.09,
+       81.31
+      ],
+      "uv": [
+       0.4171,
+       0.2345,
+       0.6994,
+       0.3139
+      ]
+     },
+     "blank": {
+      "px": [
+       5,
+       23.33,
+       289.09,
+       298.12
+      ],
+      "uv": [
+       0.0049,
+       0.0228,
+       0.2872,
+       0.3139
+      ]
+     },
+     "pier": {
+      "px": [
+       304.09,
+       23.33,
+       54.2,
+       298.12
+      ],
+      "uv": [
+       0.297,
+       0.0228,
+       0.3499,
+       0.3139
+      ]
+     },
+     "corner": {
+      "px": [
+       368.29,
+       23.33,
+       48.78,
+       298.12
+      ],
+      "uv": [
+       0.3597,
+       0.0228,
+       0.4073,
+       0.3139
+      ]
+     },
+     "shop": {
+      "px": [
+       5,
+       639.57,
+       289.09,
+       379.43
+      ],
+      "uv": [
+       0.0049,
+       0.6246,
+       0.2872,
+       0.9951
+      ]
+     },
+     "entrance": {
+      "px": [
+       304.09,
+       639.57,
+       346.91,
+       379.43
+      ],
+      "uv": [
+       0.297,
+       0.6246,
+       0.6357,
+       0.9951
+      ]
+     },
+     "ground_blank": {
+      "px": [
+       660.99,
+       639.57,
+       289.09,
+       379.43
+      ],
+      "uv": [
+       0.6455,
+       0.6246,
+       0.9278,
+       0.9951
+      ]
+     }
+    },
+    "note": "rects.px = [x, y, w, h] in albedo pixels from the top-left; rects.uv = [u0, v0, u1, v1] in glTF / three.js (flipY=false) UV space. Normal / ORM / mask are half resolution."
+   },
+   "impostor": {
+    "albedo": "tex/brick_imp_albedo.webp",
+    "normal": "tex/brick_imp_normal.webp",
+    "orm": "tex/brick_imp_orm.webp",
+    "mask": "tex/brick_imp_mask.webp",
+    "size": [
+     256,
+     512
+    ],
+    "bays": 2,
+    "widthMetres": 6.4,
+    "heightMetres": 11.7,
+    "rows": {
+     "ground": [
+      0.641,
+      1
+     ],
+     "middle": [
+      0.0769,
+      0.641
+     ],
+     "cap": [
+      0,
+      0.0769
+     ]
+    },
+    "rowsMetres": {
+     "ground": [
+      0,
+      4.2
+     ],
+     "middle": [
+      4.2,
+      10.8
+     ],
+     "cap": [
+      10.8,
+      11.700000000000001
+     ]
+    },
+    "middleFloors": 2,
+    "ground": "shop",
+    "middleModules": [
+     "bay",
+     "bay"
+    ],
+    "note": "u repeats every 2 bays (wrapS = RepeatWrapping); rows[k] = [v0, v1] in glTF/three.js UV space (v = 0 at the TOP of the image, flipY=false; with TextureLoader flipY=true use 1 - v). The middle row holds 2 floors: map each pair of middle floors onto it (an odd last floor maps to half the row)."
+   },
+   "bytes": {
+    "glb": 62408,
+    "textures": {}
+   }
+  }
+ },
+ "common": {
+  "file": "common.glb",
+  "materials": {
+   "wall": {
+    "pbr": "concrete_painted",
+    "tint": "#d9d5cc",
+    "tintLinear": [
+     0.6939,
+     0.6654,
+     0.6038
+    ],
+    "factor": [
+     1.6957,
+     1.8131,
+     1.7346
+    ],
+    "uv": "metres"
+   },
+   "trim": {
+    "pbr": "concrete_painted",
+    "tint": "#d9d5cc",
+    "tintLinear": [
+     0.6939,
+     0.6654,
+     0.6038
+    ],
+    "factor": [
+     1.6957,
+     1.8131,
+     1.7346
+    ],
+    "uv": "metres"
+   },
+   "accent": {
+    "pbr": "concrete_painted",
+    "tint": "#bfb8aa",
+    "tintLinear": [
+     0.521,
+     0.4793,
+     0.402
+    ],
+    "factor": [
+     1.2732,
+     1.306,
+     1.1548
+    ],
+    "uv": "metres"
+   },
+   "plinth": {
+    "pbr": "granite_dark_tiles",
+    "uv": "metres"
+   },
+   "frame": {
+    "pbr": "window_frame_aluminium",
+    "tint": "#c9cbcc",
+    "tintLinear": [
+     0.5841,
+     0.5972,
+     0.6038
+    ],
+    "factor": [
+     2.0225,
+     1.994,
+     1.9126
+    ],
+    "uv": "metres"
+   },
+   "glass": {
+    "pbr": "window_glass",
+    "tint": "#5f7480",
+    "tintLinear": [
+     0.1144,
+     0.1746,
+     0.2159
+    ],
+    "uv": "metres"
+   },
+   "glass_spandrel": {
+    "pbr": "window_glass",
+    "tint": "#3d5a78",
+    "tintLinear": [
+     0.0467,
+     0.1022,
+     0.1878
+    ],
+    "uv": "metres"
+   },
+   "metal": {
+    "pbr": "window_frame_aluminium",
+    "tint": "#3a3d40",
+    "tintLinear": [
+     0.0423,
+     0.0467,
+     0.0513
+    ],
+    "factor": [
+     0.1465,
+     0.1559,
+     0.1625
+    ],
+    "uv": "metres"
+   },
+   "roof_sheet": {
+    "pbr": "corrugated_weathered",
+    "uv": "metres"
+   },
+   "sign": {
+    "pbr": "metal_panel",
+    "tint": "#e8e4d8",
+    "tintLinear": [
+     0.807,
+     0.7758,
+     0.6867
+    ],
+    "uv": "unit"
+   }
+  },
+  "modules": {
+   "canopy": {
+    "node": "common_canopy",
+    "lod1Node": "common_canopy_lod1",
+    "kind": "attachment",
+    "floor": "ground",
+    "width": 3,
+    "height": 0.55,
+    "depth": {
+     "out": 2.4,
+     "in": 0
+    },
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0.5,
+      8
+     ],
+     "y": [
+      1,
+      1
+     ]
+    },
+    "lod1": "self",
+    "materials": [
+     "trim",
+     "sign"
+    ],
+    "tris": [
+     18,
+     18
+    ],
+    "anchors": {},
+    "notes": "cantilevered pavement canopy; origin = underside of the slab at the wall (place at canopy anchor z); fascia front face is role sign (UV 0..1 per module)"
+   },
+   "bars": {
+    "node": "common_bars",
+    "lod1Node": null,
+    "kind": "attachment",
+    "floor": "any",
+    "width": 1,
+    "height": 1,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0.4,
+      4
+     ],
+     "y": [
+      0.4,
+      3
+     ]
+    },
+    "lod1": "none",
+    "materials": [
+     "metal"
+    ],
+    "tris": [
+     112,
+     0
+    ],
+    "anchors": {},
+    "notes": "burglar bars: 1 x 1 m steel grid, scale to the window rect (anchors.bars), 6 cm proud"
+   },
+   "sign_blade": {
+    "node": "common_sign_blade",
+    "lod1Node": "common_sign_blade_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.14,
+    "height": 1.6,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0.14,
+      0.14
+     ],
+     "y": [
+      0.8,
+      3
+     ]
+    },
+    "lod1": "self",
+    "materials": [
+     "metal",
+     "sign"
+    ],
+    "tris": [
+     30,
+     30
+    ],
+    "anchors": {},
+    "notes": "projecting blade sign (both faces role sign, UV 0..1), origin at the wall, bottom"
+   },
+   "shutter": {
+    "node": "common_shutter",
+    "lod1Node": "common_shutter_lod1",
+    "kind": "attachment",
+    "floor": "ground",
+    "width": 1.08,
+    "height": 2.4,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0.6,
+      5
+     ],
+     "y": [
+      1.8,
+      4.2
+     ]
+    },
+    "lod1": "decimate:0.25",
+    "materials": [
+     "shutter"
+    ],
+    "tris": [
+     552,
+     137
+    ],
+    "anchors": {},
+    "notes": "Poly Haven roll-down shutter (scan) incl. shutter box; scale x/y to anchors.shutter; origin bottom-left, back of the box on the wall plane"
+   },
+   "downpipe": {
+    "node": "common_downpipe",
+    "lod1Node": "common_downpipe_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.11,
+    "height": 1,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0,
+      0
+     ],
+     "y": [
+      0.5,
+      6
+     ]
+    },
+    "lod1": "decimate:0.5",
+    "materials": [
+     "pipe"
+    ],
+    "tris": [
+     223,
+     110
+    ],
+    "anchors": {},
+    "notes": "galvanised downpipe, 1 m long: scale y to the run length; axis 0.11 m off the wall"
+   },
+   "downpipe_shoe": {
+    "node": "common_downpipe_shoe",
+    "lod1Node": "common_downpipe_shoe_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.108,
+    "height": 0.283,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0,
+      0
+     ],
+     "y": [
+      1,
+      1
+     ]
+    },
+    "lod1": "self",
+    "materials": [
+     "pipe.001"
+    ],
+    "tris": [
+     252,
+     252
+    ],
+    "anchors": {},
+    "notes": "downpipe shoe (bottom outlet)"
+   },
+   "downpipe_hopper": {
+    "node": "common_downpipe_hopper",
+    "lod1Node": "common_downpipe_hopper_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.241,
+    "height": 0.255,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0,
+      0
+     ],
+     "y": [
+      1,
+      1
+     ]
+    },
+    "lod1": "self",
+    "materials": [
+     "pipe.002"
+    ],
+    "tris": [
+     222,
+     222
+    ],
+    "anchors": {},
+    "notes": "rainwater hopper head (top of a downpipe, under the parapet)"
+   },
+   "ac_window": {
+    "node": "common_ac_window",
+    "lod1Node": "common_ac_window_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.661,
+    "height": 0.429,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0,
+      0
+     ],
+     "y": [
+      1,
+      1
+     ]
+    },
+    "lod1": "decimate:0.15",
+    "materials": [
+     "ac_window"
+    ],
+    "tris": [
+     969,
+     145
+    ],
+    "anchors": {},
+    "notes": "window / through-wall air conditioner (Sketchfab scan-textured model). Origin: bottom-centre, 0.35 m behind its grille: place on an anchors.ac point"
+   },
+   "ac_split": {
+    "node": "common_ac_split",
+    "lod1Node": "common_ac_split_lod1",
+    "kind": "attachment",
+    "floor": "any",
+    "width": 0.8,
+    "height": 0.604,
+    "pivot": "bottom-left of the tiling rectangle on the wall plane (x right along the wall seen from the street, y up, +z outward)",
+    "stretch": {
+     "x": [
+      0,
+      0
+     ],
+     "y": [
+      1,
+      1
+     ]
+    },
+    "lod1": "decimate:0.2",
+    "materials": [
+     "ac_split"
+    ],
+    "tris": [
+     936,
+     187
+    ],
+    "anchors": {},
+    "notes": "split-system outdoor unit on wall brackets (Sketchfab). Origin: bottom-centre on the wall plane; hang it on the wall (spandrel / pier) of any floor"
+   }
+  },
+  "bytes": 259480,
+  "credits": [
+   {
+    "source": "Sketchfab",
+    "title": "Air Conditioner Unit, Low Poly",
+    "authors": [
+     "MC_RightLeft"
+    ],
+    "url": "https://sketchfab.com/3d-models/air-conditioner-unit-low-poly-11d7c77bfe804f448a516928adf3f05d",
+    "licence": "CC Attribution",
+    "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+    "use": "weathered split-system outdoor unit (ac_split attachment)"
+   },
+   {
+    "source": "Sketchfab",
+    "title": "Old window air conditioner",
+    "authors": [
+     "HASSAN"
+    ],
+    "url": "https://sketchfab.com/3d-models/old-window-air-conditioner-df7687570458444cb66fecdbfea2adc4",
+    "licence": "CC Attribution",
+    "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+    "use": "window / through-wall box air conditioner (ac_window attachment)"
+   },
+   {
+    "source": "Poly Haven",
+    "title": "Modular Metal Gutter",
+    "authors": [
+     "Maxim Domnin"
+    ],
+    "url": "https://polyhaven.com/a/modular_metal_gutter",
+    "licence": "CC0 1.0",
+    "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "use": "downpipe, offset bend, shoe and hopper (drainpipe attachments)"
+   },
+   {
+    "source": "Poly Haven",
+    "title": "Rollershutter Door",
+    "authors": [
+     "MP"
+    ],
+    "url": "https://polyhaven.com/a/rollershutter_door",
+    "licence": "CC0 1.0",
+    "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "use": "shopfront roll-down steel shutter + shutter box (ground-floor shop bays)"
+   }
+  ]
+ }
+}

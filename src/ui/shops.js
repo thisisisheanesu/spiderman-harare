@@ -10,10 +10,10 @@
 //   nearest(x, z, r)   the street-level sign (ground / first floor) best placed within r m, or null
 //   version      bumps when the data arrives (the big map redraws)
 
-const URL = 'data/shops.json';
+const SHOPS_URL = 'data/shops.json';
 const CELL = 40; // m, grid cell for nearest()
 const MERGE = 60; // m: signs of one business closer than this are one map label
-const STREET_FLOORS = 1; // signs up to this floor count as "outside" at street level
+export const STREET_FLOORS = 1; // signs up to this floor count as "outside" at street level
 
 export class ShopIndex {
   constructor(game) {
@@ -22,8 +22,8 @@ export class ShopIndex {
     this.grid = new Map();
     this.version = 0;
     const load = game.assets?.json
-      ? game.assets.json(URL)
-      : fetch(URL)
+      ? game.assets.json(SHOPS_URL)
+      : fetch(SHOPS_URL)
           .then((r) => (r.ok ? r.json() : null))
           .catch(() => null);
     this.ready = Promise.resolve(load)

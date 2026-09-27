@@ -183,7 +183,7 @@ export function buildProps(ctx) {
   const groundY = (x, z) => heightAt(x, z) + KERB_HEIGHT;
   // A model instance that pedestrians walk around (unless solid = false) and that later props avoid.
   const place = (name, x, y, z, rot = 0, s = 1, lit = 0, solid = true) => {
-    set.add(name, x, y, z, rot, s, lit);
+    if (set.add(name, x, y, z, rot, s, lit) < 0) return;
     const r = PROP_META[name].base * s;
     occ.add(x, z, r);
     if (solid) obstacle(x, z, r);
@@ -194,16 +194,36 @@ export function buildProps(ctx) {
       anchors.push({ x: tmp.x, y: tmp.y, z: tmp.z, kind, radius: 0 });
     }
   };
+  // A bus shelter model with its obstacles (bench / back panel, front posts) and a roof collider.
+  const busShelter = (x, y, z, rot) => {
+    set.add('bus_shelter', x, y, z, rot, 1, 0);
+    occ.add(x, z, 2.2);
+    for (const lx of [-1.4, 0, 1.4]) localObstacle(x, z, rot, lx, -0.5, 0.45);
+    for (const lx of [-1.95, 1.95]) localObstacle(x, z, rot, lx, 0.75, 0.15);
+    const col = colliderFor(-5);
+    col.setTransform(x, y, z, rot);
+    col.box(0, 2.5, 0, 4.3, 0.3, 2.1, 1);
+    col.clearTransform();
+  };
   // Free pavement: not in a building, not on a carriageway, clear of other furniture.
   const clear = (x, z, r, margin = 0.2) => !world.buildingAt(x, z) && offRoad(x, z, margin) && occ.free(x, z, r);
 
-  // Dual carriageways (a median between two one-way roads) get median lights instead of kerb lamps.
-  const medianRoads = new Set(medians.map((m) => m.road));
+  // Dual carriageways (a median along most of the road, between two one-way carriageways) get
+  // median lights instead of kerb lamps; short median fragments at junctions don't count.
+  const polyLen = (pts) => {
+    let len = 0;
+    for (let i = 0; i + 3 < pts.length; i += 2) len += Math.hypot(pts[i + 2] - pts[i], pts[i + 3] - pts[i + 1]);
+    return len;
+  };
+  const medianLen = new Map();
+  for (const m of medians) medianLen.set(m.road, (medianLen.get(m.road) || 0) + polyLen(m.pts));
+  const medianRoads = new Set();
+  for (const [ri, len] of medianLen) if (len > 0.5 * polyLen(roads[ri].pts)) medianRoads.add(ri);
 
   // Single-arm lamps at the kerb, arm over the road; bins, ZESA boxes and manholes on the pavement.
   let boxAcc = 60;
   let holeAcc = 25;
-  let worksAcc = 900;
+  let worksAcc = 12;
   for (const sp of sidewalkPaths) {
     const r = roads[sp.road];
     const urban = urbanAt(sp.pts[0], sp.pts[1]);
@@ -272,9 +292,8 @@ export function buildProps(ctx) {
           set.add('manhole_cover', hx, groundY(hx, hz) - 0.06, hz, rng() * 6.28, 1, 0);
           occ.add(hx, hz, 0.35);
           // Now and then it is open for repairs: cones around it and a concrete barrier.
-          worksAcc -= 1;
-          if (worksAcc < 0 && rng() < 0.12) {
-            worksAcc = 6;
+          if (--worksAcc < 0) {
+            worksAcc = rng.int(28, 45);
             for (let k = 0; k < 3; k++) {
               const a = (k / 3) * Math.PI * 2 + rng() * 0.5;
               const cx = hx + Math.cos(a) * 0.75;
@@ -388,6 +407,7 @@ export function buildProps(ctx) {
         }
       }
     }
+    if (p.cls === 'pedestrian' && p.w >= 6) mallLamps(p);
     const gap = p.cls === 'pedestrian' || p.cls === 'footway' ? 30 : 0;
     if (!gap) continue;
     let nPl = 0;
@@ -471,11 +491,7 @@ export function buildProps(ctx) {
             local(sx, sz, rot, lx, lz, tmp);
             if (!offRoad(tmp.x, tmp.z, 0.3) || world.buildingAt(tmp.x, tmp.z)) ok = false;
           }
-          if (!ok) continue;
-          set.add('bus_shelter', sx, heightAt(sx, sz), sz, rot, 1, 0);
-          occ.add(sx, sz, 2.2);
-          for (const lx of [-1.4, 0, 1.4]) localObstacle(sx, sz, rot, lx, -0.5, 0.45);
-          for (const lx of [-1.95, 1.95]) localObstacle(sx, sz, rot, lx, 0.75, 0.15);
+          if (ok) busShelter(sx, heightAt(sx, sz), sz, rot);
         }
         continue;
       }
@@ -512,6 +528,44 @@ export function buildProps(ctx) {
       }
       // A trader's corner: a drum, a stack of crates, a chair and a few boxes, just inside.
       if (corner++ < 6 && rng() < 0.7) traderCorner(ax, az, ring);
+    }
+  }
+
+  // Tall single-arm lamps down the pedestrian malls (First Street), alternating sides a metre in
+  // from the shopfronts, arms over the middle.
+  function mallLamps(p) {
+    const pts = p.pts;
+    let acc = 8;
+    let side = 1;
+    for (let i = 0; i + 3 < pts.length; i += 2) {
+      const ax = pts[i];
+      const az = pts[i + 1];
+      const dx = pts[i + 2] - ax;
+      const dz = pts[i + 3] - az;
+      const len = Math.hypot(dx, dz);
+      if (len < 1e-3) continue;
+      const nx = -dz / len;
+      const nz = dx / len;
+      let t = acc;
+      for (; t < len; t += 28) {
+        const s0 = side;
+        side = -side;
+        const off = p.w / 2 - 1.1;
+        const x = ax + (dx / len) * t + nx * off * s0;
+        const z = az + (dz / len) * t + nz * off * s0;
+        if (world.buildingAt(x, z) || !occ.free(x, z, 0.5)) continue;
+        // Arm (local +Z) towards the middle of the mall.
+        const rot = Math.atan2(-nx * s0, -nz * s0);
+        const on = rng() < 0.75 ? 1 : 0;
+        const y = heightAt(x, z);
+        place('street_lamp_single', x, y, z, rot, 1, on);
+        anchors.push({ x, y: y + 8, z, kind: 'lamp', radius: 0 });
+        if (on) {
+          local(x, z, rot, 0, 2.05, tmp);
+          pools.push(tmp.x, tmp.z);
+        }
+      }
+      acc = t - len;
     }
   }
 
@@ -612,10 +666,7 @@ export function buildProps(ctx) {
       }
       if (!ok) continue;
       stopAcc = rng.range(350, 480);
-      set.add('bus_shelter', x, groundY(x, z), z, rot, 1, 0);
-      occ.add(x, z, 2.3);
-      for (const lx of [-1.4, 0, 1.4]) localObstacle(x, z, rot, lx, -0.5, 0.45);
-      for (const lx of [-1.95, 1.95]) localObstacle(x, z, rot, lx, 0.75, 0.15);
+      busShelter(x, groundY(x, z), z, rot);
     }
   }
 
@@ -719,9 +770,13 @@ export function buildProps(ctx) {
   let stalls = false;
   let external = false;
   let lastFrame = -1;
+  const fwd = new THREE.Vector3();
   const tick = (cam, dt) => {
     set.update(cam);
-    shopSigns?.update(cam, dt);
+    if (shopSigns) {
+      game.camera?.getWorldDirection(fwd);
+      shopSigns.update(cam, dt, fwd);
+    }
     // Traders' clutter gives way to the pedestrian lane's stalls once those exist.
     if (!stalls) {
       const list = game?.npcs?.vendors?.stalls;
@@ -790,7 +845,7 @@ export function buildProps(ctx) {
     try {
       const json = await (ctx.shopData ?? game.assets.json('data/shops.json'));
       if (json?.shops?.length) {
-        shopSigns = new ShopSigns({ json, frontages, buildings: data.buildings, heightAt, uniforms, level });
+        shopSigns = new ShopSigns({ json, frontages, buildings: data.buildings, heightAt, uniforms, level, nodes: data.nodes });
         for (const o of shopSigns.obstacles) {
           obstacles.push(o);
           occ.add(o.x, o.z, o.r);
@@ -813,9 +868,14 @@ export function buildProps(ctx) {
     } catch (err) {
       console.warn('[props] shop signs unavailable', err);
     }
-    await set.load(game.assets, uniforms);
-    group.add(set.group);
-    set.update(game.camera?.position || { x: 0, z: 0 });
+    try {
+      await set.load(game.assets, uniforms);
+      group.add(set.group);
+      set.update(game.camera?.position || { x: 0, z: 0 });
+    } catch (err) {
+      // Street furniture is decoration: a failure must not stop the city from starting.
+      console.warn('[props] prop models unavailable', err);
+    }
     result.stats.anchors = anchors.length;
     return result;
   })();

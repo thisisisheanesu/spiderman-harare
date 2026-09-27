@@ -162,7 +162,10 @@ export function buildStreets(ctx) {
         const runs = sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW);
         for (const run of runs) {
           const median = run[0].median;
-          emitSidewalk(walks, G, run, hw, side, heightAt, median);
+          // Outside the CBD the "pavement" is mostly a red-earth and dry-grass verge.
+          const mid = run[run.length >> 1];
+          const verge = !median && ctx.urbanAt && ctx.urbanAt(mid.x, mid.z) < 0.22;
+          emitSidewalk(walks, G, run, hw, side, heightAt, median, verge);
           const path = [];
           for (const s of run) path.push(s.x + s.nx * side * (hw + s.w / 2), s.z + s.nz * side * (hw + s.w / 2));
           const width = run.reduce((m, s) => Math.min(m, s.w), sw);
@@ -435,52 +438,66 @@ function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW
 }
 
 // Raised strip along the kerb: paving for pavements; dry grass with black-and-white painted kerbs
-// for medians.
-function emitSidewalk(gb, G, run, hw, side, heightAt, median) {
+// for medians. The kerb is its own material: the face towards the road plus a 0.28 m strip of its
+// top (kerb_* textures map face + top into v, u runs along the kerb in metres).
+const KERB_TOP = 0.28;
+function emitSidewalk(gb, G, run, hw, side, heightAt, median, verge = false) {
   const y = KERB_HEIGHT;
   const inner = [];
+  const edge = [];
   const outer = [];
-  for (const s of run) {
+  const along = [];
+  let acc = 0;
+  for (let k = 0; k < run.length; k++) {
+    const s = run[k];
+    const top = Math.min(KERB_TOP, s.w * 0.4);
     const ix = s.x + s.nx * side * hw;
     const iz = s.z + s.nz * side * hw;
+    const ex = s.x + s.nx * side * (hw + top);
+    const ez = s.z + s.nz * side * (hw + top);
     const ox = s.x + s.nx * side * (hw + s.w);
     const oz = s.z + s.nz * side * (hw + s.w);
+    if (k > 0) acc += Math.hypot(ix - inner[inner.length - 3], iz - inner[inner.length - 2]);
+    along.push(acc);
     inner.push(ix, iz, heightAt(ix, iz));
+    edge.push(ex, ez, heightAt(ex, ez));
     outer.push(ox, oz, heightAt(ox, oz));
   }
   const m = run.length;
-  const top = median ? G.dryGrass : G.paving;
-  const topScale = median ? 9 : 3;
-  gb.brush(tint(median ? '#e6dcc8' : '#ffffff'), top, 0, 0);
+  const topLayer = median || verge ? G.dryGrass : G.paving;
+  gb.brush(tint(median ? '#e6dcc8' : verge ? '#f0e4d0' : '#ffffff'), topLayer, 0, 0);
+  // Slab joints run parallel to the kerb: uv = (along, across) in metres.
+  if (!median && !verge) gb.surface(255, 255, 0, 1);
   for (let i = 0; i < m - 1; i++) {
     const a = i * 3;
     const b = a + 3;
     gb.quad(
-      inner[a], inner[a + 2] + y, inner[a + 1], inner[b], inner[b + 2] + y, inner[b + 1],
+      edge[a], edge[a + 2] + y, edge[a + 1], edge[b], edge[b + 2] + y, edge[b + 1],
       outer[b], outer[b + 2] + y, outer[b + 1], outer[a], outer[a + 2] + y, outer[a + 1],
-      0, 1, 0, inner[a] / 3, -inner[a + 1] / 3, inner[b] / 3, -outer[a + 1] / 3,
+      0, 1, 0, along[i], KERB_TOP, along[i + 1], run[i].w,
     );
   }
-  // World-space UVs for the top (quad() takes a rect; re-map the quads just written).
-  const P = gb.pos;
-  const U = gb.uv;
-  for (let v = gb.vCount - (m - 1) * 4; v < gb.vCount; v++) {
-    U[v * 2] = P[v * 3] / topScale;
-    U[v * 2 + 1] = -P[v * 3 + 2] / topScale;
-  }
-  // Kerb face (towards the road) and outer edge.
-  gb.brush(tint('#ffffff'), median ? G.kerbPaint : G.kerb, 0, 0);
+  // Kerb: face towards the road (+ the outer edge face) and the kerb-top strip, uv in metres.
+  gb.brush(tint(median ? '#ffffff' : '#f2f0ec'), median ? G.kerbPaint : G.kerb, 0, 0);
+  gb.surface(255, 255, 0, 1);
   for (let i = 0; i < m - 1; i++) {
     const a = i * 3;
     const b = a + 3;
-    const len = Math.hypot(inner[b] - inner[a], inner[b + 1] - inner[a + 1]);
+    const u0 = along[i];
+    const u1 = along[i + 1];
+    const len = u1 - u0;
     const dx = (inner[b] - inner[a]) / (len || 1);
     const dz = (inner[b + 1] - inner[a + 1]) / (len || 1);
     // Normal pointing to the road side: -side * left(d) = -side * (dz, -dx).
     const nx = -side * dz;
     const nz = side * dx;
-    gb.quad(inner[a], inner[a + 2], inner[a + 1], inner[b], inner[b + 2], inner[b + 1], inner[b], inner[b + 2] + y, inner[b + 1], inner[a], inner[a + 2] + y, inner[a + 1], nx, 0, nz, 0, 0, len / 2, y / 2);
-    gb.quad(outer[a], outer[a + 2], outer[a + 1], outer[b], outer[b + 2], outer[b + 1], outer[b], outer[b + 2] + y, outer[b + 1], outer[a], outer[a + 2] + y, outer[a + 1], -nx, 0, -nz, 0, 0, len / 2, y / 2);
+    gb.quad(inner[a], inner[a + 2], inner[a + 1], inner[b], inner[b + 2], inner[b + 1], inner[b], inner[b + 2] + y, inner[b + 1], inner[a], inner[a + 2] + y, inner[a + 1], nx, 0, nz, u0, 0, u1, y);
+    gb.quad(
+      inner[a], inner[a + 2] + y, inner[a + 1], inner[b], inner[b + 2] + y, inner[b + 1],
+      edge[b], edge[b + 2] + y, edge[b + 1], edge[a], edge[a + 2] + y, edge[a + 1],
+      0, 1, 0, u0, y, u1, y + KERB_TOP,
+    );
+    gb.quad(outer[a], outer[a + 2], outer[a + 1], outer[b], outer[b + 2], outer[b + 1], outer[b], outer[b + 2] + y, outer[b + 1], outer[a], outer[a + 2] + y, outer[a + 1], -nx, 0, -nz, u0, 0, u1, y);
   }
   // End caps.
   for (const [i, sgn] of [[0, -1], [m - 1, 1]]) {
@@ -488,8 +505,37 @@ function emitSidewalk(gb, G, run, hw, side, heightAt, median) {
     const dx = run[Math.min(m - 1, i + 1)].x - run[Math.max(0, i - 1)].x;
     const dz = run[Math.min(m - 1, i + 1)].z - run[Math.max(0, i - 1)].z;
     const l = Math.hypot(dx, dz) || 1;
-    gb.quad(inner[a], inner[a + 2], inner[a + 1], outer[a], outer[a + 2], outer[a + 1], outer[a], outer[a + 2] + y, outer[a + 1], inner[a], inner[a + 2] + y, inner[a + 1], (sgn * dx) / l, 0, (sgn * dz) / l, 0, 0, 1, y / 2);
+    const w = Math.hypot(outer[a] - inner[a], outer[a + 1] - inner[a + 1]);
+    gb.quad(inner[a], inner[a + 2], inner[a + 1], outer[a], outer[a + 2], outer[a + 1], outer[a], outer[a + 2] + y, outer[a + 1], inner[a], inner[a + 2] + y, inner[a + 1], (sgn * dx) / l, 0, (sgn * dz) / l, 0, 0, w, y);
   }
+}
+
+// Quad strip like ribbon() but with uv = (arc length, lateral offset) in metres, for surfaces laid
+// out along their centreline (First Street Mall's paver grid).
+export function ribbonAlong(gb, pts, nrm, o0, o1, heightAt, y = 0) {
+  const n = pts.length / 2;
+  const lens = arcLengths(pts);
+  const i0 = gb.iCount;
+  let prevA = -1;
+  let prevB = -1;
+  for (let i = 0; i < n; i++) {
+    const x = pts[i * 2];
+    const z = pts[i * 2 + 1];
+    const k = nrm[i * 3 + 2];
+    const ax = x + nrm[i * 3] * o0 * k;
+    const az = z + nrm[i * 3 + 1] * o0 * k;
+    const bx = x + nrm[i * 3] * o1 * k;
+    const bz = z + nrm[i * 3 + 1] * o1 * k;
+    const a = gb.vertex(ax, heightAt(ax, az) + y, az, 0, 1, 0, lens[i], o0);
+    const b = gb.vertex(bx, heightAt(bx, bz) + y, bz, 0, 1, 0, lens[i], o1);
+    if (prevA >= 0) {
+      gb.tri(prevA, prevB, b);
+      gb.tri(prevA, b, a);
+    }
+    prevA = a;
+    prevB = b;
+  }
+  faceUp(gb, i0);
 }
 
 // Continuous line at lateral offset o (left of a->b), width w, between arc lengths s0..s1.

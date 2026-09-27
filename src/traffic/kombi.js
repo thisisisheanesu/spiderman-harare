@@ -240,6 +240,8 @@ export class KombiLife {
         continue;
       }
       v.callT = rng.range(7, 16);
+      // The hwindi leans out of the sliding door while he calls (vehicleRenderer.js).
+      v.leanT = rng.range(5, 8);
       this._cd = rng.range(1.8, 3.2);
       if (v.voiced === undefined) this._chooseVoice(v, rng);
       if (v.voiced && dx * dx + dz * dz < VOICE_RANGE * VOICE_RANGE && rng() < VOICE_CHANCE) {

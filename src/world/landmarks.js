@@ -11,31 +11,31 @@ import { GeoBuffer } from './geoBuffer.js';
 // also written to the building's collider buffer so physics matches what you see.
 
 const STYLE = {
-  rbz: { upper: 'curtain', ground: 'lobby', glass: 6, tint: '#aeb0ac', parapet: false, clutter: 0.3 },
-  rbz_podium: { upper: 'bands', ground: 'lobby', glass: 6, tint: '#a3a8a6' },
-  joina_city: { upper: 'bands', ground: 'lobby', glass: 1, tint: '#b9bab6', parapet: false, clutter: 0 },
+  rbz: { upper: 'curtain', ground: 'lobby', glass: 6, tint: '#aeb0ac', parapet: false, clutter: 0.3, wallMat: 'granite_cladding_light', accentMat: 'granite_cladding_light' },
+  rbz_podium: { upper: 'bands', ground: 'lobby', glass: 6, tint: '#8f9593', wallMat: 'granite_cladding_light', accentMat: 'granite_dark_tiles' },
+  joina_city: { upper: 'bands', ground: 'lobby', glass: 1, tint: '#b9bab6', parapet: false, clutter: 0, wallMat: 'concrete_painted', accentMat: 'concrete_raw' },
   joina_city_podium: { ground: 'shop', letters: ['JOINA CITY', '#b9bab6', '#1d3d6b'] },
-  karigamombe: { upper: 'curtain', ground: 'lobby', glass: 1, tint: '#b8b5b3', clutter: 0 },
+  karigamombe: { upper: 'curtain', ground: 'lobby', glass: 1, tint: '#b8b5b3', clutter: 0, wallMat: 'concrete_painted', accentMat: 'granite_cladding_light' },
   livingstone_house: { upper: 'grid', tint: '#dfdfda', glass: 4 },
-  monomotapa: { upper: 'bands', tint: '#cdbd9c', glass: 0, thicken: 7, clutter: 0.3 },
+  monomotapa: { upper: 'bands', tint: '#cdbd9c', glass: 0, thicken: 7, clutter: 0.3, wallMat: 'plaster_textured', accentMat: 'plaster_textured' },
   meikles: { upper: 'grid', tint: '#e3e0da', glass: 4 },
   meikles_south: { upper: 'bands', tint: '#9c9a92', letters: ['MEIKLES HOTEL', '#8f8d86', '#f1efe8'] },
   eastgate_block_n: { upper: 'eastgate', ground: 'shop', tint: '#ece6de', parapet: false, clutter: 0 },
   eastgate_block_s: { upper: 'eastgate', ground: 'shop', tint: '#ece6de', parapet: false, clutter: 0 },
   eastgate: { upper: 'curtain', ground: 'shop', roofLayer: 'curtain', roofKind: 0, glass: 0, clutter: 0 },
-  town_house: { upper: 'colonial', ground: 'colshop', tint: '#e8d9b5', clutter: 0 },
-  munhumutapa_building: { upper: 'colonial', ground: null, tint: '#e2d596', clutter: 0 },
-  parliament_house: { upper: 'colonial', ground: null, tint: '#dcd2b8', roof: 'hip', clutter: 0 },
-  anglican_cathedral: { upper: 'stone', ground: null, tint: '#a89a86', clutter: 0 },
-  sacred_heart_cathedral: { upper: 'stone', ground: null, tint: '#cdbfa2', clutter: 0 },
-  harare_station: { upper: 'brick', ground: 'colshop', tint: '#ffffff', roof: 'hip', verandah: true, postColor: '#365374' },
+  town_house: { upper: 'colonial', ground: 'colshop', tint: '#e8d9b5', clutter: 0, wallMat: 'plaster_smooth' },
+  munhumutapa_building: { upper: 'colonial', ground: null, tint: '#e2d596', clutter: 0, wallMat: 'plaster_smooth' },
+  parliament_house: { upper: 'colonial', ground: null, tint: '#dcd2b8', roof: 'hip', clutter: 0, wallMat: 'plaster_smooth' },
+  anglican_cathedral: { upper: 'stone', ground: null, tint: '#a89a86', clutter: 0, wallMat: 'stone_cladding_sand' },
+  sacred_heart_cathedral: { upper: 'stone', ground: null, tint: '#cdbfa2', clutter: 0, wallMat: 'stone_cladding_sand' },
+  harare_station: { upper: 'brick', ground: 'colshop', tint: '#ffffff', roof: 'hip', verandah: true, postColor: '#365374', wallMat: 'brick_face_red', accentMat: 'plaster_smooth' },
   pearl_house: { upper: 'grid', tint: '#c29a4e', letters: ['PEARL', '#b08a45', '#f3ead2'] },
   social_security_centre: { upper: 'grid', tint: '#a9a497', glass: 1 },
   zanu_pf_hq: { upper: 'grid', tint: '#a09a8c', clutter: 0 },
   rainbow_towers: { upper: 'blank', ground: 'lobby', tint: '#dad19e', clutter: 0.3 },
   rainbow_towers_hotel: { upper: 'curtain', glass: 5, tint: '#d6c48c' },
   old_mutual_centre: { glass: 3 },
-  national_gallery: { upper: 'blank', tint: '#d9d4ca', clutter: 0 },
+  national_gallery: { upper: 'blank', tint: '#d9d4ca', clutter: 0, wallMat: 'granite_cladding_light' },
 };
 
 const PALM_KEYS = new Set(['town_house', 'parliament_house', 'meikles', 'rainbow_towers', 'rainbow_towers_hotel', 'harare_station', 'monomotapa', 'rbz', 'national_gallery']);
@@ -53,7 +53,7 @@ export class Landmarks {
   adjustSpec(b, spec) {
     const st = STYLE[b.lm];
     if (!st) return;
-    for (const k of ['upper', 'glass', 'parapet', 'clutter', 'postColor']) if (st[k] !== undefined) spec[k] = st[k];
+    for (const k of ['upper', 'glass', 'parapet', 'clutter', 'postColor', 'wallMat', 'accentMat']) if (st[k] !== undefined) spec[k] = st[k];
     if (st.ground !== undefined) spec.ground = st.ground;
     if (st.tint) spec.tint = tint(st.tint);
     if (st.verandah) spec.verandah = true;

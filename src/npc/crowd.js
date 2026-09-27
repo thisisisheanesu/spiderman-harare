@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { CROSS, WALK } from './walkways.js';
-import { walkClipFor } from './appearance.js';
 
 // Crowd simulation: agents walk the pedestrian network (edge + arc length + lateral offset inside the
 // edge's validated band), wait at kerbs for a gap or a red light, dodge each other and the stalls,
@@ -37,7 +36,7 @@ function voiceRateOf(look) {
 const FADE = 0.25;
 const FADE_SIT = 0.45;
 // A clip a variant was not baked with falls back to the next one along.
-const FALLBACK = { flee_run: 'walk', call_out: 'wave', carry_on_head: 'walk', walk_slow: 'walk', sit_talk: 'sit_idle', phone_call: 'idle_relaxed', idle_look: 'idle_relaxed', idle_arms_folded: 'idle_relaxed' };
+const FALLBACK = { flee_run: 'walk', walk_formal: 'walk', call_out: 'wave', carry_on_head: 'walk', walk_slow: 'walk', sit_talk: 'sit_idle', phone_call: 'idle_relaxed', idle_arms_folded: 'idle_relaxed' };
 const SEATED = new Set(['sit_idle', 'sit_talk', 'sit_ground']);
 
 export class Agent {
@@ -55,7 +54,7 @@ export class Agent {
     this.pose = { headYaw: 0, headPitch: 0, sit: 0 };
     // Animation state (bodies.js draws it): current clip and time, the clip it fades from, one-shots.
     this.anim = { clip: null, t: 0, rate: 1, prev: null, pt: 0, prate: 1, blend: 0, fade: FADE, once: null, onceUntil: 0, moving: false, nodAt: 0 };
-    this.phone = false;
+    this.phone = null;
     this.vx = 0;
     this.vz = 0;
   }
@@ -82,7 +81,7 @@ export class Agent {
     this.pathPref = Math.random() * 2 - 1;
     this.speed = 0;
     this.prefSpeed = look.speed;
-    this.walkClip = look.variant ? walkClipFor(look.variant, look.load) : 'walk';
+    this.walkClip = look.walkClip || 'walk';
     this.talkClip = Math.random() < 0.5 ? 'talk' : 'talk_2';
     this.tempo = 0.92 + Math.random() * 0.16; // personal pace of standing clips
     this.forceClip = null;
@@ -131,7 +130,7 @@ export class Agent {
     an.once = null;
     an.moving = kind === 'walker';
     an.nodAt = 0;
-    this.phone = false;
+    this.phone = null; // 'call' | 'film' while holding a phone
   }
 
   // World height of the head joint (base of the skull) in the current animation frame: lower when sitting,
@@ -373,7 +372,8 @@ export class Crowd {
       a.slow = Math.min(a.slow, 0.5);
     }
     target *= a.slow;
-    a.speed = approach(a.speed, target, (target > a.speed ? 1.6 : 4) * dt);
+    // (People bolt when they flee.)
+    a.speed = approach(a.speed, target, (target > a.speed ? (a.state === 'flee' ? 4.5 : 1.6) : 4) * dt);
     const px = a.position.x;
     const pz = a.position.z;
     a.s += a.speed * dt;
@@ -813,9 +813,9 @@ export class Crowd {
       if ((a.habitT -= dt) <= 0) {
         const r = Math.random();
         const guard = L.archetype === 'security_guard' || L.archetype === 'police';
-        if (guard) a.habit = r < 0.45 ? 'fold' : r < 0.8 ? 'look' : null;
+        if (guard) a.habit = r < 0.5 ? 'fold' : null;
         else if (a.state === 'chat') a.habit = null;
-        else a.habit = r < 0.2 ? 'call' : r < 0.36 ? 'fold' : r < 0.48 ? 'look' : null;
+        else a.habit = r < 0.22 ? 'call' : r < 0.4 ? 'fold' : null;
         if (a.lounge || a.stall?.sit) a.habit = null;
         a.habitT = 5 + Math.random() * 12;
       }
@@ -823,7 +823,7 @@ export class Crowd {
 
     let name = 'idle_relaxed';
     let rate = a.tempo;
-    let phone = false;
+    let phone = null;
     let sit = 0;
     const reacting = a.state === 'react' && t >= a.react.start;
     if (an.moving) {
@@ -847,7 +847,7 @@ export class Crowd {
           break;
         case 'photo':
           name = 'phone_film';
-          phone = true;
+          phone = 'film';
           break;
         case 'wave':
           name = 'wave';
@@ -856,24 +856,24 @@ export class Crowd {
           name = 'cheer';
           break;
         case 'cover':
-          // Flinch, then stand braced.
+          // Flinch, then stand and stare.
           if (!an.once && an.clip?.name !== 'hit_head' && t - a.react.start < 0.2) this._once(a, 'hit_head');
-          name = 'idle_arms_folded';
+          name = 'idle_relaxed';
           break;
         default:
           name = 'idle_relaxed';
       }
     } else if (a.kind === 'hwindi' && a.timer > 0) {
-      name = 'call_out';
+      // Touting: leaning on a parked kombi's window sill, or waving passers-by over.
+      if (!a.calling) a.leanOn = this._kombiBeside(a);
+      name = a.leanOn ? 'call_out' : 'wave';
     } else if (a.talkUntil > t) {
       name = a.talkClip;
     } else if (a.habit === 'call') {
       name = 'phone_call';
-      phone = true;
+      phone = 'call';
     } else if (a.habit === 'fold') {
       name = 'idle_arms_folded';
-    } else if (a.habit === 'look') {
-      name = 'idle_look';
     } else if (a.group && a.state === 'chat') {
       // Listeners nod along now and then.
       if (t > an.nodAt) {
@@ -881,6 +881,7 @@ export class Crowd {
         an.nodAt = t + 5 + Math.random() * 12;
       }
     }
+    a.calling = a.kind === 'hwindi' && a.timer > 0;
     if (a.kind === 'hwindi' && a.state !== 'react') {
       a.timer -= dt;
       if (a.timer < -4 - (a.id % 5)) a.timer = 2 + (a.id % 3);
@@ -935,6 +936,30 @@ export class Crowd {
     }
     p.headYaw += (headYaw - p.headYaw) * Math.min(1, dt * 5);
     p.headPitch += (headPitch - p.headPitch) * Math.min(1, dt * 5);
+  }
+
+  // A parked kombi whose side is right in front of a tout (to lean on its window sill: the call_out clip
+  // stands 0.3 m back from the sill): turns him to face it and returns true.
+  _kombiBeside(a) {
+    const cars = this.game.traffic?.vehiclesNear?.(a.position.x, a.position.z, 2.5);
+    if (!cars?.length) return false;
+    for (let i = 0; i < cars.length; i++) {
+      const v = cars[i];
+      if (Math.abs(v.speed || 0) > 0.2 || (v.type && v.type !== 'kombi')) continue;
+      const fx = -Math.sin(v.heading);
+      const fz = -Math.cos(v.heading);
+      const dx = a.position.x - v.position.x;
+      const dz = a.position.z - v.position.z;
+      const along = dx * fx + dz * fz;
+      const side = dx * -fz + dz * fx;
+      const gap = Math.abs(side) - (v.width || 1.9) / 2;
+      if (Math.abs(along) > (v.length || 4.8) / 2 - 0.6 || gap < 0.3 || gap > 0.85) continue;
+      // Face the kombi square on.
+      const h = headingOf(side > 0 ? fz : -fz, side > 0 ? -fx : fx);
+      if (a.home) a.home.heading = h;
+      return true;
+    }
+    return false;
   }
 
   // Start a one-shot clip (nod, flinch) over whatever the person is doing while standing.

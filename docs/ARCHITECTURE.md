@@ -121,12 +121,21 @@ whose `wallNormal` is the horizontal push) and returns an object from a ring of 
 `sidewalkPaths` [{pts:[x,z,…], width, road (index into data.roads), side (+1 left / -1 right of a→b)}],
 `heightAt(x, z)` (visual + physical ground height: 0 except on the Kopje hill), `crossingNodes` (Set of road-node indices
 with zebra crossings / stop lines), `obstacles` [{x, z, r}] (street-level solids for pedestrian avoidance: lamp posts,
-street trees and palms, benches, bins, bollards, planters, rank-shelter posts and benches, verandah posts, billboard legs,
-colonnade columns, the Nehanda statue and the Africa Unity Square fountain), `obstaclesNear(x, z, r)` (those whose circle
-reaches within r), `anchorsNear(x, z, r)` → [{x, y, z}] web anchors within r (horizontal) for swinging where nothing is
-tall: crowns of trees ≥ 7 m and streetlight pole tops (9–10 m). Both queries use grids built once at load and return one
-shared array that the next call overwrites (copy what you keep; no allocation per call). Synthetic volumes (the Rainbow
-Towers hotel tower, id -7; Monomotapa's thickened slab) are registered with `world.addBuilding`.
+street trees and palms, benches, bins, bollards, planters, bus shelters, ZESA boxes, roadworks cones / barriers, the
+shopkeepers' crates / chairs / drums / tyres on the pavement, fuel-totem legs, verandah posts, billboard legs, colonnade
+columns, the Nehanda statue and the Africa Unity Square fountain), `obstaclesNear(x, z, r)` (those whose circle reaches
+within r), `anchorsNear(x, z, r)` → [{x, y, z, kind, radius}] web anchors within r (horizontal) of real high points
+that are not roof edges: `kind` ∈ `'lamp'` (street-lamp pole tops 8–10.9 m and the double-arm lamp heads over both
+carriageways of the dual carriageways), `'tree'` (crown tops of trees ≥ 7 m; `radius` = crown radius, plus `species`),
+`'roofRoom'` (top corners of rooftop lift / stair rooms), `'tank'` (tops of rooftop JoJo tanks, on stands, on the roof
+or on a lift room; `radius` = tank radius), `'mast'` (rooftop antennas / masts), `'parapet'` (convex parapet corners of buildings ≥ 30 m),
+`'billboard'` (top corners); `radius` is 0 unless stated, rooftop items also carry `b` (building id). Both queries use
+grids built once at load and return one shared array that the next call overwrites (copy what you keep; no allocation
+per call). `shops` [{name, cat, x, z, nx, nz, road, id, brand, kind, floor, verified, sub}] (every business of
+`public/data/shops.json`, at its sign on the facade; `road` = the street it faces, `harare.json` names) and
+`shopNear(x, z, r = 30)` → the nearest of them within r, or null (no allocation; e.g. the HUD's "outside OK, First Street
+Mall"). Synthetic volumes (the Rainbow Towers hotel tower, id -7; Monomotapa's thickened slab) are registered with
+`world.addBuilding`.
 
 **player**: `position` (feet, Vector3), `velocity`, `state` ('ground'|'air'|'swing'|'zip'|'wall'|'perch'|'dive'),
 `heading` (rad, 0 = facing north/-z, CCW positive, i.e. forward = (-sin h, 0, -cos h)), `object`, `suit`,

@@ -4,6 +4,7 @@ import { hashString, makeRng } from '../core/rng.js';
 import { PALETTE, tint } from './palette.js';
 import { glassPresetFor, MISC_CELLS, miscUV } from './facades.js';
 import { addRooftopClutter } from './rooftops.js';
+import { TINTABLE } from './render/pbrLibrary.js';
 
 // Buildings: every footprint becomes textured walls (texture-array facade styles with windows that
 // line up with the floors), a flat roof with a parapet (or a hip roof for small suburban houses),
@@ -15,20 +16,26 @@ export const CHUNK = 400;
 
 // Spatial chunks of merged geometry. Each chunk has a `base` buffer (walls, roofs, landmark
 // silhouettes: always drawn) and a `detail` buffer (rooftop clutter, parapet caps, canopies,
-// street furniture, signs: drawn only near the camera).
+// street furniture, signs: drawn only near the camera). Chunks are `size` metres inside `core`
+// (the dense CBD, where shadows and detail need fine culling) and twice that outside it, where the
+// low-rise suburbs are mostly seen from afar: fewer draw calls for the same city.
 export class ChunkGrid {
-  constructor(size = CHUNK) {
+  constructor(size = CHUNK, core = null) {
     this.size = size;
+    this.core = core;
     this.map = new Map();
   }
 
   _entry(x, z) {
-    const ix = Math.floor(x / this.size);
-    const iz = Math.floor(z / this.size);
-    const k = ix * 100003 + iz;
+    const c = this.core;
+    const inCore = !c || (x >= c.minX && x < c.maxX && z >= c.minZ && z < c.maxZ);
+    const size = inCore ? this.size : this.size * 2;
+    const ix = Math.floor(x / size);
+    const iz = Math.floor(z / size);
+    const k = (inCore ? 0 : 1) + 2 * (ix * 100003 + iz);
     let e = this.map.get(k);
     if (!e) {
-      e = { base: new GeoBuffer(8192), detail: new GeoBuffer(8192), cx: (ix + 0.5) * this.size, cz: (iz + 0.5) * this.size };
+      e = { base: new GeoBuffer(8192), detail: new GeoBuffer(8192), cx: (ix + 0.5) * size, cz: (iz + 0.5) * size, half: size / 2 };
       this.map.set(k, e);
     }
     return e;
@@ -152,6 +159,7 @@ export function planBuilding(b, ctx) {
   }
   if (b.lm && ctx.landmarks) ctx.landmarks.adjustSpec(b, spec);
   spec.solar = spec.cls === 1 ? rng() < 0.6 : rng() < 0.2;
+  if (ctx.pbr) pickSurfaces(spec, b, ctx.pbr, rng, residential);
 
   // Hip roofs: ridge a little above the physics roof (b.h), eaves below, so the average matches.
   // Landmarks (Parliament House, the station) get the exact shape instead: eaves at b.h, where
@@ -175,6 +183,138 @@ export function planBuilding(b, ctx) {
   Object.assign(spec, floorsOf(b, windowTop));
   spec.windowTop = windowTop;
   return spec;
+}
+
+const pickW = (rng, weights) => {
+  let t = 0;
+  for (const k in weights) t += weights[k];
+  let r = rng() * t;
+  for (const k in weights) {
+    r -= weights[k];
+    if (r <= 0) return k;
+  }
+  return Object.keys(weights)[0];
+};
+
+// PBR materials per building (public/textures/README.md "Suggested mapping from the map data"):
+// wall + accent (sills, spandrels, piers, stall risers), ground-floor cladding, roof, window frame
+// colour and weathering. Landmarks may preset wallMat / accentMat / roofMat names.
+function pickSurfaces(spec, b, pbr, rng, residential) {
+  let wall = spec.wallMat;
+  let accent = spec.accentMat;
+  let frame = 0;
+  let weather = 1;
+  const older = !b.lm && (spec.upper === 'colonial' || spec.upper === 'brick' || rng() < 0.3);
+  if (!wall) {
+    switch (spec.upper) {
+      case 'brick':
+        wall = rng() < 0.55 ? 'brick_face_red' : 'brick_face_salmon';
+        accent = 'plaster_smooth';
+        frame = rng() < 0.75 ? 2 : 0;
+        break;
+      case 'curtain':
+        wall = 'metal_panel';
+        accent = rng() < 0.6 ? 'granite_cladding_light' : 'concrete_painted';
+        frame = rng() < 0.5 ? 0 : 1;
+        weather = 0;
+        break;
+      case 'bands':
+        wall = pickW(rng, { concrete_painted: 3, plaster_smooth: 2, brick_face_salmon: 0.7, concrete_board_formed: 0.5 });
+        accent = 'concrete_raw';
+        frame = rng() < 0.6 ? 0 : 1;
+        break;
+      case 'punched':
+      case 'pair':
+        wall = pickW(rng, { plaster_smooth: 3, concrete_painted: 2, plaster_textured: 1.2, brick_face_salmon: 0.9, stone_cladding_sand: 0.4 });
+        accent = 'concrete_painted';
+        frame = residential ? (rng() < 0.7 ? 2 : 1) : rng.pick([0, 1, 2]);
+        break;
+      case 'fins':
+      case 'grid':
+        wall = pickW(rng, { concrete_painted: 3, concrete_board_formed: 1, granite_cladding_light: 0.8, plaster_smooth: 1 });
+        accent = rng() < 0.5 ? 'concrete_board_formed' : 'concrete_raw';
+        frame = rng() < 0.6 ? 0 : 1;
+        break;
+      case 'balcony':
+        wall = rng() < 0.6 ? 'plaster_smooth' : 'concrete_painted';
+        accent = 'concrete_painted';
+        frame = rng() < 0.6 ? 2 : 1;
+        break;
+      case 'colonial':
+        wall = rng() < 0.4 ? 'plaster_peeling' : 'plaster_smooth';
+        accent = 'plaster_smooth';
+        frame = rng() < 0.6 ? 2 : 3;
+        weather = 2;
+        break;
+      case 'house':
+        wall = rng() < 0.6 ? 'plaster_textured' : 'plaster_smooth';
+        accent = 'plaster_smooth';
+        frame = rng() < 0.6 ? 2 : 0;
+        break;
+      case 'industrial':
+        wall = rng() < 0.45 ? 'corrugated_weathered' : 'concrete_painted';
+        accent = 'concrete_raw';
+        weather = 2;
+        break;
+      // Painted landmark artwork: the material lends its relief and grain.
+      case 'eastgate':
+        wall = 'brick_face_salmon';
+        accent = 'concrete_board_formed';
+        break;
+      case 'stone':
+        wall = 'stone_cladding_sand';
+        break;
+      case 'frieze':
+        wall = 'granite_cladding_light';
+        break;
+      case 'lattice':
+        wall = 'concrete_board_formed';
+        break;
+      default:
+        wall = 'concrete_painted';
+        accent = 'concrete_raw';
+    }
+  }
+  if (older) weather = Math.min(3, weather + 1);
+  spec.wallMat = wall;
+  spec.accentMat = accent || 'concrete_painted';
+  // Non-tintable materials (face brick, stone, corrugated sheet) keep their own colour: the
+  // building tint becomes a near-white multiplier for them.
+  spec.wallTint = TINTABLE.has(wall) ? spec.tint : tint(rng.pick(PALETTE.brick), 0.92 + rng() * 0.12);
+  // Street level: shop piers in the wall material or granite; stall risers in dark granite / tiles.
+  if (!spec.groundMat) {
+    spec.groundMat = rng() < 0.55 ? wall : pickW(rng, { granite_cladding_light: 2, metal_panel: 1, concrete_painted: 1 });
+    spec.groundAccent = rng() < 0.65 ? 'granite_dark_tiles' : 'granite_cladding_light';
+    if (spec.ground === 'lobby') {
+      spec.groundMat = 'granite_dark_tiles';
+      spec.groundAccent = 'granite_cladding_light';
+    }
+  }
+  spec.groundTint = TINTABLE.has(spec.groundMat) ? spec.tint : tint('#ffffff', 0.95);
+  spec.flags = (frame << 2) | (weather << 4);
+  spec.ids = { wall: pbr.id(wall), accent: pbr.id(spec.accentMat), ground: pbr.id(spec.groundMat), groundAccent: pbr.id(spec.groundAccent) };
+  // Roofs.
+  if (!spec.roofMat) {
+    if (spec.roof === 'hip') {
+      if (spec.roofLayer === 'tiles') {
+        spec.roofMat = 'clay_tile_roof';
+        spec.roofTint = tint(rng.pick(['#ffffff', '#f0e2da', '#e2d0c4', '#ffffff']), 0.9 + rng() * 0.15);
+      } else if (b.roofColor || rng() < 0.55) {
+        spec.roofMat = 'ibr_sheet_painted';
+        spec.roofTint = tint(b.roofColor || rng.pick(['#8a3a2c', '#7a2f25', '#3f5f45', '#44566e', '#6d6f70', '#9a4a32']), b.roofColor ? 0.8 : 1);
+      } else {
+        spec.roofMat = 'corrugated_weathered';
+        spec.roofTint = tint('#ffffff', 0.85 + rng() * 0.25);
+      }
+    } else if (spec.upper === 'industrial') {
+      spec.roofMat = rng() < 0.6 ? 'corrugated_weathered' : 'roof_membrane';
+      spec.roofTint = tint('#ffffff', 0.85 + rng() * 0.2);
+    } else {
+      spec.roofMat = pickW(rng, { roof_gravel: 4, roof_membrane: 3, concrete_raw: 2 });
+      spec.roofTint = spec.roofMat === 'concrete_raw' ? tint(rng.pick(['#a39e96', '#b3ada4', '#98948e'])) : tint('#ffffff', 0.82 + rng() * 0.25);
+    }
+  }
+  spec.ids.roof = pbr.id(spec.roofMat);
 }
 
 // Which street (if any) an outer wall edge faces, and how much pavement lies in front of it.
@@ -236,8 +376,8 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
       if (street && (spec.windowTop > fh * 1.6 || spec.fl === 1)) {
         const gl = spec.ground;
         const nb = Math.max(1, Math.round(len / tileW[gl]));
-        gb.brush(spec.tint, L[gl], seed, 0, 2, spec.glass);
-        gb.wall(ax, az, bx, bz, 0, fh, nx, nz, 0, nb, 0, 1);
+        gb.brush(spec.groundTint || spec.tint, L[gl], seed, 0, 2, spec.glass);
+        emitShopWall(gb, spec, ctx, b, ax, az, bx, bz, fh, nx, nz, nb);
         y0 = fh;
         frontages.push({ b, ax, az, bx, bz, nx, nz, len, y: fh, street, canopy: null, seed });
       }
@@ -246,7 +386,8 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
         const tiny = len < tileW[spec.upper] * 0.45;
         const layer = tiny ? 'blank' : spec.upper;
         const nb = tiny ? len / tileW.blank : Math.max(1, Math.round(len / tileW[layer]));
-        gb.brush(spec.tint, L[layer], seed, 0, spec.cls, spec.glass);
+        gb.brush(spec.wallTint || spec.tint, L[layer], seed, 0, spec.cls, spec.glass);
+        if (spec.ids) gb.surface(spec.ids.wall, spec.ids.accent, 0, spec.flags);
         gb.wall(ax, az, bx, bz, y0, top, nx, nz, u0, u0 + nb, y0 / fh, top / fh);
         u0 += Math.ceil(nb);
       }
@@ -284,12 +425,21 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
           if (!spec.fullCollider) col.wall(ax, az, bx, bz, roofY, parapetTop, nx, nz, 0, 1, 0, 1);
         }
       }
+      // Projecting coping / cornice along the outer walls: real relief that catches the sun and
+      // throws a shadow line (detail layer: only drawn near the camera). Deeper on colonial fronts.
+      if (outer && b.core && !b.lm && spec.ids && CORNICE[spec.upper]) {
+        const [proj, h] = CORNICE[spec.upper];
+        emitCornice(detail, ring, normals, parapetTop - h + 0.04, parapetTop + 0.04, proj, bandTint, L, seed, spec.ids.accent);
+        // A second, slimmer band where the parapet meets the top floor.
+        if (spec.upper === 'colonial' || spec.upper === 'bands') emitCornice(detail, ring, normals, Math.min(spec.windowTop, roofY) - 0.12, Math.min(spec.windowTop, roofY), proj * 0.6, bandTint, L, seed, spec.ids.accent);
+      }
     }
   });
 
   if (flat) {
     const layer = spec.roofLayer || 'roofFlat';
     gb.brush(spec.roofTint, L[layer], seed, spec.roofKind ?? 2, spec.cls, spec.glass);
+    if (spec.ids && layer === 'roofFlat') gb.surface(spec.ids.roof, 255, 0, 0);
     gb.polygon(fp, holes, roofY, tileW[layer]);
   } else {
     emitHipRoof(fp, spec, gb, L, tileW, seed, spec.solidRoof ? col : null);
@@ -328,6 +478,87 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
   return frontages;
 }
 
+// Interior-atlas cell (public/textures/glass/interiors.json) for a shop category (shops.json).
+const SHOP_CELL = {
+  supermarket: 4, grocery: 4, wholesale: 4, liquor: 4, pharmacy: 4, butcher: 4, bakery: 4, market: 4, retail: 4, clinic: 4,
+  clothing: 5, shoes: 5, department: 5, jewellery: 5, salon: 5, fast_food: 5, restaurant: 5, cafe: 5, bar: 5, cinema: 5,
+  hardware: 6, auto_parts: 6, electronics: 6, phone: 6, telecom: 6, furniture: 6, stationery: 6, printing: 6, books: 6,
+  bank: 0, money: 0, finance: 0, insurance: 0, travel: 0, courier: 0, office: 0, government: 0, hotel: 0, mall: 4,
+};
+
+// Ground-floor shopfront wall, one quad per bay so each bay can show the interior of the real
+// business trading there (shops.json, matched by building, facade normal and anchor position).
+function emitShopWall(gb, spec, ctx, b, ax, az, bx, bz, fh, nx, nz, nb) {
+  const ids = spec.ids;
+  const surface = (hint) => {
+    if (ids) gb.surface(ids.ground, ids.groundAccent, hint, spec.flags);
+  };
+  const shops = ctx.shopsByBuilding?.get(b.id);
+  const len = Math.hypot(bx - ax, bz - az);
+  const ex = (bx - ax) / len;
+  const ez = (bz - az) / len;
+  const here = [];
+  if (shops) {
+    for (const s of shops) {
+      if (s.floor > 0 || s.nx * nx + s.nz * nz < 0.9) continue;
+      const along = (s.x - ax) * ex + (s.z - az) * ez;
+      const off = Math.abs((s.x - ax) * nx + (s.z - az) * nz);
+      if (off > 1.2 || along < -1 || along > len + 1) continue;
+      const cell = SHOP_CELL[s.cat];
+      if (cell !== undefined) here.push({ along, half: (s.w || 4) / 2 + 0.6, hint: cell + 1 });
+    }
+  }
+  if (!here.length) {
+    surface(0);
+    gb.wall(ax, az, bx, bz, 0, fh, nx, nz, 0, nb, 0, 1);
+    return;
+  }
+  for (let k = 0; k < nb; k++) {
+    const t0 = (k / nb) * len;
+    const t1 = ((k + 1) / nb) * len;
+    const mid = (t0 + t1) / 2;
+    let hint = 0;
+    let best = Infinity;
+    for (const h of here) {
+      const d = Math.abs(h.along - mid);
+      if (d < h.half && d < best) {
+        best = d;
+        hint = h.hint;
+      }
+    }
+    surface(hint);
+    gb.wall(ax + ex * t0, az + ez * t0, ax + ex * t1, az + ez * t1, 0, fh, nx, nz, k, k + 1, 0, 1);
+  }
+}
+
+// Cornice profiles per facade style: [projection m, height m].
+const CORNICE = { bands: [0.18, 0.28], punched: [0.14, 0.22], pair: [0.14, 0.22], grid: [0.22, 0.3], fins: [0.16, 0.25], balcony: [0.16, 0.25], brick: [0.12, 0.2], colonial: [0.3, 0.38], blank: [0.1, 0.18] };
+
+// Box profile along a ring (outward normals): front face, top and soffit.
+function emitCornice(gb, ring, normals, y0, y1, proj, color, L, seed, mat) {
+  const out = offsetRing(ring, normals, proj);
+  const n = ring.length / 2;
+  gb.brush(color, L.concrete, seed, 2);
+  gb.surface(mat, 255, 0, 0);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const ax = ring[i * 2];
+    const az = ring[i * 2 + 1];
+    const bx = ring[j * 2];
+    const bz = ring[j * 2 + 1];
+    if (Math.hypot(bx - ax, bz - az) < 0.12) continue;
+    const nx = normals[i * 2];
+    const nz = normals[i * 2 + 1];
+    const Ax = out[i * 2];
+    const Az = out[i * 2 + 1];
+    const Bx = out[j * 2];
+    const Bz = out[j * 2 + 1];
+    gb.wall(Ax, Az, Bx, Bz, y0, y1, nx, nz, 0, 1, 0, 1);
+    gb.quad(ax, y1, az, bx, y1, bz, Bx, y1, Bz, Ax, y1, Az, 0, 1, 0, 0, 0, 1, 1);
+    gb.quad(ax, y0, az, Ax, y0, Az, Bx, y0, Bz, bx, y0, bz, 0, -1, 0, 0, 0, 1, 1);
+  }
+}
+
 // Copies triangles [i0, end) of `gb` into `col` (for pieces that are not in the physics data).
 function copyTriangles(gb, i0, col) {
   const P = gb.pos;
@@ -358,8 +589,10 @@ function emitHipRoof(fp, spec, gb, L, tileW, seed, col) {
     const t = Math.max(-rl, Math.min(rl, u));
     return [obb.cx + obb.ux * t, obb.cz + obb.uz * t];
   };
-  const s = 1 / tileW[spec.roofLayer];
+  const pbrRoof = spec.ids && spec.ids.roof !== undefined;
+  const s = pbrRoof ? 1 : 1 / tileW[spec.roofLayer];
   gb.brush(spec.roofTint, L[spec.roofLayer], seed, 2);
+  if (pbrRoof) gb.surface(spec.ids.roof, 255, 0, 1);
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
     const ax = ring[i * 2];
@@ -413,8 +646,10 @@ function emitHipRoof(fp, spec, gb, L, tileW, seed, col) {
     }
     // Fascia board under the eave edge.
     gb.setLayer(L.concrete);
+    if (pbrRoof) gb.surface(255);
     gb.wall(ax, az, bx, bz, eave - 0.18, eave, -ix, -iz, 0, len / 4, 0, 0.05);
     gb.setLayer(L[spec.roofLayer]);
+    if (pbrRoof) gb.surface(spec.ids.roof, 255, 0, 1);
   }
   // Soffit (underside of the overhang) so the eaves read from street level.
   gb.brush(tint('#d9d4c8'), L.concrete, seed, 2);

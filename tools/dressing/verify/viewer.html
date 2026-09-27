@@ -1,0 +1,109 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Dressing verify</title>
+<style>html,body{margin:0;background:#000;overflow:hidden}</style>
+<script type="importmap">{ "imports": { "three": "/repo/node_modules/three/build/three.module.js", "three/addons/": "/repo/node_modules/three/examples/jsm/", "three/examples/jsm/": "/repo/node_modules/three/examples/jsm/" } }</script>
+</head><body>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { patchVegetationMaterial, createImpostorMesh, windUniforms } from '/repo/tools/dressing/runtime/dressing.js';
+
+const q = new URLSearchParams(location.search);
+const W = +(q.get('w') || 960), H = +(q.get('h') || 540);
+const cfg = await (await fetch(q.get('cfg'))).json();
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = cfg.exposure || 1.0;
+renderer.shadowMap.enabled = cfg.shadows !== false;
+renderer.shadowMap.type = THREE.PCFShadowMap;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(cfg.sky || '#a9c4e4');
+if (cfg.fog) scene.fog = new THREE.Fog(cfg.sky || '#a9c4e4', cfg.fog[0], cfg.fog[1]);
+const hemi = new THREE.HemisphereLight('#c3d6ee', '#a08868', cfg.hemi ?? 1.1);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight('#fff3e2', cfg.sunI ?? 3);
+const el = THREE.MathUtils.degToRad(cfg.sun?.elev ?? 55), az = THREE.MathUtils.degToRad(cfg.sun?.azim ?? 35);
+const sunDir = new THREE.Vector3(Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az));
+sun.position.copy(sunDir).multiplyScalar(80);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+const sc = cfg.shadowSize || 40;
+Object.assign(sun.shadow.camera, { left: -sc, right: sc, top: sc, bottom: -sc, near: 1, far: 250 });
+sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.05;
+const tgt = new THREE.Object3D(); tgt.position.set(...(cfg.shadowCenter || [0, 0, 0])); scene.add(tgt);
+sun.position.add(tgt.position); sun.target = tgt;
+scene.add(sun);
+
+// ground: asphalt road + concrete pavements (Harare colours from PHOTOS.md) or plain earth
+function box(pos, size, color, rough = 0.95) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(...size), new THREE.MeshStandardMaterial({ color, roughness: rough }));
+  m.position.set(pos[0], pos[1] + size[1] / 2, pos[2]); m.castShadow = true; m.receiveShadow = true; scene.add(m); return m;
+}
+const g = new THREE.Mesh(new THREE.PlaneGeometry(2000, 2000), new THREE.MeshStandardMaterial({ color: cfg.groundColor || '#8e8472', roughness: 1 }));
+g.rotation.x = -Math.PI / 2; g.receiveShadow = true; scene.add(g);
+for (const b of cfg.boxes || []) box(b.pos, b.size, b.color || '#cfc6b4');
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const texLoader = new THREE.TextureLoader();
+let tris = 0;
+const glbCache = new Map();
+async function glb(url) {
+  if (!glbCache.has(url)) glbCache.set(url, loader.loadAsync(url));
+  return (await glbCache.get(url)).scene;
+}
+let old = null;
+for (const o of cfg.objects || []) {
+  let obj;
+  if (o.old) {
+    old = old || await import('/repo/src/world/treeModels.js');
+    const geo = old.modelFor(o.old, o.oldLod || 0);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, map: old.leafTexture(), alphaTest: 0.45, side: THREE.DoubleSide });
+    obj = new THREE.Mesh(geo, mat);
+    obj.castShadow = true;
+    obj.customDepthMaterial = new THREE.MeshDepthMaterial({ map: mat.map, alphaTest: 0.45, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
+  } else if (o.impostor) {
+    const imp = o.impostor;
+    const [ta, tn] = await Promise.all([texLoader.loadAsync(imp.albedo), texLoader.loadAsync(imp.normal)]);
+    const mesh = createImpostorMesh({ impostor: imp }, ta, tn, 1,
+      { lights: { sunDir, sunColor: new THREE.Color('#fff3e2').multiplyScalar((cfg.sunI ?? 3) * 0.8), skyColor: new THREE.Color('#c3d6ee').multiplyScalar(0.9), groundColor: new THREE.Color('#a08868').multiplyScalar(0.8) } });
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(...o.pos), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), o.rotY || 0), new THREE.Vector3(1, 1, 1).multiplyScalar(o.scale || 1));
+    mesh.setMatrixAt(0, m); mesh.count = 1;
+    if (cfg.impDebug) { mesh.material.defines = { IMP_DEBUG_NORMAL: '' }; mesh.material.needsUpdate = true; }
+    scene.add(mesh); tris += 2;
+    continue;
+  } else {
+    obj = (await glb(o.src)).clone();
+    obj.traverse((c) => {
+      if (!c.isMesh) return;
+      c.castShadow = true; c.receiveShadow = true;
+      const mats = Array.isArray(c.material) ? c.material : [c.material];
+      for (const m of mats) {
+        if (o.veg) {
+          const fol = /foliage|frond|leaf|skirt/i.test(m.name) || m.alphaTest > 0 || m.transparent;
+          if (fol && m.map) { m.alphaTest = 0.5; m.transparent = false; }
+          patchVegetationMaterial(m, { foliage: fol });
+          if (fol) c.customDepthMaterial = new THREE.MeshDepthMaterial({ map: m.map, alphaTest: 0.5, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
+        }
+      }
+      tris += (c.geometry.index ? c.geometry.index.count : c.geometry.attributes.position.count) / 3;
+    });
+  }
+  obj.position.set(...o.pos);
+  obj.rotation.y = o.rotY || 0;
+  if (o.scale) obj.scale.setScalar(o.scale);
+  scene.add(obj);
+}
+const cam = new THREE.PerspectiveCamera(cfg.camera?.fov || 50, W / H, 0.1, 3000);
+cam.position.set(...(cfg.camera?.pos || [0, 1.7, 20]));
+cam.lookAt(new THREE.Vector3(...(cfg.camera?.target || [0, 5, 0])));
+windUniforms.uWindTime.value = 3.0;
+renderer.render(scene, cam);
+await new Promise((r) => setTimeout(r, 300));
+renderer.render(scene, cam);
+window.__stats = { tris: Math.round(tris), calls: renderer.info.render.calls, rtris: renderer.info.render.triangles };
+window.__done = true;
+</script></body></html>

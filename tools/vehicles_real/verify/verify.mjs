@@ -63,14 +63,14 @@ for (const s of shots) {
   page.on('pageerror', (e) => errors.push(String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   const params = new URLSearchParams({ models: s.models.join(','), view: s.view || 'front34', lod: String(s.lod || 0) });
-  for (const k of ['night', 'cols', 'paint', 'toggles', 'gap', 'zoom', 'fov', 'cam', 'labels', 'wire', 'backface', 'rawlen']) {
+  for (const k of ['night', 'cols', 'paint', 'toggles', 'gap', 'zoom', 'fov', 'cam', 'labels', 'wire', 'backface', 'rawlen', 'rawopaque', 'views', 'gcols', 'shadow']) {
     if (s[k] !== undefined) params.set(k, String(s[k]));
   }
   await page.goto(`http://localhost:${port}/index.html?${params}`);
   await page.waitForFunction('window.__ready === true', null, { timeout: 600000 });
   const st = await page.evaluate(() => window.__stats);
   for (const [k, v] of Object.entries(st)) allStats[`${k}${s.lod ? '_lod1' : ''}`] = v;
-  await page.screenshot({ path: path.join(outDir, `${s.name}.png`) });
+  await page.screenshot({ path: path.join(outDir, `${s.name}.png`), timeout: 600000 });
   if (errors.length) console.log(s.name, 'errors:', errors.slice(0, 5));
   console.log('shot', s.name);
   await page.close();

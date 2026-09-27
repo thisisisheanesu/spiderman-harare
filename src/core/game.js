@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { EventBus } from './events.js';
 import { Input } from './input.js';
+import { PostFX } from './postfx.js';
 
 // Game: owns the renderer, scene, camera, main loop and the list of systems.
 //
@@ -140,7 +141,9 @@ export class Game {
         }
       }
     }
-    this.renderer.render(this.scene, this.camera);
+    // Scene + post effects (ambient occlusion, night glow; none on 'low'). See postfx.js.
+    if (!this.postfx) this.postfx = new PostFX(this);
+    this.postfx.render(this.scene, this.camera);
     this.frame++;
   }
 

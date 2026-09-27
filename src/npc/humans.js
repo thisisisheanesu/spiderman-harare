@@ -32,11 +32,11 @@ const CLIP_DEFS = {
   walk: [30, true],
   walk_female: [30, true],
   walk_slow: [30, true],
+  walk_formal: [30, true],
   carry_on_head: [30, true],
   flee_run: [30, true],
   idle_relaxed: [15, true],
   idle_arms_folded: [15, true],
-  idle_look: [15, true],
   talk: [15, true],
   talk_2: [15, true],
   phone_call: [15, true],
@@ -51,8 +51,18 @@ const CLIP_DEFS = {
   nod_yes: [15, false],
   hit_head: [30, false],
 };
+// Things people carry, built into every variant's mesh (skinned 100 % to their bone, collapsed unless the
+// person's prop flags show them, bodies.js): a phone at the ear, a phone held up filming, a basin of produce
+// on the head. Colour slots: 1 phone, 2 basin, 3 produce (palettes below, picked per person).
+export const PROP = { CALL: 1, FILM: 2, BASIN: 4 };
+export const BASIN_COLORS = ['#c9ced3', '#2b56a1', '#d23a2a', '#e0b23a', '#2e8b57'];
+export const LOAD_COLORS = ['#d6331f', '#f0d23c', '#f08c1a', '#2f7d32', '#b99b6b', '#b5654a'];
+
 // Long skirts and wraps tear in a run (README): these people hurry at a fast walk instead.
 const NO_RUN = new Set(['woman_zambia_wrap', 'woman_vendor_apron', 'woman_elder', 'woman_apostolic', 'man_elder_flatcap']);
+
+// Roles that also get the upright, straight-armed walk.
+const FORMAL = ['office_man', 'street_preacher', 'police', 'security_guard'];
 
 function clipsFor(v) {
   const out = [];
@@ -60,8 +70,9 @@ function clipsFor(v) {
     if (name === 'walk' && v.gender !== 'male') continue;
     if (name === 'walk_female' && v.gender !== 'female') continue;
     if (name === 'walk_slow' && !v.roles.includes('elder')) continue;
+    if (name === 'walk_formal' && !FORMAL.some((r) => v.roles.includes(r))) continue;
     if (name === 'carry_on_head' && !v.roles.includes('market_woman')) continue;
-    if (name === 'call_out' && !v.roles.includes('hwindi')) continue;
+    if (name === 'call_out' && !v.roles.includes('hwindi') && !v.roles.includes('youth')) continue;
     if (name === 'flee_run' && NO_RUN.has(v.id)) continue;
     out.push(name);
   }
@@ -108,6 +119,31 @@ function toHalf(src) {
   const out = new Uint16Array(src.length);
   for (let i = 0; i < src.length; i++) out[i] = DataUtils.toHalfFloat(src[i]);
   return out;
+}
+
+// Prop geometry in its own frame: {part, pos, nor, slot (per triangle... per vertex)}.
+function propParts() {
+  const parts = [];
+  const make = (part, pieces) => {
+    const pos = [];
+    const nor = [];
+    const slot = [];
+    for (const [geo, s] of pieces) {
+      const g = geo.index ? geo.toNonIndexed() : geo;
+      pos.push(...g.attributes.position.array);
+      nor.push(...g.attributes.normal.array);
+      for (let i = 0; i < g.attributes.position.count; i++) slot.push(s);
+    }
+    parts.push({ part, pos, nor, slot });
+  };
+  make(1, [[new THREE.BoxGeometry(0.072, 0.145, 0.009), 1]]);
+  make(2, [[new THREE.BoxGeometry(0.072, 0.145, 0.009), 1]]);
+  make(3, [
+    [new THREE.CylinderGeometry(0.25, 0.17, 0.11, 14, 1, true).translate(0, 0.055, 0), 2],
+    [new THREE.CircleGeometry(0.17, 14).rotateX(Math.PI / 2).translate(0, 0.002, 0), 2],
+    [new THREE.SphereGeometry(0.23, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.42, 1).translate(0, 0.08, 0), 3],
+  ]);
+  return parts;
 }
 
 export class Humans {
@@ -158,7 +194,7 @@ export class Humans {
     const pelvis = this.boneIndex.get('pelvis');
     this.HEAD = this.boneIndex.get('head');
     this.NECK = this.boneIndex.get('neck_01');
-    this.PROP_BONES = [this.HEAD, this.boneIndex.get('hand_r')];
+    this.PROP_BONES = [this.HEAD, this.boneIndex.get('hand_r'), this.boneIndex.get('hand_l')];
 
     // Variants: rest pose (local TRS by canonical bone), metrics and geometry.
     const variants = list.map((v, index) => {
@@ -218,7 +254,7 @@ export class Humans {
         else qmul(out, p * 4, qLocal, i * 4, out, i * 4);
       }
     };
-    const fkPos = (v, qW, tLocal, out, shiftY = 0) => {
+    const fkPos = (v, qW, tLocal, out) => {
       const tmp = this._tmp3 || (this._tmp3 = new Float32Array(3));
       for (let i = 0; i < NB; i++) {
         const p = this.parents[i];
@@ -228,7 +264,7 @@ export class Humans {
         if (p < 0) {
           qrot(v.pQ, 0, x * v.pS, y * v.pS, z * v.pS, tmp, 0);
           out[i * 3] = v.pT[0] + tmp[0];
-          out[i * 3 + 1] = v.pT[1] + tmp[1] - shiftY;
+          out[i * 3 + 1] = v.pT[1] + tmp[1];
           out[i * 3 + 2] = v.pT[2] + tmp[2];
         } else {
           qrot(qW, p * 4, x * v.pS, y * v.pS, z * v.pS, tmp, 0);
@@ -346,7 +382,10 @@ export class Humans {
     this.bakeStats = { qFrames, cRows, qTexels: qFrames * NB, cTexels: cRows * NB };
 
     // --- Geometry and colour per LOD ---------------------------------------------------------------
-    this.lods = [0, 1].map((lod) => this._packGeometry(lod));
+    this.restQ = restQ;
+    const lod1 = this._extract(1);
+    const far = this._decimate(lod1, 0.085);
+    this.lods = [this._pack(this._withProps(this._extract(0))), this._pack(this._withProps(lod1)), this._pack(far)];
     this.maps = [
       this._textureArray(variants.map((v) => this._mapOf(v.gltf[0])), lod0Size),
       this._textureArray(variants.map((v) => this._mapOf(v.gltf[1])), lod1Size),
@@ -387,33 +426,22 @@ export class Humans {
     });
   }
 
-  // De-quantised bind-pose mesh of every variant in character space, packed for vertex pulling.
-  _packGeometry(lod) {
-    const NB = this.NB;
-    const meshes = this.variants.map((v) => {
-      let mesh = null;
-      v.gltf[lod].scene.traverse((o) => {
-        if (o.isSkinnedMesh && !mesh) mesh = o;
-      });
-      v.gltf[lod].scene.updateMatrixWorld(true);
-      return mesh;
-    });
-    let maxCorners = 0;
-    let totalVerts = 0;
-    for (const m of meshes) {
-      maxCorners = Math.max(maxCorners, m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count);
-      totalVerts += m.geometry.attributes.position.count;
-    }
-    const vtx = new Float32Array(totalVerts * 12);
-    const idx = new Float32Array(maxCorners * meshes.length);
+  // De-quantised bind-pose mesh of every variant in character space: per variant {vtx (12 floats a vertex:
+  // position, packed joints, normal, u, three weights, v), index}.
+  _extract(lod) {
+    const out = [];
     const D = new THREE.Matrix4();
     const Di = new THREE.Matrix4();
     const nm = new THREE.Matrix3();
     const p = new THREE.Vector3();
     const n = new THREE.Vector3();
-    let base = 0;
     let bindError = 0;
-    meshes.forEach((mesh, vi) => {
+    for (const v of this.variants) {
+      let mesh = null;
+      v.gltf[lod].scene.traverse((o) => {
+        if (o.isSkinnedMesh && !mesh) mesh = o;
+      });
+      v.gltf[lod].scene.updateMatrixWorld(true);
       const g = mesh.geometry;
       const sk = mesh.skeleton;
       // D: bind-space position -> character space (bone world x inverse bind x bind matrix); every bone
@@ -431,42 +459,194 @@ export class Humans {
       const si = g.attributes.skinIndex;
       const sw = g.attributes.skinWeight;
       const count = pos.count;
+      const vtx = new Float32Array(count * 12);
       for (let i = 0; i < count; i++) {
         p.fromBufferAttribute(pos, i).applyMatrix4(D);
         n.fromBufferAttribute(nor, i).applyMatrix3(nm).normalize();
-        const w = [sw.getX(i), sw.getY(i), sw.getZ(i), sw.getW(i)];
-        const j = [si.getX(i), si.getY(i), si.getZ(i), si.getW(i)].map((b) => remap[b] ?? 0);
-        const sum = w[0] + w[1] + w[2] + w[3] || 1;
-        const o = (base + i) * 12;
+        const w0 = sw.getX(i);
+        const w1 = sw.getY(i);
+        const w2 = sw.getZ(i);
+        const sum = w0 + w1 + w2 + sw.getW(i) || 1;
+        const o = i * 12;
         vtx[o] = p.x;
         vtx[o + 1] = p.y;
         vtx[o + 2] = p.z;
-        vtx[o + 3] = j[0] + j[1] * 64 + j[2] * 4096 + j[3] * 262144;
+        vtx[o + 3] = remap[si.getX(i)] + remap[si.getY(i)] * 64 + remap[si.getZ(i)] * 4096 + remap[si.getW(i)] * 262144;
         vtx[o + 4] = n.x;
         vtx[o + 5] = n.y;
         vtx[o + 6] = n.z;
         vtx[o + 7] = uv.getX(i);
-        vtx[o + 8] = w[0] / sum;
-        vtx[o + 9] = w[1] / sum;
-        vtx[o + 10] = w[2] / sum;
+        vtx[o + 8] = w0 / sum;
+        vtx[o + 9] = w1 / sum;
+        vtx[o + 10] = w2 / sum;
         vtx[o + 11] = uv.getY(i);
       }
-      const index = g.index;
-      const corners = index ? index.count : count;
-      const o = vi * maxCorners;
-      for (let k = 0; k < maxCorners; k++) {
-        // Padding repeats the last corner: zero-area triangles the GPU drops.
-        const c = Math.min(k, corners - 1);
-        idx[o + k] = base + (index ? index.getX(c) : c);
-      }
-      base += count;
-    });
+      const index = g.index ? Uint32Array.from(g.index.array) : Uint32Array.from({ length: count }, (_, i) => i);
+      out.push({ vtx, index });
+    }
     if (bindError > 1e-3) console.warn('[npc] bind pose mismatch', bindError);
-    if (NB > 64) console.warn('[npc] more than 64 bones: joint packing overflows');
+    if (this.NB > 64) console.warn('[npc] more than 64 bones: joint packing overflows');
+    return out;
+  }
+
+  // A far LOD by vertex clustering (cells of `cell` m, never merging across limbs): a few hundred
+  // triangles, same UVs as the source (smears a little over atlas seams, invisible at 100 m).
+  _decimate(src, cell) {
+    const limbOf = new Int8Array(this.NB);
+    for (const [name, i] of this.boneIndex) {
+      const side = name.endsWith('_l') ? 0 : name.endsWith('_r') ? 1 : -1;
+      const leg = /thigh|calf|foot|ball/.test(name);
+      limbOf[i] = side < 0 ? 0 : (leg ? 1 : 3) + side;
+    }
+    return src.map(({ vtx, index }) => {
+      const count = vtx.length / 12;
+      const cluster = new Map();
+      const map = new Int32Array(count);
+      const acc = [];
+      for (let i = 0; i < count; i++) {
+        const o = i * 12;
+        const J = vtx[o + 3];
+        const js = [J & 63, (J >> 6) & 63, (J >> 12) & 63, (J >> 18) & 63];
+        const ws = [vtx[o + 8], vtx[o + 9], vtx[o + 10], 1 - vtx[o + 8] - vtx[o + 9] - vtx[o + 10]];
+        let best = 0;
+        for (let k = 1; k < 4; k++) if (ws[k] > ws[best]) best = k;
+        const key = `${limbOf[js[best]]}|${Math.floor(vtx[o] / cell)}|${Math.floor(vtx[o + 1] / cell)}|${Math.floor(vtx[o + 2] / cell)}`;
+        let c = cluster.get(key);
+        if (c === undefined) {
+          c = acc.length;
+          cluster.set(key, c);
+          acc.push({ rep: i, n: 0, p: [0, 0, 0], nr: [0, 0, 0] });
+        }
+        const a = acc[c];
+        a.n++;
+        for (let k = 0; k < 3; k++) {
+          a.p[k] += vtx[o + k];
+          a.nr[k] += vtx[o + 4 + k];
+        }
+        map[i] = c;
+      }
+      const out = new Float32Array(acc.length * 12);
+      acc.forEach((a, c) => {
+        out.set(vtx.subarray(a.rep * 12, a.rep * 12 + 12), c * 12);
+        const len = Math.hypot(a.nr[0], a.nr[1], a.nr[2]) || 1;
+        for (let k = 0; k < 3; k++) {
+          out[c * 12 + k] = a.p[k] / a.n;
+          out[c * 12 + 4 + k] = a.nr[k] / len;
+        }
+      });
+      const tris = [];
+      const seen = new Set();
+      for (let t = 0; t < index.length; t += 3) {
+        const a = map[index[t]];
+        const b = map[index[t + 1]];
+        const c = map[index[t + 2]];
+        if (a === b || b === c || a === c) continue;
+        const key = [a, b, c].sort((x, y) => x - y).join(',');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        tris.push(a, b, c);
+      }
+      return { vtx: out, index: Uint32Array.from(tris) };
+    });
+  }
+
+  // Held props appended to every variant's mesh (u < 0 marks a prop vertex: -u = colour slot, v = part).
+  _withProps(list) {
+    const parts = propParts();
+    const m = new THREE.Matrix4();
+    const rest = new THREE.Matrix4();
+    const pose = new THREE.Matrix4();
+    const nm = new THREE.Matrix3();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const v3 = new THREE.Vector3();
+    const one = new THREE.Vector3(1, 1, 1);
+    return list.map((d, vi) => {
+      const V = this.variants[vi];
+      const extra = [];
+      for (const part of parts) {
+        // Where the prop sits in its bone's frame: measured once from a frame of the clip that uses it.
+        const k = part.part === 3 ? 0 : 1;
+        const bone = this.PROP_BONES[k];
+        if (part.part === 3) m.makeTranslation(0, 0.175, 0);
+        else {
+          const clip = this.clips[part.part === 1 ? 'phone_call' : 'phone_film'];
+          const f = Math.round(Math.min(1, clip.dur * 0.4) * clip.fps);
+          const qf = clip.qBase + f;
+          const row = clip.cBase[vi] + f;
+          this.phonePose(part.part === 1 ? 'call' : 'film', qf, row, m);
+          this.propPose(1, qf, row, p, q);
+          pose.compose(p, q, one);
+          m.premultiply(pose.invert());
+        }
+        q.fromArray(this.restQ, bone * 4);
+        p.fromArray(V.restT, bone * 3);
+        rest.compose(p, q, one).multiply(m);
+        nm.getNormalMatrix(rest);
+        for (let i = 0; i < part.pos.length; i += 3) {
+          v3.fromArray(part.pos, i).applyMatrix4(rest);
+          extra.push(v3.x, v3.y, v3.z, bone);
+          v3.fromArray(part.nor, i).applyMatrix3(nm).normalize();
+          extra.push(v3.x, v3.y, v3.z, -part.slot[i / 3], 1, 0, 0, part.part);
+        }
+      }
+      const n0 = d.vtx.length / 12;
+      const vtx = new Float32Array(d.vtx.length + extra.length);
+      vtx.set(d.vtx);
+      vtx.set(extra, d.vtx.length);
+      const index = new Uint32Array(d.index.length + extra.length / 12);
+      index.set(d.index);
+      for (let i = 0; i < extra.length / 12; i++) index[d.index.length + i] = n0 + i;
+      return { vtx, index };
+    });
+  }
+
+  // Character-space placement of a phone for a pose sample: against the right palm at the ear for a call,
+  // held up between both hands at eye level, screen to the eyes, when filming. Writes a Matrix4.
+  phonePose(kind, qf, row, out) {
+    const t = this._pp || (this._pp = { head: new THREE.Vector3(), r: new THREE.Vector3(), l: new THREE.Vector3(), q: new THREE.Quaternion(), p: new THREE.Vector3(), x: new THREE.Vector3(), y: new THREE.Vector3(), z: new THREE.Vector3() });
+    this.propPose(0, qf, row, t.head, t.q);
+    this.propPose(1, qf, row, t.r, t.q);
+    t.head.y += 0.07; // eyes / ear
+    if (kind === 'film') {
+      this.propPose(2, qf, row, t.l, t.q);
+      t.p.addVectors(t.r, t.l).multiplyScalar(0.5);
+      t.p.y += 0.07;
+      t.y.set(0, 1, 0);
+    } else {
+      // The fingers point along the hand bone's +y: the phone lies along them, between palm and ear.
+      t.y.set(0, 1, 0).applyQuaternion(t.q);
+      t.p.copy(t.r).addScaledVector(t.y, 0.07).lerp(t.head, 0.28);
+    }
+    t.z.subVectors(t.head, t.p).normalize();
+    t.x.crossVectors(t.y, t.z).normalize();
+    t.y.crossVectors(t.z, t.x);
+    return out.makeBasis(t.x, t.y, t.z).setPosition(t.p);
+  }
+
+  // Pack every variant of a LOD for vertex pulling (one texture of vertices, one of corners).
+  _pack(list) {
+    let maxCorners = 0;
+    let totalVerts = 0;
+    for (const d of list) {
+      maxCorners = Math.max(maxCorners, d.index.length);
+      totalVerts += d.vtx.length / 12;
+    }
+    const vtx = new Float32Array(totalVerts * 12);
+    const idx = new Float32Array(maxCorners * list.length);
+    let base = 0;
+    list.forEach((d, vi) => {
+      vtx.set(d.vtx, base * 12);
+      const corners = d.index.length;
+      const o = vi * maxCorners;
+      // Padding repeats the last corner: zero-area triangles the GPU drops.
+      for (let k = 0; k < maxCorners; k++) idx[o + k] = base + d.index[Math.min(k, corners - 1)];
+      base += d.vtx.length / 12;
+    });
     return {
       corners: maxCorners,
       vertices: totalVerts,
-      tris: meshes.map((m) => (m.geometry.index ? m.geometry.index.count / 3 : 0)),
+      tris: list.map((d) => d.index.length / 3),
       vtx: dataTexture(vtx, totalVerts * 3, THREE.FloatType),
       idx: dataTexture(idx, idx.length, THREE.FloatType, THREE.RedFormat),
     };
@@ -513,7 +693,7 @@ export class Humans {
     return rt.texture;
   }
 
-  // Character-space height of prop bone k (0 head, 1 right hand) at time t of `clip` for variant index v.
+  // Character-space height of prop bone k (0 head, 1 right hand, 2 left hand) at time t of `clip` for variant index v.
   jointY(k, clip, t, v) {
     let f = t * clip.fps;
     f = clip.loop ? ((f % clip.frames) + clip.frames) % clip.frames : Math.min(Math.max(f, 0), clip.frames);
@@ -521,7 +701,7 @@ export class Humans {
     return this.propT[(row * this.PROP_BONES.length + k) * 3 + 1];
   }
 
-  // Pose of a prop bone (k: 0 head, 1 right hand) for an animation sample, in character space:
+  // Pose of a prop bone (k: 0 head, 1 right hand, 2 left hand) for an animation sample, in character space:
   // writes position into outP (Vector3) and world rotation into outQ (Quaternion).
   propPose(k, qFrame, cRow, outP, outQ) {
     const nP = this.PROP_BONES.length;

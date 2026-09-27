@@ -6,7 +6,8 @@ import { PointGrid } from './pointGrid.js';
 // Real business signage from public/data/shops.json (docs/references/BUSINESSES.md): one sign per
 // entry on the facade of the building it occupies (fascia boards, lightboxes, painted walls,
 // awnings, entrance boards, fuel totems, tower letters), snapped onto the building's canopy or
-// verandah edge when its shopfront has one.
+// verandah edge when its shopfront has one; plus black-on-white street-name plates on the building
+// corners at junctions (medium / high).
 //
 // Rendering: every sign of the city is one merged BufferGeometry (one draw call). Sign faces are
 // textured from a small text cache: a texture array of 4:1 slots holding the faces ((name, sub,
@@ -16,9 +17,10 @@ import { PointGrid } from './pointGrid.js';
 // slot draw as plain boards in their colours with a soft band where the lettering is. Lightboxes,
 // fuel totems and hotel tower letters glow at night (shared uNight uniform).
 //
-// Public: shops [{name, cat, x, z, road, id, brand, kind, floor, verified, sub}] (all entries, at
-// the sign anchor on the facade), near(x, z, r) -> nearest entry within r or null (shared, no
-// allocation), group, update(camera), obstacles [{x, z, r}] (fuel totem legs), stats.
+// Public: shops [{name, cat, x, z, nx, nz, road, id, brand, kind, floor, verified, sub}] (all
+// entries, at the sign anchor on the facade; (nx, nz) = the facade's outward normal),
+// near(x, z, r) -> nearest entry within r or null (no allocation), group, update(camera, dt),
+// fill(x, z), obstacles [{x, z, r}] (fuel totem legs), stats.
 
 const CACHE = {
   low: { w: 256, h: 64, layers: 1, budget: 1.5, maxDist: 150 },
@@ -228,6 +230,21 @@ function drawFace(ctx, W, H, face) {
   ctx.fillRect(0, LH * 0.92, LW, LH * 0.08);
 }
 
+// "Samora Machel Avenue" -> "SAMORA MACHEL AVE", "Fourth Street/ S.V Muzenda" -> "FOURTH ST".
+function plateName(name) {
+  const base = name.split('/')[0].replace(/\(.*?\)/g, '').trim();
+  if (!base || /^\d/.test(base)) return '';
+  return base
+    .replace(/\bAvenue\b/i, 'Ave')
+    .replace(/\bStreet\b/i, 'St')
+    .replace(/\bRoad\b/i, 'Rd')
+    .replace(/\bDrive\b/i, 'Dr')
+    .replace(/\bTerrace\b/i, 'Tce')
+    .replace(/\bLane\b/i, 'Ln')
+    .replace(/\s+/g, ' ')
+    .toUpperCase();
+}
+
 function shadeHex(hex, k) {
   const [r, g, b] = shade(rgbBytes(hex), k);
   return `rgb(${r},${g},${b})`;
@@ -400,7 +417,7 @@ totalEmissiveRadiance += sCol * (vCol.a * uNight * 1.7);`,
 export class ShopSigns {
   // opts: {json (shops.json), frontages (from buildings.js emitBuilding), buildings (data.buildings),
   //        heightAt(x, z), uniforms ({uNight}), level ('low'|'medium'|'high')}
-  constructor({ json, frontages, buildings, heightAt, uniforms, level = 'high' }) {
+  constructor({ json, frontages, buildings, heightAt, uniforms, level = 'high', nodes = null }) {
     this.level = level;
     this.cfg = CACHE[level] || CACHE.high;
     this.uniforms = uniforms;
@@ -409,7 +426,7 @@ export class ShopSigns {
     this.obstacles = [];
     this.styles = json.styles || {};
     this.shops = json.shops.map((s) => ({
-      name: s.name, cat: s.cat, x: s.x, z: s.z, road: s.road || '', id: s.id, brand: s.brand || null,
+      name: s.name, cat: s.cat, x: s.x, z: s.z, nx: s.nx, nz: s.nz, road: s.road || '', id: s.id, brand: s.brand || null,
       kind: s.kind || this.styles[s.style]?.kind || 'fascia', floor: s.floor || 0, verified: s.verified, sub: s.sub || null,
     }));
     this._grid = new PointGrid(this.shops, 32);
@@ -432,9 +449,52 @@ export class ShopSigns {
       this._emit(geo, s, style, kind, fronts, buildings, heightAt);
       this.stats.signs++;
     }
+    if (nodes && level !== 'low') this._streetPlates(geo, frontages || [], nodes, heightAt);
     this.geo = geo;
     this.stats.faces = this.faces.length;
     this.stats.triangles = geo.idx.length / 3;
+  }
+
+  // Black-on-white street-name plates on the building corners at junctions (PHOTOS.md s.20: "R.
+  // MUGABE RD"), one per corner and street, from the frontages that face a named street.
+  _streetPlates(geo, frontages, nodes, heightAt) {
+    const seen = new Set();
+    const style = { bg: '#f2f1ec', fg: '#141414', font: 'bold-sans', case: 'upper', kind: 'board' };
+    const bg = rgbBytes(style.bg);
+    const fg = rgbBytes(style.fg);
+    for (const f of frontages) {
+      const r = f.street?.road;
+      if (!r?.name || !f.b.core || f.len < 4 || r.a === undefined) continue;
+      const name = plateName(r.name);
+      if (!name) continue;
+      for (const end of [0, 1]) {
+        const cx = end ? f.bx : f.ax;
+        const cz = end ? f.bz : f.az;
+        let near = Infinity;
+        for (const ni of [r.a, r.b]) near = Math.min(near, Math.hypot(nodes[ni][0] - cx, nodes[ni][1] - cz));
+        if (near > 16) continue;
+        const key = `${name}|${Math.round(cx / 8)}|${Math.round(cz / 8)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        // 0.9 m in from the corner, on the first-floor wall just above the shop signs / canopy.
+        const ex = ((end ? f.ax - f.bx : f.bx - f.ax) / f.len) * 0.9;
+        const ez = ((end ? f.az - f.bz : f.bz - f.az) / f.len) * 0.9;
+        const w = 1.3;
+        const x = cx + ex + (ex / 0.9) * (w / 2);
+        const z = cz + ez + (ez / 0.9) * (w / 2);
+        const y = f.y + 0.85;
+        if (y + 0.3 > f.b.h) continue;
+        const id = this._faceFor({ style: 'street_plate', name, sub: null }, style, 'board', w / 0.26, {});
+        const n = [f.nx, f.nz];
+        const rr = [f.nz, -f.nx];
+        const g0 = heightAt ? heightAt(x, z) : 0;
+        geo.box([x + f.nx * 0.04, g0 + y, z + f.nz * 0.04], rr, n, w, 0.26, 0.02, id, bg, 0.05, fg, 0, shade(bg, 0.6));
+        this.signs.x.push(x);
+        this.signs.z.push(z);
+        this.signs.face.push(id);
+        this.stats.plates = (this.stats.plates || 0) + 1;
+      }
+    }
   }
 
   // Phones: researched and chain signs only, no entrance boards.
@@ -534,7 +594,8 @@ export class ShopSigns {
       return;
     }
 
-    let depth = kind === 'painted' ? 0 : DEPTH[kind] ?? 0.05;
+    // Painted lettering and raised tower letters are single faces; boards and boxes have depth.
+    const depth = kind === 'painted' || kind === 'tower' ? 0 : DEPTH[kind] ?? 0.05;
     let out = kind === 'painted' ? 0.025 : kind === 'tower' ? 0.12 : 0.02;
     const hit = this._frontage(s, fronts);
     if (hit && kind !== 'tower') {
@@ -559,10 +620,13 @@ export class ShopSigns {
         if (y + h > b.h + 0.9) h = Math.max(0.55, b.h + 0.9 - y);
         this.stats.snapped++;
       } else if (kind !== 'board') {
-        // Above the shopfront glazing (the ground-floor band's glass ends ~80 % up).
-        y = Math.max(y, (f.glassTop ?? f.y * 0.8) + 0.05);
+        // Above the shopfront glazing: the display windows end ~0.78 m under the ground-floor band's
+        // top (facade shader), leaving the fascia strip the sign covers.
+        y = Math.max(y, (f.glassTop ?? f.y - 0.76) + 0.03);
       }
     }
+    // Raised building parts (overhangs, bridges: minH > 0) have no wall below minH.
+    if (b?.minH > 0 && y < b.minH + 0.2) y = b.minH + 0.2;
     if (kind !== 'tower' && !(hit?.f.canopy && kind !== 'board' && kind !== 'awning') && b && y + h > b.h + 0.3) {
       h = Math.max(0.5, Math.min(h, b.h + 0.3 - y));
       if (y + h > b.h + 0.3) y = Math.max(0.5, b.h + 0.3 - h);
@@ -676,7 +740,8 @@ export class ShopSigns {
   }
 
   // Which faces deserve a slot: the nearest ones (by their nearest sign) within maxDist.
-  _select(cx, cz) {
+  // Signs behind the camera (forward (fx, fz)) count as 1.5 x farther.
+  _select(cx, cz, fx = 0, fz = 0) {
     const faces = this.faces;
     for (const f of faces) {
       f.dist = Infinity;
@@ -686,7 +751,7 @@ export class ShopSigns {
     for (let i = 0; i < N; i++) {
       const dx = this.sx[i] - cx;
       const dz = this.sz[i] - cz;
-      const d = dx * dx + dz * dz;
+      const d = (dx * dx + dz * dz) * (dx * fx + dz * fz < 0 ? 2.25 : 1);
       const f = faces[this.sf[i]];
       if (d < f.dist) f.dist = d;
     }
@@ -790,7 +855,8 @@ export class ShopSigns {
 
   // Keeps the cache on the faces nearest the camera: re-selects every few metres (or half second)
   // and rasterises a couple of faces per frame within the time budget.
-  update(cam, dt = 0) {
+  // fwd: optional horizontal view direction {x, z} (prioritises the signs in front).
+  update(cam, dt = 0, fwd = null) {
     if (!this.atlas) return;
     this._timer += dt;
     const dx = cam.x - this._lastX;
@@ -799,7 +865,7 @@ export class ShopSigns {
       this._timer = 0;
       this._lastX = cam.x;
       this._lastZ = cam.z;
-      this._select(cam.x, cam.z);
+      this._select(cam.x, cam.z, fwd?.x || 0, fwd?.z || 0);
     }
     if (this._qi < this._queue.length) this._drain(this.cfg.budget);
   }

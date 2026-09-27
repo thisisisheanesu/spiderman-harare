@@ -8,12 +8,16 @@ import { findSwingAnchor } from './anchors.js';
 //   taut   the rope is a stiff, critically damped spring along the web. Its radial "tug" beyond what
 //          the arc itself needs (centripetal + gravity) is capped, and eased in over TUG_RAMP, so a
 //          catch is a firm pull, never a velocity snap; the web pays out a little under the cap.
-//   reel   only when the anchor is low for the arc's clearance: the rope shortens (a hard pull on the
-//          web, limited speed and acceleration) to the planned length, never below MIN_ROPE
+//   reel   only when the anchor is low for the arc's clearance: during the down-swing Spider-Man pulls
+//          the web in (a visible pull, at most REEL_MAX = 5 m/s) to the planned length, never below
+//          MIN_ROPE; that keeps low anchors (16-35 m roofs, lamp heads, tree crowns) swingable
 //   swing  gravity SWING_G, light air drag; forward input pumps along the arc (Spider-Man pulling and
 //          kicking through the downswing and bottom), sideways input steers across the swing plane;
 //          brushing a wall plants a foot and kicks off it (the web stays on), meeting one head-on
 //          grabs it (wall crawl)
+// Clearance: the feet may come down to CLEAR_LOW (1.3 m) over an empty street, but not within
+// CLEAR_HIGH of anyone, nor within VEH_CLEAR of a vehicle's roof, under the low part of the arc
+// (traffic.vehiclesNear / npcs.npcsNear, checked when planning and again on the way down).
 // Which anchor: findSwingAnchor ranks believable anchors geometrically, then this module simulates the
 // pendulum each of the best few would give (same physics, rigid rope) and rates the outcome: arc
 // clear of walls, roofs and the street (vetoed otherwise), not hugging a wall, where the release
@@ -38,8 +42,8 @@ const TUG_RAMP = 0.35;
 const SHOT_SPEED = 520; // m/s (web.js animates the same)
 const SHOT_SLACK = 0.7; // m of slack in the fresh web (it sags, then pulls taut)
 const KEEP_SLACK = 0.12; // once taut, slack beyond this is taken up (the web stays snug)
-const REEL_MAX = 24; // m/s
-const REEL_ACC = 90; // m/s² (a hard pull on the web: at most ~3 m/s per frame at 30 fps)
+const REEL_MAX = 5; // m/s: pulling the web in hand over hand
+const REEL_ACC = 18; // m/s² (at most 0.6 m/s per frame at 30 fps)
 const REEL_GAIN = 2.5; // 1/s: reel speed per metre still to reel
 const PUMP = 12; // m/s² along the arc with forward held (downswing, bottom and early upswing): Spider-Man
 // pulling and kicking through
@@ -48,7 +52,12 @@ const STEER = 6; // m/s² across the swing plane
 const DRAG = 0.003; // quadratic air drag (1/m): 2.7 m/s² at 30 m/s
 const SUB_H = 1 / 120; // integration step
 const HAND_UP = 1.1;
-const CLEAR = 2.9; // m: lowest the feet may come to the street / a roof under the arc (kombis, buses)
+const CLEAR_LOW = 1.3; // m: lowest the feet may come to an empty street / a roof under the arc...
+const CLEAR_HIGH = 2.6; // ...with people under the low part of the arc...
+const VEH_CLEAR = 0.8; // ...and over a vehicle's roof there
+const LOW_BAND = 3.2; // m: the part of the arc lower than this over the street is checked for traffic
+const REEL_BUDGET = 3.5; // m the rope can be reeled in on a down-swing (anchor pre-filter)
+const RELEASE_BUFFER = 1.0; // s: a jump tapped on the down-swing lets go (boosted) past the bottom, by then
 const ALT = 10; // m: preferred lowest point of the feet over the street, when the anchor allows it
 const MIN_ROPE = 9; // never reel shorter than this for ALT
 const REL_ELEV = 0.42; // rad: forward held, let go once the velocity climbs this steeply past the bottom
@@ -147,22 +156,29 @@ export class SwingMove {
     this.hit = { point: new THREE.Vector3(), normal: new THREE.Vector3(), side: 1, buildingId: -1, kind: '', score: 0 };
     this.aim = new THREE.Vector3(0, 0, -1); // desired travel direction at the start (street-aligned)
     this.facadeN = new THREE.Vector3();
-    this.plan = { L0: 0, target: 0, delay: 0, hd: 0, ceiling: 0 };
+    this.plan = { L0: 0, target: 0, delay: 0, hd: 0, ceiling: 0, clear: CLEAR_LOW };
+    this.clear = CLEAR_LOW; // this swing's street clearance (raised if traffic comes under it)
+    this.releaseQueued = -1; // s since a jump was tapped on the down-swing (-1: none)
+    this._low = { n: 0, x0: 0, z0: 0, x1: 0, z1: 0 };
+    this._cars = [];
+    this._people = [];
+    this._trafficT = 0;
     this.ceiling = 0;
     this.sim = { hit: false, ground: false, hitT: 0, tRel: 0, vx: 0, vy: 0, vz: 0, x: 0, y: 0, z: 0, minFeet: 0, streetRel: 0, hug: 0, kicks: 0 };
     this._planHand = new THREE.Vector3();
     this._planDir = new THREE.Vector3();
     this._planPump = false;
     // Anchor-search telemetry (counts since start; for tests / tuning).
-    this.stats = { tries: 0, found: 0, rated: 0, ground: 0, wall: 0, align: 0, plan: 0 };
+    this.stats = { tries: 0, found: 0, rated: 0, ground: 0, wall: 0, align: 0, plan: 0, traffic: 0, props: 0 };
     this.query = {
       speed: 0,
       fall: 0,
       side: 1,
       street: 0,
       alt: ALT,
-      // Street lights / trees for low-rise streets, if the city provides them.
-      fallback: (x, z, r) => ctrl.game.city?.anchorsNear?.(x, z, r),
+      minBottom: -Infinity,
+      // Rooftop structures, street-light heads and tree crowns, if the city provides them.
+      props: (x, z, r) => ctrl.game.city?.anchorsNear?.(x, z, r),
       accept: (point, cand) => this._rate(point, cand),
     };
   }
@@ -253,11 +269,13 @@ export class SwingMove {
     q.fall = -p.velocity.y;
     q.side = -this.side;
     q.street = this._street(hand.x, hand.z);
+    q.minBottom = q.street + CLEAR_LOW + c.centerHeight - REEL_BUDGET;
     this._planHand.copy(hand);
     this._planDir.copy(dir);
     this._planPump = c.wish.lengthSq() > 0.09;
     this.cinematic = false;
     this.stats.tries++;
+    this._gatherTraffic(hand.x, hand.z);
     const hit = findSwingAnchor(c.world, hand, dir, q, this.hit);
     if (!hit || !this._start(hit, hand, dir)) this.retry = 0.1;
     else this.stats.found++;
@@ -279,6 +297,7 @@ export class SwingMove {
     q.side = -this.side;
     q.street = this._street(hand.x, hand.z);
     const accept = q.accept;
+    q.minBottom = -Infinity;
     q.accept = (pt) => {
       const d = hand.distanceTo(pt);
       const up = (pt.y - hand.y) / d;
@@ -330,7 +349,7 @@ export class SwingMove {
   // Rope for a web to `point` from the body centre (cx, cy, cz): its length when it lands (L0,
   // including the shot's slack) and the planned length (target): as shot, unless the arc would
   // then bottom out too low (below ALT over the street when the anchor is high enough, and never
-  // closer than CLEAR to the street or a roof under the arc), in which case it reels in to that.
+  // closer than out.clear to the street or a roof under the arc), in which case it reels in to that.
   // False if no usable rope is left.
   _planRope(point, cx, cy, cz, out) {
     const c = this.c;
@@ -348,7 +367,7 @@ export class SwingMove {
     }
     const street = this._street(point.x, point.z);
     const ch = c.centerHeight;
-    const low = Math.max(floor + CLEAR, Math.min(street + ALT, point.y - MIN_ROPE - ch)) + ch;
+    const low = Math.max(floor + out.clear, Math.min(street + ALT, point.y - MIN_ROPE - ch)) + ch;
     out.L0 = d + SHOT_SLACK;
     out.target = Math.min(out.L0, point.y - low);
     out.hd = hd;
@@ -394,12 +413,29 @@ export class SwingMove {
     const cz = center.z + v.z * delay;
     const st = this.stats;
     st.rated++;
+    plan.clear = CLEAR_LOW;
     if (!this._planRope(point, cx, cy, cz, plan)) {
       st.plan++;
       return null;
     }
     plan.delay = delay;
-    const s = this._simulate(point, plan.L0, plan.target, this._planPump, this.sim, cand);
+    let s = this._simulate(point, plan.L0, plan.target, this._planPump, this.sim, cand);
+    // Someone or something under the low part of the arc: plan it higher over them (more reeling),
+    // or not at all.
+    if (!s.hit && s.minFeet < LOW_BAND) {
+      const need = this._clearanceUnder(this._low);
+      if (need > s.minFeet) {
+        st.traffic++;
+        plan.clear = need;
+        if (!this._planRope(point, cx, cy, cz, plan)) {
+          st.plan++;
+          return null;
+        }
+        s = this._simulate(point, plan.L0, plan.target, this._planPump, this.sim, cand);
+        if (!s.hit && s.minFeet < this._clearanceUnder(this._low)) return null;
+      }
+    }
+    if (cand) cand.clear = plan.clear;
     // Never a swing into the street / onto a roof, nor into a wall before it would let go.
     if (s.hit) {
       if (s.ground) st.ground++;
@@ -429,7 +465,7 @@ export class SwingMove {
       2 * align +
       0.025 * clamp(s.streetRel - (center.y - c.centerHeight - this._street(center.x, center.z)), -12, 12) +
       0.08 * clamp(spd - speed0, -10, 10) +
-      0.6 * smooth(CLEAR, ALT, s.minFeet) +
+      0.6 * smooth(CLEAR_LOW, ALT, s.minFeet) +
       0.35 * smooth(8, 18, s.streetRel) +
       0.5 * bump(dur, 1.4, 0.9) -
       0.8 * smooth(2.2, 2.6, dur) -
@@ -438,11 +474,47 @@ export class SwingMove {
     // Somewhere to go next: roofs ahead of the release point at about the release height or above.
     const ahead = this._roofsAhead(s.x, s.z, s.vx / hs, s.vz / hs);
     score += 0.6 * smooth(-8, 3, ahead - s.y);
-    if (s.minFeet < CLEAR) {
+    if (s.minFeet < plan.clear) {
       st.ground++;
       return null;
     }
     return score;
+  }
+
+  // Vehicles and people near the player, gathered once per anchor search (for _clearanceUnder).
+  _gatherTraffic(x, z) {
+    const game = this.c.game;
+    const cars = this._cars;
+    const people = this._people;
+    cars.length = 0;
+    people.length = 0;
+    const vs = game.traffic?.vehiclesNear?.(x, z, 80);
+    if (vs) for (let i = 0; i < vs.length; i++) if (vs[i]?.position) cars.push(vs[i]);
+    const ps = game.npcs?.npcsNear?.(x, z, 70);
+    if (ps) for (let i = 0; i < ps.length; i++) if (ps[i]?.position) people.push(ps[i]);
+  }
+
+  // The street clearance the low part of an arc (low: its first and last point under LOW_BAND)
+  // needs: CLEAR_LOW over an empty street, more over people and vehicles.
+  _clearanceUnder(low) {
+    if (!low.n) return CLEAR_LOW;
+    let need = CLEAR_LOW;
+    const ax = low.x0;
+    const az = low.z0;
+    const bx = low.x1 - ax;
+    const bz = low.z1 - az;
+    const bl = bx * bx + bz * bz || 1e-6;
+    const dist = (px, pz) => {
+      const t = clamp(((px - ax) * bx + (pz - az) * bz) / bl, 0, 1);
+      return Math.hypot(px - ax - bx * t, pz - az - bz * t);
+    };
+    for (const v of this._cars) {
+      if (dist(v.position.x, v.position.z) < (v.length || 4) / 2 + 1.5) need = Math.max(need, (v.height || 1.6) + VEH_CLEAR);
+    }
+    for (const n of this._people) {
+      if (dist(n.position.x, n.position.z) < 1.6) need = Math.max(need, CLEAR_HIGH);
+    }
+    return need;
   }
 
   // The swing on a rope to `point` from the current state, as far as the automatic release (or a
@@ -472,6 +544,8 @@ export class SwingMove {
     out.minFeet = Infinity;
     out.hug = 0;
     out.kicks = 0;
+    const low = this._low;
+    low.n = 0;
     let samples = 0;
     let t = 0;
     let released = false;
@@ -544,6 +618,15 @@ export class SwingMove {
       const feet = y - ch;
       const street = this._street(x, z);
       if (feet - street < out.minFeet) out.minFeet = feet - street;
+      if (feet - street < LOW_BAND) {
+        if (!low.n) {
+          low.x0 = x;
+          low.z0 = z;
+        }
+        low.x1 = x;
+        low.z1 = z;
+        low.n++;
+      }
       // Hugging a wall: a building right beside the body, on the anchor's side.
       if (t >= delay) {
         const ad2 = Math.hypot(point.x - x, point.z - z) || 1;
@@ -630,8 +713,12 @@ export class SwingMove {
       const cx = center.x + v.x * plan.delay;
       const cy = center.y + v.y * plan.delay;
       const cz = center.z + v.z * plan.delay;
+      plan.clear = hit.clear || CLEAR_LOW;
       if (!this._planRope(hit.point, cx, cy, cz, plan)) return false;
     }
+    this.clear = this.cinematic ? CLEAR_LOW : plan.clear;
+    this.releaseQueued = -1;
+    if (hit.kind === 'prop') this.stats.props++;
     this.aim.copy(dir);
     if (p.state === 'dive') c.game.cameraRig?.fovKick?.(-3);
     this.anchor.copy(hit.point);
@@ -695,6 +782,17 @@ export class SwingMove {
       this.release(false, true);
       c.obstacle(res.wallNormal, c.wallImpact);
       return;
+    }
+    this._watchTraffic(h);
+    if (this.releaseQueued >= 0) {
+      // A jump tapped on the down-swing: let go (boosted) once past the bottom and rising.
+      this.releaseQueued += h;
+      const ctr = c.center;
+      const ahead = (ctr.x - this.anchor.x) * v.x + (ctr.z - this.anchor.z) * v.z > 0;
+      if ((ahead && v.y > 0) || this.taut >= RELEASE_BUFFER || this.releaseQueued > RELEASE_BUFFER) {
+        this.release(true);
+        return;
+      }
     }
     if (this.delay > 0 || this.taut < 0) return;
     const center = c.center;
@@ -765,7 +863,7 @@ export class SwingMove {
       // Dropping towards the street / a roof anyway (steering or pumping took the arc lower than
       // planned): pull up on the web.
       const feet = p.position.y - this._street(p.position.x, p.position.z);
-      if (feet < CLEAR && v.y < 0) this.ropeTarget = Math.min(this.ropeTarget, d - (CLEAR - feet) - 1);
+      if (feet < this.clear && v.y < 0) this.ropeTarget = Math.min(this.ropeTarget, d - (this.clear - feet) - 1);
       // Reel in towards the planned length (smoothly); take up slack beyond KEEP_SLACK.
       const excess = this.ropeLen - this.ropeTarget;
       const want = excess > 0 ? Math.min(REEL_MAX, excess * REEL_GAIN) : 0;
@@ -901,6 +999,41 @@ export class SwingMove {
 
   // ------------------------------------------------------------------ release
 
+  // Jump pressed mid-swing: a boosted release; tapped on the down-swing of a young swing it waits for
+  // the bottom of the arc (letting go on the way down would only drop you towards the street).
+  jumpPressed() {
+    const c = this.c;
+    const v = c.p.velocity;
+    const ctr = c.center;
+    const ahead = (ctr.x - this.anchor.x) * v.x + (ctr.z - this.anchor.z) * v.z > 0;
+    const young = this.taut < 0 ? this.time < RELEASE_BUFFER : this.taut < RELEASE_BUFFER;
+    if (young && !(ahead && v.y > 0) && this.kick !== 1) {
+      if (this.releaseQueued < 0) this.releaseQueued = 0;
+      return;
+    }
+    this.release(true);
+  }
+
+  // On the way down, vehicles or people moving in under the arc: raise the clearance (the reel pulls
+  // up; failing that, the feet meet the roof and land on it).
+  _watchTraffic(h) {
+    if ((this._trafficT -= h) > 0) return;
+    this._trafficT = 0.1;
+    const c = this.c;
+    const p = c.p;
+    const v = p.velocity;
+    const feet = p.position.y - this._street(p.position.x, p.position.z);
+    if (feet > LOW_BAND + 3 || v.y > 2) return;
+    const low = this._low;
+    low.n = 1;
+    low.x0 = p.position.x;
+    low.z0 = p.position.z;
+    low.x1 = p.position.x + v.x * 0.6;
+    low.z1 = p.position.z + v.z * 0.6;
+    this._gatherTraffic(p.position.x, p.position.z);
+    this.clear = Math.max(this.clear, this._clearanceUnder(low));
+  }
+
   // Let go: pure momentum. boost = jump pressed mid-swing (a hop up and on).
   release(boost, quiet = false) {
     const c = this.c;
@@ -908,6 +1041,7 @@ export class SwingMove {
     const v = p.velocity;
     p.state = 'air';
     this.lateBoost = 0;
+    this.releaseQueued = -1;
     this.kick = 0;
     this.kickT = 0;
     this.tension = 0;

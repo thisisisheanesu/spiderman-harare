@@ -7,8 +7,9 @@ import { WALK, PATH } from './walkways.js';
 import { rankSites } from './ranks.js';
 
 // Street vendors: stalls placed once from the pedestrian network (busy junction corners, pavements in
-// the core, First Street Mall, flower sellers around Africa Unity Square, kombi ranks) and drawn as a
-// handful of instanced prop meshes. Each stall has a vendor spot the crowd fills when the player is near.
+// the core, First Street Mall, flower sellers around Africa Unity Square, kombi ranks) and drawn as one
+// merged static mesh. Each stall has a vendor spot the crowd fills when the player is near (seated
+// vendors sit on an upturned crate SEAT m high).
 
 const TYPES = STREETLIFE.VENDOR_TYPES?.length
   ? STREETLIFE.VENDOR_TYPES
@@ -29,7 +30,6 @@ const _p = { x: 0, z: 0 };
 const SEAT = 0.4;
 const STRIP = 16; // px of white under the sign tiles
 const V_WHITE = STRIP / 2 / (320 + STRIP); // texture v of the white strip (flipY: bottom rows)
-const CHUNK = 400; // m: stalls are merged per square of this size (culled as a whole)
 
 // Heading that faces back across edge e from its `out` side (+1 = left of a→b).
 function facingIn(e, out) {
@@ -336,12 +336,12 @@ export class Vendors {
     this.obstacles.push({ x: st.x, z: st.z, r });
   }
 
-  // All stall props merged into static meshes (vertex colours; the boards' paint from the sign atlas), one
-  // per CHUNK-sized square of the city, so the stalls cost a draw call or two wherever you are.
+  // All stall props merged into one static mesh (vertex colours; the boards' paint from the sign atlas):
+  // one draw call (and one in the shadow pass) for every stall in the city.
   _buildMeshes() {
     const geos = propGeometries();
     const boardUv = geos.board.attributes.uv;
-    const chunks = new Map();
+    const out = { pos: [], nor: [], col: [], uv: [] };
     const m = new THREE.Matrix4();
     const nm = new THREE.Matrix3();
     const q = new THREE.Quaternion();
@@ -355,9 +355,6 @@ export class Vendors {
       const s = Math.sin(st.heading);
       // Local (x right, z back) -> world, with the stall facing -z at heading 0.
       const toWorld = (lx, lz) => ({ x: st.x + lx * c + lz * s, z: st.z - lx * s + lz * c });
-      const key = `${Math.floor(st.x / CHUNK)},${Math.floor(st.z / CHUNK)}`;
-      if (!chunks.has(key)) chunks.set(key, { pos: [], nor: [], col: [], uv: [] });
-      const out = chunks.get(key);
       for (const p of st.localProps) {
         const w = toWorld(p.x, p.z);
         q.setFromAxisAngle(up, st.heading + p.rot);
@@ -390,18 +387,19 @@ export class Vendors {
     const mat = new THREE.MeshStandardMaterial({ map: signTexture(), vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
     this.group = new THREE.Group();
     this.group.name = 'vendor-stalls';
-    for (const [key, d] of chunks) {
+    if (out.pos.length) {
       const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(d.pos, 3));
-      geo.setAttribute('normal', new THREE.Float32BufferAttribute(d.nor, 3));
-      geo.setAttribute('color', new THREE.Float32BufferAttribute(d.col, 3));
-      geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2));
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(out.pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(out.nor, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(out.col, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(out.uv, 2));
       geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, mat);
       mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
-      mesh.name = `stalls-${key}`;
+      mesh.name = 'stalls';
       this.group.add(mesh);
+      this.tris = out.pos.length / 9;
     }
     this.game.scene.add(this.group);
   }

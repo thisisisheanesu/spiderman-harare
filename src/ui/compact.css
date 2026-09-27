@@ -186,6 +186,8 @@
 /* Mouse-capture hint (small desktop windows): in the toasts' place, which moves down under it. */
 .hud.compact .lock-hint {
   top: calc(var(--top) + 48px);
+  width: max-content;
+  max-width: calc(100% - var(--left) - var(--right));
   padding: 6px 13px 7px;
   font-size: 12px;
   text-align: center;
@@ -196,7 +198,19 @@
 }
 
 .hud.compact:has(.lock-hint.shown) .toasts {
-  top: calc(var(--top) + 84px);
+  top: calc(var(--top) + 54px + var(--lock-h, 30px));
+}
+
+/* Small landscape desktop windows (compact with a mouse): the location / objective chips sit at the top
+   left, so toasts and the capture hint keep right of them (the lane rule in hud.css). */
+.hud.compact.landscape:not(.touch) {
+  --col: calc(var(--left) + min(250px, calc(50vw - var(--left) - 8px)) + 12px);
+}
+
+.hud.compact.landscape:not(.touch) .toasts,
+.hud.compact.landscape:not(.touch) .lock-hint {
+  max-width: calc(100% - var(--col) - var(--right));
+  transform: translateX(max(-50%, calc(var(--col) - 50vw)));
 }
 
 /* ---------------------------------------------------------------- controls hint: small and brief */

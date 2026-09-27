@@ -1,4 +1,5 @@
 import * as STREETLIFE from '../data/streetlife.js';
+import { BASIN_COLORS, LOAD_COLORS } from './humans.js';
 
 // Who is on the pavement: archetypes (weights, speeds, hours) from PEDESTRIAN_STYLES, each dressed as one of
 // the realistic variants (public/models/humans) of the right role and gender. A look carries the variant,
@@ -45,8 +46,6 @@ const MALE_SHARE = { youth: 0.7, school_kid: 0.5, elder: 0.5, apostolic: 0.45 };
 const PACE = { police: [0.8, 1.0], security_guard: [0.8, 1.0], street_preacher: [1.0, 1.2], apostolic: [0.9, 1.2], car_washer: [1.0, 1.3], hwindi: [1.2, 1.6] };
 // Walk cadence the clips look natural at (playback rate range); the pace is clamped into it.
 const RATE = [0.95, 1.45];
-const BASINS = ['#c9ced3', '#2b56a1', '#d23a2a', '#e0b23a', '#2e8b57'];
-const LOADS = ['#d6331f', '#f0d23c', '#f08c1a', '#2f7d32', '#b99b6b', '#b5654a'];
 const FIRST_NAMES = STREETLIFE.NPC_FIRST_NAMES?.length ? STREETLIFE.NPC_FIRST_NAMES : [{ name: 'Tendai', g: 'u' }, { name: 'Chipo', g: 'f' }, { name: 'Simba', g: 'm' }];
 
 let HUMANS = null;
@@ -54,11 +53,6 @@ let HUMANS = null;
 // The loaded variants (humans.js) every look is dressed from.
 export function useHumans(humans) {
   HUMANS = humans;
-}
-
-function packColor(hex) {
-  const v = parseInt(String(hex).replace('#', '').slice(0, 6), 16);
-  return Number.isFinite(v) ? v : 0x808080;
 }
 
 function inHours(a, hour) {
@@ -83,10 +77,12 @@ export function archetypeById(id) {
   return ARCHETYPES.find((a) => a.id === id) || { id };
 }
 
-// The walking clip a variant uses: elders shuffle, market women steady a load on the head.
-export function walkClipFor(variant, load) {
+// The walking clip a person uses: elders shuffle, market women steady a load on the head, uniforms and
+// most suits walk upright (`formal`: a per-person roll, 0..1).
+export function walkClipFor(variant, load, formal = 0) {
   if (load && variant.has('carry_on_head')) return 'carry_on_head';
   if (variant.roles.includes('elder') && variant.has('walk_slow')) return 'walk_slow';
+  if (formal > 0.35 && variant.has('walk_formal')) return 'walk_formal';
   return variant.has('walk') ? 'walk' : 'walk_female';
 }
 
@@ -120,20 +116,22 @@ export function makeLook(rng, archetype, opts = {}) {
     speed: 1.2,
     runSpeed: 0,
     walkMax: 1.5,
+    walkClip: 'walk',
     stationary: rng() < (archetype.stationary || 0),
-    load: false,
-    basinColor: 0,
-    loadColor: 0,
+    load: false, // a basin of produce on the head (market women)
+    basin: 0, // colour indices (humans.js palettes)
+    produce: 0,
     name: '',
   };
   if (id === 'market_woman' && opts.load !== false && rng() < (archetype.carryOnHeadChance ?? 0.5)) {
     L.load = true;
-    L.basinColor = packColor(rng.pick(BASINS));
-    L.loadColor = packColor(rng.pick(LOADS));
+    L.basin = rng.int(0, BASIN_COLORS.length - 1);
+    L.produce = rng.int(0, LOAD_COLORS.length - 1);
   }
   if (variant) {
     // Stride-matched pace: ground speed = clip speed x stride x scale x rate, with the rate kept natural.
-    const clip = HUMANS.clips[walkClipFor(variant, L.load)];
+    L.walkClip = walkClipFor(variant, L.load, rng());
+    const clip = HUMANS.clips[L.walkClip];
     const natural = (clip?.speed || 1.05) * variant.stride * scale;
     const [lo, hi] = PACE[id] || archetype.walkSpeed || [1.1, 1.5];
     L.speed = Math.min(natural * RATE[1], Math.max(natural * RATE[0], rng.range(lo, hi)));

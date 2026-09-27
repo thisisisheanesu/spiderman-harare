@@ -330,6 +330,11 @@
   color: #a9c1ff;
 }
 
+.credits p.credits-details {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .credits code {
   font-size: 12px;
   color: #fff;

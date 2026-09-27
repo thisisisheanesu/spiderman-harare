@@ -22,7 +22,8 @@ const JOINA = { x: -500, z: 262 };
 
 // how: per input mode ('keyboard' | 'touch' | 'gamepad'), plus 'free' = keyboard without mouse capture.
 // ground (optional): the same, shown while Spider-Man is on the ground or a roof, where the swing
-// button is the parkour sprint and jumping mid-sprint web-launches (src/player/controller.js).
+// button is the parkour sprint and jumping mid-sprint web-launches (src/player/controller.js); the
+// touch button reads SPRINT there (touch.js).
 const STEPS = [
   {
     id: 'dive',
@@ -44,7 +45,7 @@ const STEPS = [
     },
     ground: {
       keyboard: 'Hold Shift to sprint, then Space to web-launch into a swing',
-      touch: 'Hold SWING to sprint, then tap JUMP to web-launch into a swing',
+      touch: 'Hold SPRINT (the swing button), then tap JUMP to web-launch',
       gamepad: 'Hold RT to sprint, then A to web-launch into a swing',
     },
     target: 'samora',
@@ -60,7 +61,7 @@ const STEPS = [
     },
     ground: {
       keyboard: 'Hold Shift to sprint there, Space to launch · people here speak Shona',
-      touch: 'Hold SWING to sprint there, JUMP to launch · people here speak Shona',
+      touch: 'Hold SPRINT to run there, JUMP to launch · people here speak Shona',
       gamepad: 'Hold RT to sprint there, A to launch · people here speak Shona',
     },
     target: 'aus',

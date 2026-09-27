@@ -17,6 +17,8 @@ import { treeHeight } from './treeModels.js';
 import { PointGrid } from './pointGrid.js';
 import { PbrSet, FACADE_SET, FACADE_SET_LOW, GROUND_SET, GROUND_SET_LOW, loadInteriors } from './render/pbrLibrary.js';
 import { makeNoiseTexture } from './render/noise.js';
+import { AO_LAYER } from '../core/postfx.js';
+import { createCanopyFade, applyCanopyFade } from './render/canopyFade.js';
 
 // tex: canvas layers (signs, painted artwork); pbr: PBR texture-array size; normals: normal /
 // AO / metalness array; smallInteriors: the 1024 x 512 interior atlas.
@@ -62,6 +64,8 @@ export class City {
 
   async init(game) {
     this.game = game;
+    const t0 = performance.now();
+    this.timings = {};
     const data = game.data;
     const world = game.world;
     this.group = new THREE.Group();
@@ -94,8 +98,32 @@ export class City {
     const { G, scale: groundScale } = paintGroundLayers(groundAtlas, groundSet);
     const L = facadeAtlas.index;
     const urban = buildUrbanMask(data.buildings, data.meta.bounds);
+    // Real businesses (data/shops.json, optional): ground-floor bays show the right kind of shop.
+    const shopsData = await assets.json('data/shops.json');
+    const shopsByBuilding = new Map();
+    for (const sh of shopsData?.shops || []) {
+      if (sh.b === undefined || sh.b < 0) continue;
+      let list = shopsByBuilding.get(sh.b);
+      if (!list) shopsByBuilding.set(sh.b, (list = []));
+      list.push(sh);
+    }
 
-    const chunks = new ChunkGrid();
+    // Fine chunks over the CBD core (core buildings' extent + a margin), coarse ones outside.
+    let core = null;
+    for (const b of data.buildings) {
+      if (!b.core || b.cx === undefined) continue;
+      core = core || { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+      core.minX = Math.min(core.minX, b.cx);
+      core.maxX = Math.max(core.maxX, b.cx);
+      core.minZ = Math.min(core.minZ, b.cz);
+      core.maxZ = Math.max(core.maxZ, b.cz);
+    }
+    if (core) {
+      // Snap to the fine grid so coarse cells never cut through a fine one.
+      const snap = (v, up) => (up ? Math.ceil((v + 150) / CHUNK) : Math.floor((v - 150) / CHUNK)) * CHUNK;
+      core = { minX: snap(core.minX, false), maxX: snap(core.maxX, true), minZ: snap(core.minZ, false), maxZ: snap(core.maxZ, true) };
+    }
+    const chunks = new ChunkGrid(CHUNK, core);
     const colliders = new Map();
     const colliderFor = (id) => {
       let col = colliders.get(id);
@@ -107,7 +135,7 @@ export class City {
     const landmarks = new Landmarks(data, signs);
     const landmarkStyles = new Map((data.meta.landmarks || []).map((l) => [l.key, l.style || {}]));
     const ctx = {
-      game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, pbr: facadeSet,
+      game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, pbr: facadeSet, shopsByBuilding,
       streets: new StreetIndex(data), carriageways: new CarriagewayIndex(data.roads), obstacles: [],
     };
     const frontages = [];
@@ -120,7 +148,7 @@ export class City {
 
     // Streets, ground, the Kopje.
     const crossingPoints = data.features.filter((f) => f.kind === 'traffic_signals' || f.kind === 'crossing');
-    const streets = buildStreets({ ...ctx, heightAt: roadHeightAt, crossingPoints, densify: (pts) => kopje.touches(pts) });
+    const streets = buildStreets({ ...ctx, heightAt: roadHeightAt, crossingPoints, densify: (pts) => kopje.touches(pts), urbanAt: urban.at });
     this.sidewalkPaths = streets.sidewalkPaths;
     this.crossingNodes = streets.crossingNodes;
     const grounds = buildGround({ ...ctx, heightAt: roadHeightAt, skipArea });
@@ -137,7 +165,16 @@ export class City {
     const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, medians: streets.medians, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
     const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, heightAt: this.heightAt });
     const allTrees = trees.concat(landmarks.palms, props.palms);
+    const vegStart = this.group.children.length;
     this.vegetation = createVegetation(this.group, allTrees, this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
+    // Canopies near the camera / in front of Spider-Man dissolve (render/canopyFade.js).
+    const foliage = new Set();
+    for (const o of this.group.children.slice(vegStart)) {
+      const m = o.material;
+      if (m && !Array.isArray(m) && m.alphaTest > 0 && !m.transparent) foliage.add(m);
+    }
+    this.canopyFade = createCanopyFade();
+    applyCanopyFade(foliage, this.canopyFade);
 
     // Pedestrian obstacles and low-rise web anchors (spatial grids built once).
     const obstacles = ctx.obstacles.concat(landmarks.obstacles, props.obstacles);
@@ -163,6 +200,8 @@ export class City {
     // Materials + meshes.
     const facadeTex = facadeAtlas.build(game.renderer);
     const groundTex = groundAtlas.build(game.renderer);
+    this.timings.geometry = Math.round(performance.now() - t0);
+    const tTex = performance.now();
     await texturesReady;
     const interiors = await interiorsReady;
     const noise = makeNoiseTexture();
@@ -171,7 +210,7 @@ export class City {
       canvasFacade: facadeAtlas.bytes, canvasGround: groundAtlas.bytes, pbrFacade: facadeSet.bytes, pbrGround: groundSet.bytes,
       interiors: interiors?.bytes || 0, noise: noise.bytes,
     };
-    this.facadeMat = createFacadeMaterial(facadeTex, this.uniforms, L, { pbr: facadeSet, interiors, noise });
+    this.facadeMat = createFacadeMaterial(facadeTex, this.uniforms, L, { pbr: facadeSet, interiors, noise, urban });
     const ground = (offset) => createGroundMaterial(groundTex, this.uniforms, G, urban, { offset, res: { ground: groundSet, noise } });
     const mats = { base: ground(3), landuse: ground(2), areas: ground(1), paths: ground(0), roads: ground(-1), marks: ground(-2) };
 
@@ -179,7 +218,7 @@ export class City {
     for (const e of chunks.map.values()) {
       const base = this._mesh(e.base, this.facadeMat, true);
       const detail = this._mesh(e.detail, this.facadeMat, true);
-      if (base || detail) this.chunks.push({ base, detail, x: e.cx, z: e.cz });
+      if (base || detail) this.chunks.push({ base, detail, x: e.cx, z: e.cz, half: e.half });
     }
     // Rooftop clutter, parapet caps, canopies, signs and furniture vanish into sub-pixel detail
     // well before this on a phone screen; each detail chunk is a draw call and ~25k triangles.
@@ -207,6 +246,8 @@ export class City {
     if (fountain && landmarks.jets.iCount) this.effects.push(createFountainJets(landmarks.jets.toGeometry(), fountain));
     for (const fx of this.effects) this.group.add(fx.mesh);
 
+    this.timings.textureWait = Math.round(performance.now() - tTex);
+    this.timings.total = Math.round(performance.now() - t0);
     this.setNight(game.sky?.nightFactor ?? 0);
   }
 
@@ -216,6 +257,8 @@ export class City {
     mesh.castShadow = castShadow;
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
+    // City geometry is what the screen-space ambient occlusion prepass draws (core/postfx.js).
+    mesh.layers.enable(AO_LAYER);
     this.group.add(mesh);
     return mesh;
   }
@@ -226,7 +269,7 @@ export class City {
     u.uNight.value = t;
     u.uShutterFrac.value = 0.18 + 0.5 * t;
     // Rooms behind the glass: dim by day (the street is far brighter), lit ones glow at night.
-    u.uInterior.value.set(THREE.MathUtils.lerp(0.5, 1.15, t), 0.035, 1 - 0.85 * t);
+    u.uInterior.value.set(THREE.MathUtils.lerp(0.42, 1.15, t), 0.035, 1 - 0.85 * t);
     const dir = this.game?.sky?.lightDirection;
     if (dir) u.uSunDir.value.copy(dir);
     if (this.lightPools) {
@@ -243,23 +286,39 @@ export class City {
 
   update(dt, game) {
     this.uniforms.uTime.value += dt;
-    const ld = game.sky?.lightDirection;
+    const sky = game.sky;
+    const ld = sky?.lightDirection;
     if (ld) this.uniforms.uSunDir.value.copy(ld);
+    if (sky?.sun) {
+      const u = this.uniforms;
+      const sunUp = Math.max(0, sky.sunDirection.y);
+      u.uBounce.value.copy(sky.sun.color).multiplyScalar(sky.sun.intensity * sunUp * 0.05);
+      u.uCanyonLit.value.copy(sky.sun.color).multiplyScalar(sky.sun.intensity * 0.28 * THREE.MathUtils.smoothstep(sky.sunDirection.y, -0.02, 0.1));
+      const hemi = sky.hemi;
+      if (hemi) u.uCanyonShade.value.copy(hemi.color).lerp(hemi.groundColor, 0.4).multiplyScalar(0.3 * (sky.nightFactor > 0.5 ? 0.4 : 1));
+    }
     const cam = game.camera.position;
     this.vegetation.update(cam);
+    const fade = this.canopyFade;
+    if (fade) {
+      fade.uFadeCam.value.copy(cam);
+      const p = game.player?.position;
+      if (p) fade.uFadeTarget.value.set(p.x, p.y + 1.1, p.z);
+      else fade.uFadeTarget.value.copy(cam);
+    }
     // Chunk LOD: drop the detail layer away from the camera and whole chunks beyond the fog.
-    const half = CHUNK / 2;
-    const far = (game.scene.fog?.far ?? 3000) + half;
+    const fogFar = game.scene.fog?.far ?? 3000;
     // The key light's shadow box spans about +-shadowSize around a focus just ahead of the player,
     // so only chunks near the camera can cast into it: street-level detail from close by, whole
     // buildings from as far as the tallest tower's shadow reaches at the current light elevation.
     // The rest would only add whole-chunk draws (tens of thousands of triangles) to the shadow pass.
-    const sky = this.game.sky;
     const shadows = sky?.sun?.castShadow;
     const reach = (sky?.shadowSize ?? 110) * 1.6;
     const ly = Math.min(0.999, Math.max(0.05, sky?.lightDirection?.y ?? 1));
     const reachBase = reach + Math.min(450, (125 * Math.sqrt(1 - ly * ly)) / ly); // 125 m tower / tan(elevation)
     for (const c of this.chunks) {
+      const half = c.half;
+      const far = fogFar + half;
       const dx = Math.max(0, Math.abs(cam.x - c.x) - half);
       const dz = Math.max(0, Math.abs(cam.z - c.z) - half);
       const d = Math.hypot(dx, dz);

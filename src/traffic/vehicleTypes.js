@@ -112,6 +112,7 @@ export class TrafficMix {
     v.stopChance = STOPPERS[def.type] ?? 0;
 
     const toggles = [];
+    v.toggles = toggles;
     const groups = model.toggleGroups || {};
     const pickOf = (group) => (groups[group]?.length ? rng.pick(groups[group]) : null);
     const colors = sub?.colors || def.colors || model.paints;
@@ -150,7 +151,6 @@ export class TrafficMix {
       if (v.sub === 'single_cab_load' && groups.cargo) toggles.push(groups.cargo[0]);
       else if (rng() < 0.3 && groups.sports_bar) toggles.push(groups.sports_bar[0]);
     }
-    v.toggles = toggles;
 
     // Who is on board (indices into the baked figure variants; -1 = nobody).
     const busy = def.type === 'kombi' || def.type === 'bus';

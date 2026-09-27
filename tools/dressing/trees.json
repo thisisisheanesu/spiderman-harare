@@ -1,0 +1,547 @@
+{
+ "_doc": "Tree build recipes for tools/dressing/tree_build.py. src = folder under $DRESSING_RAW (Sketchfab download, see CREDITS). height = target height in metres (sources are scaled uniformly). hsv = [hue shift (turns), saturation x, value x] applied to the source textures of that category before baking. Card counts are quads (2 tris each).",
+ "trees": [
+  {
+   "name": "jacaranda_bloom_a",
+   "kind": "broadleaf",
+   "src": "jac10",
+   "height": 13.5,
+   "flower": [
+    "flw",
+    "flower"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.015,
+     0.62,
+     1.22
+    ],
+    "leaf": [
+     0.0,
+     0.85,
+     1.0
+    ],
+    "bark": [
+     0.02,
+     1.35,
+     1.3
+    ]
+   },
+   "cards0": 4600,
+   "cards1": 620,
+   "bark0": 4200,
+   "bark1": 420,
+   "barkMinLen0": 0.9,
+   "barkMinLen1": 3.0,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 1.1,
+   "clump1": 2.6,
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "avenue",
+    "park"
+   ],
+   "aspect": 0.8,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (10/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-1040-3cb24e61fe8443deaddf7c8e15cbce38",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "jacaranda_bloom_b",
+   "kind": "broadleaf",
+   "src": "jac4",
+   "height": 11.5,
+   "flower": [
+    "flw",
+    "flower"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.015,
+     0.62,
+     1.22
+    ],
+    "leaf": [
+     0.0,
+     0.85,
+     1.0
+    ],
+    "bark": [
+     0.02,
+     1.35,
+     1.3
+    ]
+   },
+   "cards0": 4600,
+   "cards1": 620,
+   "bark0": 4200,
+   "bark1": 420,
+   "barkMinLen0": 0.8,
+   "barkMinLen1": 2.6,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 1.1,
+   "clump1": 2.6,
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "avenue",
+    "park"
+   ],
+   "aspect": 0.88,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (4/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-440-bbc3118893c446c0983691fc59e78dfe",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "jacaranda_young",
+   "kind": "broadleaf",
+   "src": "jac7",
+   "height": 5.2,
+   "flower": [
+    "flw",
+    "flower"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.015,
+     0.62,
+     1.22
+    ],
+    "leaf": [
+     0.0,
+     0.85,
+     1.0
+    ],
+    "bark": [
+     0.02,
+     1.35,
+     1.3
+    ]
+   },
+   "cards0": 2600,
+   "cards1": 400,
+   "bark0": 2400,
+   "bark1": 300,
+   "barkMinLen0": 0.35,
+   "barkMinLen1": 1.2,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 0.55,
+   "clump1": 1.3,
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "street",
+    "young"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (7/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-740-0a92761615b24e0c90217cb039aa284f",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "palm_washingtonia_tall",
+   "kind": "palm",
+   "src": "palm4",
+   "height": 16.0,
+   "hsv": {
+    "leaf": [
+     0.0,
+     0.9,
+     1.0
+    ],
+    "trunk": [
+     0.0,
+     0.8,
+     0.95
+    ]
+   },
+   "frondGrid0": [
+    4,
+    4
+   ],
+   "trunk0": 1400,
+   "trunk1": 160,
+   "stubs0": 1600,
+   "samples": 12,
+   "tags": [
+    "tree",
+    "palm",
+    "washingtonia",
+    "median",
+    "avenue"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Mexican fan palm (4/10)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-mexican-fan-palm-410-cd15d13b69d04bdbb0960fad61f4c052",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "palm_washingtonia_skirt",
+   "kind": "palm",
+   "src": "palm2",
+   "height": 10.5,
+   "hsv": {
+    "leaf": [
+     0.0,
+     0.9,
+     1.0
+    ],
+    "trunk": [
+     0.0,
+     0.8,
+     0.95
+    ]
+   },
+   "frondGrid0": [
+    4,
+    4
+   ],
+   "trunk0": 1000,
+   "trunk1": 140,
+   "stubs0": 1600,
+   "samples": 12,
+   "tags": [
+    "tree",
+    "palm",
+    "washingtonia",
+    "first_street",
+    "square"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Mexican fan palm (2/10)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-mexican-fan-palm-210-3914b6105cd34f54b37181426b167e4c",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "flame_tree",
+   "kind": "broadleaf",
+   "src": "poin19",
+   "height": 9.5,
+   "aspect": 0.8,
+   "flower": [
+    "flower",
+    "bud"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.02,
+     1.05,
+     1.05
+    ],
+    "leaf": [
+     0.0,
+     0.95,
+     1.0
+    ],
+    "bark": [
+     0.0,
+     1.0,
+     1.1
+    ]
+   },
+   "cards0": 4600,
+   "cards1": 620,
+   "bark0": 3800,
+   "bark1": 400,
+   "barkMinLen0": 0.7,
+   "barkMinLen1": 2.4,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 1.0,
+   "clump1": 2.4,
+   "tags": [
+    "tree",
+    "flame",
+    "flamboyant",
+    "delonix",
+    "avenue",
+    "park"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Royal poinciana (19/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-royal-poinciana-1940-5b67001c531a4d5aa75e6d713deed64c",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "msasa",
+   "kind": "broadleaf",
+   "src": "china29",
+   "height": 10.0,
+   "aspect": 0.95,
+   "flower": [
+    "flower"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "exclude": [
+    "fruit"
+   ],
+   "hsv": {
+    "leaf": [
+     -0.27,
+     1.25,
+     0.78
+    ],
+    "leafAlt": [
+     -0.08,
+     1.05,
+     0.95
+    ],
+    "bark": [
+     0.0,
+     0.9,
+     0.95
+    ]
+   },
+   "altEvery": 3,
+   "cards0": 4600,
+   "cards1": 620,
+   "bark0": 3800,
+   "bark1": 400,
+   "barkMinLen0": 0.8,
+   "barkMinLen1": 2.6,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 1.0,
+   "clump1": 2.4,
+   "tags": [
+    "tree",
+    "msasa",
+    "spring_flush",
+    "park",
+    "wood",
+    "kopje"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Chinaberry tree (29/30)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-chinaberry-tree-2930-6e9ad5fa65784b189d9aaf0d2fb77e40",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "bauhinia_street",
+   "kind": "broadleaf",
+   "src": "bauh9",
+   "height": 6.5,
+   "aspect": 0.95,
+   "barkKeys": [
+    "trunk",
+    "branches"
+   ],
+   "flower": [
+    "petal",
+    "recept",
+    "flw",
+    "organs",
+    "flower",
+    "bud"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.0,
+     1.0,
+     1.05
+    ],
+    "leaf": [
+     0.0,
+     0.95,
+     1.0
+    ],
+    "bark": [
+     0.0,
+     1.0,
+     1.1
+    ]
+   },
+   "cards0": 3200,
+   "cards1": 450,
+   "bark0": 2600,
+   "bark1": 320,
+   "barkMinLen0": 0.45,
+   "barkMinLen1": 1.4,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.45,
+   "clump0": 0.7,
+   "clump1": 1.6,
+   "tags": [
+    "tree",
+    "street",
+    "young",
+    "bauhinia",
+    "orchid_tree"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Hong Kong orchid tree (9/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-hong-kong-orchid-tree-940-a7cafa984d8c4b49a76a0a190741b335",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "shrub_hibiscus",
+   "kind": "broadleaf",
+   "src": "hib4",
+   "height": 2.3,
+   "aspect": 1.0,
+   "flower": [
+    "petal",
+    "bud",
+    "sepal",
+    "style",
+    "genitals",
+    "flw"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "flower": [
+     0.0,
+     1.0,
+     1.0
+    ],
+    "leaf": [
+     0.0,
+     1.0,
+     1.0
+    ],
+    "bark": [
+     0.0,
+     1.0,
+     1.0
+    ]
+   },
+   "cards0": 1600,
+   "cards1": 220,
+   "bark0": 900,
+   "bark1": 120,
+   "barkMinLen0": 0.35,
+   "barkMinLen1": 0.9,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.5,
+   "clump0": 0.45,
+   "clump1": 0.9,
+   "impostor": false,
+   "tags": [
+    "shrub",
+    "hibiscus",
+    "garden",
+    "planter",
+    "median"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Chinese hibiscus (4/20)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-chinese-hibiscus-420-ef986d46d304495ca8b262901d6d58e8",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "shrub_round",
+   "kind": "broadleaf",
+   "src": "fringe9",
+   "height": 1.4,
+   "aspect": 1.15,
+   "flower": [
+    "flower"
+   ],
+   "drop": [
+    "twig"
+   ],
+   "hsv": {
+    "leaf": [
+     0.03,
+     0.8,
+     1.05
+    ],
+    "bark": [
+     0.0,
+     1.0,
+     1.0
+    ]
+   },
+   "altEvery": 2,
+   "hsvNote": "Loropetalum foliage regraded to a plain dark-green hedge shrub",
+   "cards0": 1400,
+   "cards1": 200,
+   "bark0": 500,
+   "bark1": 80,
+   "barkMinLen0": 0.25,
+   "barkMinLen1": 0.6,
+   "clumps0": 10,
+   "clumps1": 6,
+   "cardScale": 1.5,
+   "clump0": 0.4,
+   "clump1": 0.8,
+   "impostor": false,
+   "tags": [
+    "shrub",
+    "hedge",
+    "garden",
+    "median",
+    "planter"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Chinese fringe flower (9/10)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-chinese-fringe-flower-910-49668153ad834f66ad6f27b5e3b20f84",
+    "license": "CC BY 4.0"
+   }
+  }
+ ]
+}

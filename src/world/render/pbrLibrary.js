@@ -32,6 +32,14 @@ export const GROUND_SET_LOW = [
   'grass_green', 'soil_red',
 ];
 
+// Materials authored near-neutral (tags "tintable"): their albedo is re-centred on the target
+// colour (see materials.js cityAlbedo); the others keep their own colour and a tint multiplies it.
+export const TINTABLE = new Set([
+  'concrete_raw', 'concrete_board_formed', 'concrete_weathered', 'concrete_painted', 'plaster_smooth', 'plaster_textured',
+  'plaster_peeling', 'brick_painted', 'block_painted', 'granite_cladding_light', 'metal_panel', 'window_frame_aluminium',
+  'shutter_rolldown', 'ibr_sheet_painted', 'kerb_concrete', 'plastic_matte',
+]);
+
 const FALLBACK = {
   plaster_textured: 'plaster_smooth',
   plaster_peeling: 'plaster_smooth',

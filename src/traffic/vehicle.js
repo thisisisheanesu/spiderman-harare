@@ -25,6 +25,11 @@ export class Vehicle {
     this.crew = null;
     this.hwindi = false;
     this.siren = false;
+    this.sirenT = 0;
+    this.leanT = 0;
+    this.livery = null;
+    this.routeGroup = null;
+    this.routeCall = null;
     this.call = null;
 
     // Route: front bumper at arc length `s` on `path` (lane or connector); `next` is the connector at

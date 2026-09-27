@@ -95,8 +95,8 @@ function visible(world, a, b, slack = 1.2) {
 }
 
 const bump = (x, c, w) => Math.max(0, 1 - Math.abs(x - c) / w);
-const TOP_K = 10;
-const _best = Array.from({ length: TOP_K }, () => ({ score: -Infinity, x: 0, y: 0, z: 0, nx: 0, nz: 0, side: 1, id: -1, kind: 0 }));
+const TOP_K = 14;
+const _best = Array.from({ length: TOP_K }, () => ({ score: -Infinity, x: 0, y: 0, z: 0, nx: 0, nz: 0, side: 1, id: -1, kind: 0, clear: 0 }));
 const KINDS = ['roof', 'facade', 'prop'];
 
 function pushCandidate(score, x, y, z, nx, nz, side, id, kind) {
@@ -117,13 +117,15 @@ function pushCandidate(score, x, y, z, nx, nz, side, id, kind) {
   slot.side = side;
   slot.id = id;
   slot.kind = kind;
+  slot.clear = 0;
 }
 
 // Swing-anchor search state for one query (module scratch, so scoring allocates nothing).
-const Q = { fx: 0, fy: 0, fz: 0, dx: 0, dz: 0, minRise: 0, minElev: 0, idealElev: 0, idealDist: 0, prefSide: 1, street: 0, alt: 13 };
+const Q = { fx: 0, fy: 0, fz: 0, dx: 0, dz: 0, minRise: 0, minElev: 0, idealElev: 0, idealDist: 0, prefSide: 1, street: 0, alt: 13, minBottom: -Infinity };
 const FACADE_BELOW_ROOF = 1.5; // facade anchors stay this far under the roof edge
 export const MAX_REACH = 72;
 const MIN_REACH = 9;
+const MIN_REACH_PROP = 5.5; // (a street light or tree can be webbed from closer)
 
 // Score one candidate anchor at (x, y, z) whose surface faces (nx, nz) (0, 0: no facing, e.g. a
 // lamp post); corner = 0..1 bonus; kind indexes KINDS; kept in the top-K list if good enough.
@@ -138,7 +140,10 @@ function scoreAnchor(x, y, z, nx, nz, corner, id, kind) {
   const hd = Math.hypot(rx, rz);
   if (hd < 2) return;
   const d = Math.hypot(hd, ry);
-  if (d < MIN_REACH || d > MAX_REACH) return;
+  if (d < (kind === 2 ? MIN_REACH_PROP : MIN_REACH) || d > MAX_REACH) return;
+  // A rope this long can't swing clear of the street, even reeling in on the way down (the
+  // simulation would only veto it: keep the few places for webs that can).
+  if (y - d - 1 < Q.minBottom) return;
   const elev = Math.atan2(ry, hd);
   if (elev < Q.minElev || elev > 1.3) return;
   const fwd = (rx * Q.dx + rz * Q.dz) / hd;
@@ -157,7 +162,9 @@ function scoreAnchor(x, y, z, nx, nz, corner, id, kind) {
     0.3 * facing +
     // Higher anchors leave room for a long arc well above the street.
     Math.min(0.6, Math.max(0, y - Q.street - 14) / 30) +
-    0.3 * bump(Math.abs(lat), 0.4, 0.4) +
+    // Diagonal webs (across the street ahead) swing over the middle of the street, clear of both
+    // frontages.
+    0.45 * bump(Math.abs(lat), 0.55, 0.45) +
     (lat * Q.prefSide > 0.1 ? 0.15 : 0);
   pushCandidate(score, x, y, z, nx, nz, lat >= 0 ? 1 : -1, id, kind);
 }
@@ -165,12 +172,14 @@ function scoreAnchor(x, y, z, nx, nz, corner, id, kind) {
 // Best swing anchor ahead of `dir` (horizontal unit vector) and above `from` (the hand).
 // Candidates: roof-edge points (corners preferred); on buildings that tower over the hand, points on
 // the facade at the ideal elevation (the web sticks to the wall there), so tall buildings carry
-// swings at any height; and, only when no building qualifies, the street furniture / trees that
-// opts.fallback(x, z, r) returns (see readFallback). Falling fast, flatter webs still catch you
-// (the fall turns into the swing), so the elevation limits relax.
+// swings at any height; and the rooftop structures, street-light heads and tree crowns that
+// opts.props(x, z, r) returns (see readProps) - with the buildings, and on their own if none of the
+// best few swings clear. Falling fast, flatter webs still catch you (the fall turns into the swing),
+// so the elevation limits relax.
 // opts: {speed, fall (downward speed), side (+1 right / -1 left, gently alternates hands),
 //        street (ground height under the hand), alt (preferred lowest swing height over the street:
-//        steers the preferred web length), fallback?, accept?}.
+//        steers the preferred web length), minBottom? (lowest the arc's bottom may be for the body
+//        centre, anchor height minus distance, reeling allowed for), props?, accept?}.
 // accept(point, candidate) rates a visible candidate: a number added to its geometric score (the
 // swing module simulates the swing it would give), or -Infinity / null to veto it. Every visible
 // candidate of the top few is rated and the best total wins.
@@ -193,6 +202,7 @@ export function findSwingAnchor(world, from, dir, opts, out) {
   Q.prefSide = opts.side;
   Q.street = opts.street || 0;
   Q.alt = opts.alt ?? 13;
+  Q.minBottom = opts.minBottom ?? -Infinity;
   const tanIdeal = Math.tan(Math.max(0.2, Q.idealElev));
   const ahead = 14 + Math.min(speed, 40) * 0.55;
   const cx = from.x + dir.x * ahead;
@@ -214,17 +224,19 @@ export function findSwingAnchor(world, from, dir, opts, out) {
       if (fy < top && fy >= low) scoreAnchor(x, fy, z, pts[i + 2], pts[i + 3], 0.4, b.id, 1);
     }
   }
+  if (opts.props) readProps(opts.props(cx, cz, 60));
   const found = pickBest(world, from, out, opts.accept);
-  if (found || !opts.fallback) return found;
-  // No building anchor qualifies (low-rise streets): street lights and trees.
+  if (found || !opts.props) return found;
+  // None of the best few swings clear (low-rise streets): the props on their own.
   for (const c of _best) c.score = -Infinity;
-  if (!readFallback(opts.fallback(cx, cz, 60))) return null;
+  if (!readProps(opts.props(cx, cz, 60))) return null;
   return pickBest(world, from, out, opts.accept);
 }
 
-// Feed fallback anchors into the candidate list. Accepts an array of points
-// ({x, y, z}, {position: Vector3}, {point: Vector3}) or a flat [x, y, z, ...] number array.
-function readFallback(list) {
+// Feed prop anchors (city.anchorsNear: rooftop structures, lamp heads, tree crowns) into the candidate
+// list. Accepts an array of points ({x, y, z, kind?, radius?}, {position: Vector3}, {point: Vector3})
+// or a flat [x, y, z, ...] number array.
+function readProps(list) {
   if (!list) return false;
   let any = false;
   if (typeof list[0] === 'number') {
@@ -279,6 +291,7 @@ function writeAnchor(c, from, out) {
   out.side = c.side;
   out.buildingId = c.id;
   out.kind = KINDS[c.kind];
+  out.clear = c.clear; // (street clearance the accept() rating planned it with, if any)
   return out;
 }
 

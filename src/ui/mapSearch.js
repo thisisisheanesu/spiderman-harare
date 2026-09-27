@@ -2,7 +2,9 @@ import { el, fmtDistance } from './dom.js';
 import { ICONS } from './icons.js';
 
 const MAX_RESULTS = 8;
-const KIND_PRI = { place: 0, web: 1, rank: 2, street: 3, brand: 4, shop: 5 };
+// Ties between equally good name matches: landmarks, then verified businesses and chains (branches of
+// one chain then sort by distance), ranks, streets, other businesses.
+const KIND_PRI = { place: 0, known: 1, rank: 2, street: 3, shop: 4 };
 
 // "fast_food" -> "Fast food"
 const catLabel = (cat) => (cat ? cat.charAt(0).toUpperCase() + cat.slice(1).replace(/_/g, ' ') : 'Business');
@@ -114,7 +116,7 @@ export class MapSearch {
       if (seg) add(st.name, (seg.ax + seg.bx) / 2, (seg.az + seg.bz) / 2, 'street', 'Street', KIND_PRI.street, 0.9);
     }
     for (const s of shops.places) {
-      const pri = s.web ? KIND_PRI.web : s.brand ? KIND_PRI.brand : KIND_PRI.shop;
+      const pri = s.web || s.brand ? KIND_PRI.known : KIND_PRI.shop;
       add(s.name, s.x, s.z, 'shop', [catLabel(s.cat), s.road].filter(Boolean).join(' · '), pri, 2.6);
     }
     this.items = items;

@@ -192,6 +192,9 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
   const area = obb.len * obb.wid;
   const rot = -obb.angle;
   const seed = b.seed;
+  // Researched landmark towers (RBZ, Joina City...) keep clean roofs: no JoJo tanks, masts or dishes
+  // (their own crowns / masts come from landmarks.js).
+  const plain = !!b.lm && b.h > 40;
 
   if (opts.liftRoom && obb.len > 9 && obb.wid > 7) {
     const w = Math.min(6.5, 3 + obb.len * 0.08);
@@ -206,7 +209,7 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
       if (free(x, z, r)) {
         placed.push({ x, z, r });
         liftRoom(opts.base, col, L, x, y, z, w, d, h, rot, opts.wallTint, seed);
-        if (opts.clutter > 0.5 && rng() < 0.6) {
+        if (!plain && opts.clutter > 0.5 && rng() < 0.6) {
           // Tank on the lift room's roof slab: the highest thing on many CBD roofs.
           const lx = Math.min(w / 2 - 0.9, w * 0.25);
           tank(col, x + obb.ux * lx, y + h + 0.18, z + obb.uz * lx, rng.range(0.9, 1.05), false, rng() * 6.28, b.id);
@@ -217,7 +220,7 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
   }
 
   // JoJo tanks, 1-3 per roof (more on residential blocks), most of them up on stands.
-  const nTanks = Math.min(4, Math.floor(area / 250) + (rng() < 0.6 ? 1 : 0) + (/apartments|residential|hotel|dormitory/.test(b.cls || '') ? 1 : 0));
+  const nTanks = plain ? 0 : Math.min(4, Math.floor(area / 250) + (rng() < 0.6 ? 1 : 0) + (/apartments|residential|hotel|dormitory/.test(b.cls || '') ? 1 : 0));
   for (let i = 0; i < nTanks * opts.clutter; i++) {
     const s = rng.range(0.85, 1.12);
     const p = sample(TANK_R * s + 0.3);
@@ -240,11 +243,11 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
       if (p) solarGeyser(gb, L, p.x, y, p.z, seed);
     }
   }
-  if (rng() < 0.45 * opts.clutter) {
+  if (!plain && rng() < 0.45 * opts.clutter) {
     const p = sample(0.4);
     if (p) antenna(gb, L, p.x, y, p.z, rng.range(3, b.h > 30 ? 10 : 6), seed, b.id);
   }
-  const nDish = rng() < 0.5 ? rng.int(1, 3) : 0;
+  const nDish = !plain && rng() < 0.5 ? rng.int(1, 3) : 0;
   for (let i = 0; i < nDish * opts.clutter; i++) {
     const p = sample(0.6, 6);
     if (p) dish(p.x, y, p.z, (rng() - 0.5) * 0.5, rng.range(0.85, 1.1));

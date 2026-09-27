@@ -1,0 +1,1261 @@
+{
+ "version": 1,
+ "units": "metres, +Y up, front +Z; origin at the foot (ground items) or at the wall-contact point (wall/window items)",
+ "wind": "TEXCOORD_1 (uv1): x = sway weight 0..1 (0 at the ground), y = flutter weight 0..1 (0 = rigid, also a phase seed)",
+ "lodDistances": {
+  "lod0": 45,
+  "lod1": 160,
+  "impostor": 1200,
+  "phoneLod0": 25,
+  "phoneLod1": 90
+ },
+ "totalBytes": 4374320,
+ "items": [
+  {
+   "name": "ac_unit_small",
+   "group": "facade",
+   "file": "ac_unit_small.glb",
+   "lod1": null,
+   "height": 0.527,
+   "footprintRadius": 0.489,
+   "baseRadius": 0.487,
+   "extent": [
+    0.78,
+    0.527,
+    0.328
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    100,
+    null
+   ],
+   "bytes": [
+    82240,
+    null
+   ],
+   "tags": [
+    "facade",
+    "aircon",
+    "wall"
+   ],
+   "mount": {
+    "height": [
+     1.8,
+     3.2
+    ]
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Lowpoly Air Conditioner Outdoor Unit",
+    "author": "qb",
+    "url": "https://sketchfab.com/3d-models/lowpoly-air-conditioner-outdoor-unit-cbb20b6c0e0f4312bce9ceb0a6bedcd8",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "ac_unit_weathered",
+   "group": "facade",
+   "file": "ac_unit_weathered.glb",
+   "lod1": "ac_unit_weathered_lod1.glb",
+   "height": 1.061,
+   "footprintRadius": 0.575,
+   "baseRadius": 0.341,
+   "extent": [
+    0.8,
+    1.061,
+    0.466
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    548,
+    160
+   ],
+   "bytes": [
+    285088,
+    71116
+   ],
+   "tags": [
+    "facade",
+    "aircon",
+    "wall"
+   ],
+   "mount": {
+    "height": [
+     1.8,
+     3.2
+    ],
+    "note": "under / beside windows; brackets touch the wall"
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Air Conditioner Outdoor Unit",
+    "author": "Pert Doherty",
+    "url": "https://sketchfab.com/3d-models/air-conditioner-outdoor-unit-940781484cb64c6db6c615473bee996a",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "burglar_bars_diamond",
+   "group": "facade",
+   "file": "burglar_bars_diamond.glb",
+   "lod1": "burglar_bars_diamond_lod1.glb",
+   "height": 1.525,
+   "footprintRadius": 0.657,
+   "baseRadius": 0.615,
+   "extent": [
+    1.31,
+    1.525,
+    0.052
+   ],
+   "attach": "window",
+   "front": "+Z",
+   "tris": [
+    288,
+    2
+   ],
+   "bytes": [
+    7016,
+    9324
+   ],
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "note": "scale x / y to the window opening (bars are 16 mm; +-30 % stays believable); LOD1 is an alpha card",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "diagonal lattice guard"
+   },
+   "recolor": {
+    "paint": "white, cream, black, dark green or maroon"
+   },
+   "size": [
+    1.2,
+    1.5
+   ]
+  },
+  {
+   "name": "burglar_bars_grid",
+   "group": "facade",
+   "file": "burglar_bars_grid.glb",
+   "lod1": "burglar_bars_grid_lod1.glb",
+   "height": 1.525,
+   "footprintRadius": 0.657,
+   "baseRadius": 0.615,
+   "extent": [
+    1.31,
+    1.525,
+    0.052
+   ],
+   "attach": "window",
+   "front": "+Z",
+   "tris": [
+    204,
+    2
+   ],
+   "bytes": [
+    4908,
+    6248
+   ],
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "note": "scale x / y to the window opening (bars are 16 mm; +-30 % stays believable); LOD1 is an alpha card",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "welded 16 mm square bar grille, from the street photos (PHOTOS.md sec. 20/21)"
+   },
+   "recolor": {
+    "paint": "white, cream, black, dark green or maroon"
+   },
+   "size": [
+    1.2,
+    1.5
+   ]
+  },
+  {
+   "name": "burglar_bars_sunrise",
+   "group": "facade",
+   "file": "burglar_bars_sunrise.glb",
+   "lod1": "burglar_bars_sunrise_lod1.glb",
+   "height": 1.525,
+   "footprintRadius": 0.657,
+   "baseRadius": 0.615,
+   "extent": [
+    1.31,
+    1.525,
+    0.052
+   ],
+   "attach": "window",
+   "front": "+Z",
+   "tris": [
+    394,
+    2
+   ],
+   "bytes": [
+    8416,
+    7324
+   ],
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "note": "scale x / y to the window opening (bars are 16 mm; +-30 % stays believable); LOD1 is an alpha card",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "\"sunrise\" fan pattern common on Zimbabwean houses and flats"
+   },
+   "recolor": {
+    "paint": "white, cream, black, dark green or maroon"
+   },
+   "size": [
+    1.2,
+    1.5
+   ]
+  },
+  {
+   "name": "downpipe",
+   "group": "facade",
+   "file": "downpipe.glb",
+   "lod1": "downpipe_lod1.glb",
+   "height": 3.344,
+   "footprintRadius": 0.301,
+   "baseRadius": 0.301,
+   "extent": [
+    0.157,
+    3.344,
+    0.261
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    6270,
+    118
+   ],
+   "bytes": [
+    105260,
+    19696
+   ],
+   "tags": [
+    "facade",
+    "pipe",
+    "drain",
+    "wall"
+   ],
+   "mount": {
+    "height": [
+     0,
+     0
+    ]
+   },
+   "tile": {
+    "axis": "y",
+    "length": 2.94,
+    "note": "shoe at the bottom; stack copies above z = 0.38 + n * 2.94"
+   },
+   "source": {
+    "kind": "polyhaven",
+    "title": "Modular Metal Gutter",
+    "author": "Maxim Domnin",
+    "url": "https://polyhaven.com/a/modular_metal_gutter",
+    "license": "CC0 1.0"
+   }
+  },
+  {
+   "name": "meter_boxes",
+   "group": "facade",
+   "file": "meter_boxes.glb",
+   "lod1": "meter_boxes_lod1.glb",
+   "height": 1.117,
+   "footprintRadius": 0.632,
+   "baseRadius": 0.438,
+   "extent": [
+    1.25,
+    1.117,
+    0.142
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    3100,
+    2
+   ],
+   "bytes": [
+    70776,
+    4920
+   ],
+   "tags": [
+    "facade",
+    "electric",
+    "meter",
+    "wall"
+   ],
+   "mount": {
+    "height": [
+     0.3,
+     0.6
+    ],
+    "note": "bottom of the cables ~0.3 m above the pavement"
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Electric Meter with fuse boxes",
+    "author": "BarrySArt",
+    "url": "https://sketchfab.com/3d-models/electric-meter-with-fuse-boxes-33c41e0176cd41d8bbc40185683ee441",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "satellite_dish_wall",
+   "group": "facade",
+   "file": "satellite_dish_wall.glb",
+   "lod1": "satellite_dish_wall_lod1.glb",
+   "height": 0.95,
+   "footprintRadius": 1.047,
+   "baseRadius": 0.957,
+   "extent": [
+    0.979,
+    0.95,
+    1.007
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    3174,
+    300
+   ],
+   "bytes": [
+    194700,
+    47344
+   ],
+   "tags": [
+    "facade",
+    "dish",
+    "dstv",
+    "wall",
+    "roof"
+   ],
+   "mount": {
+    "height": [
+     2.5,
+     12
+    ],
+    "note": "dish faces north (+Z of the item should point roughly north / up the facade); also fine on roof parapets"
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Rusty House Satellite Dish",
+    "author": "TomasKiniulis",
+    "url": "https://sketchfab.com/3d-models/rusty-house-satellite-dish-929f056abe02416da19d7b1aa805d235",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "awning_canvas_green",
+   "group": "shopfront",
+   "file": "awning_canvas_green.glb",
+   "lod1": null,
+   "height": 1.005,
+   "footprintRadius": 1.869,
+   "baseRadius": 1.86,
+   "extent": [
+    3.017,
+    1.005,
+    1.109
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    128,
+    null
+   ],
+   "bytes": [
+    16060,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "awning",
+    "canvas"
+   ],
+   "mount": {
+    "height": [
+     2.3,
+     2.6
+    ],
+    "note": "item z = 0 is the valance bottom; top rail touches the wall at z = 0.97"
+   },
+   "tile": {
+    "axis": "x",
+    "length": 3
+   },
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "striped canvas awning"
+   }
+  },
+  {
+   "name": "awning_canvas_red",
+   "group": "shopfront",
+   "file": "awning_canvas_red.glb",
+   "lod1": null,
+   "height": 1.005,
+   "footprintRadius": 1.869,
+   "baseRadius": 1.86,
+   "extent": [
+    3.017,
+    1.005,
+    1.109
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    128,
+    null
+   ],
+   "bytes": [
+    16636,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "awning",
+    "canvas"
+   ],
+   "mount": {
+    "height": [
+     2.3,
+     2.6
+    ],
+    "note": "item z = 0 is the valance bottom; top rail touches the wall at z = 0.97"
+   },
+   "tile": {
+    "axis": "x",
+    "length": 3
+   },
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "striped canvas awning (BUSINESSES.md awning kind: h 0.9 m, ~1 m projection)"
+   }
+  },
+  {
+   "name": "awning_corrugated",
+   "group": "shopfront",
+   "file": "awning_corrugated.glb",
+   "lod1": null,
+   "height": 0.307,
+   "footprintRadius": 1.752,
+   "baseRadius": 1.752,
+   "extent": [
+    3,
+    0.307,
+    0.912
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    466,
+    null
+   ],
+   "bytes": [
+    130184,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "awning",
+    "canopy"
+   ],
+   "mount": {
+    "height": [
+     2.4,
+     2.8
+    ],
+    "note": "bottom edge of the wall bracket; 3 m module, repeat along the shopfront"
+   },
+   "tile": {
+    "axis": "x",
+    "length": 3
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Shop Awning",
+    "author": "Nodeaxis Interactive",
+    "url": "https://sketchfab.com/3d-models/shop-awning-e8720eef53cc4202a44657e28dfbda96",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "roller_shutter_shop",
+   "group": "shopfront",
+   "file": "roller_shutter_shop.glb",
+   "lod1": null,
+   "height": 2.52,
+   "footprintRadius": 1.435,
+   "baseRadius": 1.404,
+   "extent": [
+    2.808,
+    2.52,
+    0.3
+   ],
+   "attach": "shopfront",
+   "front": "+Z",
+   "tris": [
+    552,
+    null
+   ],
+   "bytes": [
+    68684,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "shutter",
+    "security"
+   ],
+   "note": "shutter box on top; x-scale freely (horizontal slats)",
+   "source": {
+    "kind": "polyhaven",
+    "title": "Rollershutter Door",
+    "author": "MP",
+    "url": "https://polyhaven.com/a/rollershutter_door",
+    "license": "CC0 1.0"
+   }
+  },
+  {
+   "name": "roller_shutter_window",
+   "group": "shopfront",
+   "file": "roller_shutter_window.glb",
+   "lod1": null,
+   "height": 1.851,
+   "footprintRadius": 1.091,
+   "baseRadius": 1.05,
+   "extent": [
+    2.1,
+    1.851,
+    0.3
+   ],
+   "attach": "shopfront",
+   "front": "+Z",
+   "tris": [
+    552,
+    null
+   ],
+   "bytes": [
+    62752,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "shutter",
+    "window",
+    "security"
+   ],
+   "note": "shutter box on top; x-scale freely (horizontal slats)",
+   "source": {
+    "kind": "polyhaven",
+    "title": "Rollershutter Window 01",
+    "author": "MP",
+    "url": "https://polyhaven.com/a/rollershutter_window_01",
+    "license": "CC0 1.0"
+   }
+  },
+  {
+   "name": "security_mesh_grille",
+   "group": "shopfront",
+   "file": "security_mesh_grille.glb",
+   "lod1": "security_mesh_grille_lod1.glb",
+   "height": 2.54,
+   "footprintRadius": 1.521,
+   "baseRadius": 1.521,
+   "extent": [
+    3.04,
+    2.54,
+    0.075
+   ],
+   "attach": "shopfront",
+   "front": "+Z",
+   "tris": [
+    86,
+    2
+   ],
+   "bytes": [
+    14868,
+    12412
+   ],
+   "tags": [
+    "shopfront",
+    "security",
+    "mesh",
+    "grille"
+   ],
+   "tile": {
+    "axis": "x",
+    "length": 3,
+    "uvRepeat": 0.25
+   },
+   "note": "mesh quad UVs are in metres / 0.25: scale x and multiply uv for other widths",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "cream expanded-metal grille, as in \"Vendors in pavements\" (ProtaJkz03, CC BY-SA 4.0 - reference only)"
+   }
+  },
+  {
+   "name": "sign_bracket",
+   "group": "shopfront",
+   "file": "sign_bracket.glb",
+   "lod1": null,
+   "height": 0.625,
+   "footprintRadius": 0.95,
+   "baseRadius": 0.9,
+   "extent": [
+    0.12,
+    0.625,
+    0.95
+   ],
+   "attach": "wall",
+   "front": "+Z",
+   "tris": [
+    80,
+    null
+   ],
+   "bytes": [
+    5516,
+    null
+   ],
+   "tags": [
+    "shopfront",
+    "sign",
+    "bracket"
+   ],
+   "mount": {
+    "height": [
+     2.6,
+     3.2
+    ]
+   },
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "projecting sign bracket with blank board for decals"
+   },
+   "decal": {
+    "material": "sign_face",
+    "size": [
+     0.8,
+     0.5
+    ],
+    "faces": "+X and -X"
+   }
+  },
+  {
+   "name": "trellis_gate",
+   "group": "shopfront",
+   "file": "trellis_gate.glb",
+   "lod1": "trellis_gate_lod1.glb",
+   "height": 2.31,
+   "footprintRadius": 1.052,
+   "baseRadius": 1.052,
+   "extent": [
+    2.1,
+    2.31,
+    0.095
+   ],
+   "attach": "shopfront",
+   "front": "+Z",
+   "tris": [
+    1368,
+    2
+   ],
+   "bytes": [
+    26268,
+    15668
+   ],
+   "tags": [
+    "shopfront",
+    "security",
+    "gate"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "collapsible trellis door gate"
+   },
+   "recolor": {
+    "paint": "charcoal (typical), white"
+   }
+  },
+  {
+   "name": "barrier_block_redwhite",
+   "group": "street",
+   "file": "barrier_block_redwhite.glb",
+   "lod1": null,
+   "height": 0.8,
+   "footprintRadius": 0.671,
+   "baseRadius": 0.671,
+   "extent": [
+    1.2,
+    0.8,
+    0.6
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    44,
+    null
+   ],
+   "bytes": [
+    3836,
+    null
+   ],
+   "tags": [
+    "street",
+    "barrier",
+    "median"
+   ],
+   "note": "median noses and road works; long axis x",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "red and white painted precast median-nose block (PHOTOS.md sec. 20)"
+   }
+  },
+  {
+   "name": "bollard_steel_banded",
+   "group": "street",
+   "file": "bollard_steel_banded.glb",
+   "lod1": null,
+   "height": 0.975,
+   "footprintRadius": 0.075,
+   "baseRadius": 0.07,
+   "extent": [
+    0.15,
+    0.975,
+    0.15
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    88,
+    null
+   ],
+   "bytes": [
+    4560,
+    null
+   ],
+   "tags": [
+    "street",
+    "bollard"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "steel pipe bollard, painted bands"
+   },
+   "recolor": {
+    "paint_yellow": "or white / red"
+   }
+  },
+  {
+   "name": "durawall_panel",
+   "group": "street",
+   "file": "durawall_panel.glb",
+   "lod1": null,
+   "height": 2.1,
+   "footprintRadius": 1.062,
+   "baseRadius": 1.062,
+   "extent": [
+    2.01,
+    2.1,
+    0.12
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    60,
+    null
+   ],
+   "bytes": [
+    111680,
+    null
+   ],
+   "tags": [
+    "wall",
+    "durawall",
+    "boundary"
+   ],
+   "tile": {
+    "axis": "x",
+    "length": 2
+   },
+   "note": "wall centre line on the local x axis; add one post at the far end of a run",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "precast panel boundary wall",
+    "textures": [
+     {
+      "kind": "polyhaven-texture",
+      "title": "Precast Concrete Wall",
+      "author": "Dimitrios Savva",
+      "url": "https://polyhaven.com/a/precast_concrete_wall",
+      "license": "CC0 1.0"
+     }
+    ]
+   }
+  },
+  {
+   "name": "gate_iron_ornate",
+   "group": "street",
+   "file": "gate_iron_ornate.glb",
+   "lod1": "gate_iron_ornate_lod1.glb",
+   "height": 2.929,
+   "footprintRadius": 1.475,
+   "baseRadius": 1.429,
+   "extent": [
+    2.95,
+    2.929,
+    0.098
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    9000,
+    2
+   ],
+   "bytes": [
+    253756,
+    18944
+   ],
+   "tags": [
+    "gate",
+    "boundary"
+   ],
+   "note": "2.95 m double gate for driveways / church and embassy compounds; hinge posts at x = +-1.47",
+   "source": {
+    "kind": "polyhaven",
+    "title": "Large Iron Gate",
+    "author": "Josh Dean",
+    "url": "https://polyhaven.com/a/large_iron_gate",
+    "license": "CC0 1.0"
+   }
+  },
+  {
+   "name": "razor_wire_coil",
+   "group": "street",
+   "file": "razor_wire_coil.glb",
+   "lod1": "razor_wire_coil_lod1.glb",
+   "height": 0.407,
+   "footprintRadius": 0.813,
+   "baseRadius": 0.813,
+   "extent": [
+    1.6,
+    0.407,
+    0.412
+   ],
+   "attach": "wall_top",
+   "front": "+Z",
+   "tris": [
+    4848,
+    2
+   ],
+   "bytes": [
+    233000,
+    6324
+   ],
+   "tags": [
+    "wall",
+    "security",
+    "razor_wire"
+   ],
+   "tile": {
+    "axis": "x",
+    "length": 1.6
+   },
+   "source": {
+    "kind": "sketchfab",
+    "title": "Circular Barbed Wire",
+    "author": "GameDevMoot",
+    "url": "https://sketchfab.com/3d-models/circular-barbed-wire-b51abfa01a434fe2b619b7d9774c35a5",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "tuckshop_kiosk",
+   "group": "street",
+   "file": "tuckshop_kiosk.glb",
+   "lod1": null,
+   "height": 2.55,
+   "footprintRadius": 1.879,
+   "baseRadius": 1.855,
+   "extent": [
+    2.82,
+    2.55,
+    2.484
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    289,
+    null
+   ],
+   "bytes": [
+    64076,
+    null
+   ],
+   "tags": [
+    "street",
+    "kiosk",
+    "tuckshop",
+    "vendor"
+   ],
+   "note": "serving hatch on the front (+Z), door on the right (+X)",
+   "source": {
+    "kind": "sketchfab",
+    "title": "Rusty Kiosk 01",
+    "author": "randombug",
+    "url": "https://sketchfab.com/3d-models/rusty-kiosk-01-882bfc1b677f48eb82d6dc9f7516c299",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "umbrella_airtime",
+   "group": "street",
+   "file": "umbrella_airtime.glb",
+   "lod1": "umbrella_airtime_lod1.glb",
+   "height": 2.35,
+   "footprintRadius": 1.254,
+   "baseRadius": 0.223,
+   "extent": [
+    2.508,
+    2.35,
+    2.508
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    1650,
+    180
+   ],
+   "bytes": [
+    59164,
+    20360
+   ],
+   "tags": [
+    "street",
+    "vendor",
+    "umbrella",
+    "airtime"
+   ],
+   "anchors": [
+    [
+     0,
+     2.35,
+     0
+    ]
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "White outdoor Umbrella",
+    "author": "Ngo.Phuoc.Truong",
+    "url": "https://sketchfab.com/3d-models/white-outdoor-umbrella-d6c9705a4f8e421ea473196ab9910088",
+    "license": "CC BY 4.0"
+   },
+   "recolor": {
+    "canopy_blue": "panel colour (Econet-style blue; set material.color for other networks: NetOne orange, Telecel green)"
+   }
+  },
+  {
+   "name": "vendor_stall",
+   "group": "street",
+   "file": "vendor_stall.glb",
+   "lod1": null,
+   "height": 2.06,
+   "footprintRadius": 1.471,
+   "baseRadius": 1.349,
+   "extent": [
+    2.4,
+    2.06,
+    1.7
+   ],
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    200,
+    null
+   ],
+   "bytes": [
+    28132,
+    null
+   ],
+   "tags": [
+    "street",
+    "vendor",
+    "stall",
+    "market"
+   ],
+   "note": "front (+Z) is the customer side; add crates / fruit on the table top at y = 0.8",
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "timber table under a blue tarp on four poles (PHOTOS.md sec. 25)",
+    "textures": [
+     {
+      "kind": "polyhaven-texture",
+      "title": "Weathered Planks",
+      "author": "Dario Barresi, Dimitrios Savva",
+      "url": "https://polyhaven.com/a/weathered_planks",
+      "license": "CC0 1.0"
+     }
+    ]
+   }
+  },
+  {
+   "name": "jacaranda_bloom_a",
+   "group": "vegetation",
+   "file": "jacaranda_bloom_a.glb",
+   "lod1": "jacaranda_bloom_a_lod1.glb",
+   "height": 13.65,
+   "footprintRadius": 7.32,
+   "baseRadius": 0.69,
+   "extent": null,
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    6139,
+    684
+   ],
+   "bytes": [
+    380112,
+    66208
+   ],
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "avenue",
+    "park"
+   ],
+   "impostor": {
+    "cols": 4,
+    "rows": 2,
+    "frames": 8,
+    "frameW": 15.08,
+    "frameH": 14.138,
+    "px": [
+     128,
+     120
+    ],
+    "albedo": "jacaranda_bloom_a_imp.webp",
+    "normal": "jacaranda_bloom_a_imp_n.webp",
+    "bytes": 96512
+   },
+   "crown": {
+    "cy": 8.34,
+    "rh": 5.49,
+    "rv": 3.69
+   },
+   "trunkRadius": 0.69,
+   "wind": true,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (10/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-1040-3cb24e61fe8443deaddf7c8e15cbce38",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "jacaranda_bloom_b",
+   "group": "vegetation",
+   "file": "jacaranda_bloom_b.glb",
+   "lod1": "jacaranda_bloom_b_lod1.glb",
+   "height": 11.6,
+   "footprintRadius": 6.82,
+   "baseRadius": 0.48,
+   "extent": null,
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    5549,
+    625
+   ],
+   "bytes": [
+    391588,
+    70164
+   ],
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "avenue",
+    "park"
+   ],
+   "impostor": {
+    "cols": 4,
+    "rows": 2,
+    "frames": 8,
+    "frameW": 14.045,
+    "frameH": 11.851,
+    "px": [
+     128,
+     108
+    ],
+    "albedo": "jacaranda_bloom_b_imp.webp",
+    "normal": "jacaranda_bloom_b_imp_n.webp",
+    "bytes": 82884
+   },
+   "crown": {
+    "cy": 7.6,
+    "rh": 4.8,
+    "rv": 2.78
+   },
+   "trunkRadius": 0.48,
+   "wind": true,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (4/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-440-bbc3118893c446c0983691fc59e78dfe",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "jacaranda_young",
+   "group": "vegetation",
+   "file": "jacaranda_young.glb",
+   "lod1": "jacaranda_young_lod1.glb",
+   "height": 5.28,
+   "footprintRadius": 3.1,
+   "baseRadius": 0.2,
+   "extent": null,
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    3322,
+    452
+   ],
+   "bytes": [
+    319628,
+    120032
+   ],
+   "tags": [
+    "tree",
+    "jacaranda",
+    "bloom",
+    "street",
+    "young"
+   ],
+   "impostor": {
+    "cols": 4,
+    "rows": 2,
+    "frames": 8,
+    "frameW": 6.386,
+    "frameH": 5.388,
+    "px": [
+     256,
+     216
+    ],
+    "albedo": "jacaranda_young_imp.webp",
+    "normal": "jacaranda_young_imp_n.webp",
+    "bytes": 275228
+   },
+   "crown": {
+    "cy": 3.27,
+    "rh": 2.07,
+    "rv": 1.27
+   },
+   "trunkRadius": 0.2,
+   "wind": true,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Blue jacaranda (7/40)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-blue-jacaranda-740-0a92761615b24e0c90217cb039aa284f",
+    "license": "CC BY 4.0"
+   }
+  },
+  {
+   "name": "palm_washingtonia_tall",
+   "group": "vegetation",
+   "file": "palm_washingtonia_tall.glb",
+   "lod1": "palm_washingtonia_tall_lod1.glb",
+   "height": 16.85,
+   "footprintRadius": 2.89,
+   "baseRadius": 0.58,
+   "extent": null,
+   "attach": "ground",
+   "front": "+Z",
+   "tris": [
+    9793,
+    1116
+   ],
+   "bytes": [
+    385588,
+    66344
+   ],
+   "tags": [
+    "tree",
+    "palm",
+    "washingtonia",
+    "median",
+    "avenue"
+   ],
+   "impostor": {
+    "cols": 4,
+    "rows": 2,
+    "frames": 8,
+    "frameW": 5.909,
+    "frameH": 17.189,
+    "px": [
+     44,
+     128
+    ],
+    "albedo": "palm_washingtonia_tall_imp.webp",
+    "normal": "palm_washingtonia_tall_imp_n.webp",
+    "bytes": 22776
+   },
+   "crown": {
+    "cy": 14.88,
+    "rh": 2.89,
+    "rv": 1.28
+   },
+   "trunkRadius": 0.58,
+   "wind": true,
+   "source": {
+    "kind": "sketchfab",
+    "title": "Realistic HD Mexican fan palm (4/10)",
+    "author": "PlantCatalog",
+    "url": "https://sketchfab.com/3d-models/realistic-hd-mexican-fan-palm-410-cd15d13b69d04bdbb0960fad61f4c052",
+    "license": "CC BY 4.0"
+   }
+  }
+ ]
+}

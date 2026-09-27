@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { facadeFragmentDecl, FACADE_MAIN } from './render/facadeShader.js';
+import { facadeFragmentDecl, FACADE_MAIN, FACADE_CANYON } from './render/facadeShader.js';
 import { groundFragmentDecl, GROUND_MAIN } from './render/groundShader.js';
 
 // Shared uniforms for every city material (updated by City.setNight / City.update and from the
@@ -16,6 +16,11 @@ export function createCityUniforms() {
     // x = interior exposure, y = unlit-room level at night, z = daylight on blinds / curtains
     uInterior: { value: new THREE.Vector3(0.5, 0.04, 1) },
     uSunDir: { value: new THREE.Vector3(0.3, 0.8, 0.2) },
+    // Sunlight bounced up from the street onto soffits (set from the sun each frame).
+    uBounce: { value: new THREE.Color(0, 0, 0) },
+    // Facade across the street as seen in reflections: sunlit share and shade.
+    uCanyonLit: { value: new THREE.Color(0.3, 0.28, 0.25) },
+    uCanyonShade: { value: new THREE.Color(0.1, 0.1, 0.11) },
   };
 }
 
@@ -38,8 +43,9 @@ vWNrm = normalize(mat3(modelMatrix) * objectNormal);`;
 // Lighting hooks shared by the facade and ground materials: the surface block (injected at
 // <color_fragment>) fills sRough, sMetal, sNw (world normal), sEmit, sF0 + sGlass (reflectance of
 // glass), sSun (direct light reaching into window recesses) and sAO.
-function patchLighting(fs) {
+function patchLighting(fs, canyon = '') {
   return fs
+    .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>\n${canyon}`)
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = sRough;')
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = sMetal;')
     .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize((viewMatrix * vec4(sNw, 0.0)).xyz);')
@@ -80,6 +86,8 @@ export function createFacadeMaterial(map, uniforms, layers, res) {
     if (normals) shader.uniforms.pbrB = { value: res.pbr.texB };
     shader.uniforms.interiorMap = { value: res.interiors?.tex || null };
     shader.uniforms.noiseMap = { value: res.noise };
+    shader.uniforms.urbanMap = { value: res.urban.texture };
+    shader.uniforms.urbanRect = { value: res.urban.rect };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>\n${VERT_DECL}`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${VERT_MAIN}`);
@@ -87,9 +95,10 @@ export function createFacadeMaterial(map, uniforms, layers, res) {
       shader.fragmentShader
         .replace('#include <common>', `#include <common>\n${decl}`)
         .replace('#include <color_fragment>', `#include <color_fragment>\n${FACADE_MAIN}`),
+      FACADE_CANYON,
     );
   };
-  mat.customProgramCacheKey = () => `city-facade-3${normals ? 'n' : ''}${interiors ? 'i' : ''}`;
+  mat.customProgramCacheKey = () => `city-facade-4${normals ? 'n' : ''}${interiors ? 'i' : ''}`;
   return mat;
 }
 

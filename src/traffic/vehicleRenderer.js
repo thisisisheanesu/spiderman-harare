@@ -12,10 +12,11 @@ import { createVehicleUniforms, createBodyMaterial, createGlassMaterial, FLAG } 
 
 const ROAD_Y = 0.03;
 const ALWAYS = 22; // m: vehicles this close are drawn even outside the view (their shadows reach in)
+// Distances (m): LOD0 body, wheels at all / LOD0 wheels, drivers, passenger blocks, draw, headlight pools.
 const PRESETS = {
-  high: { lod0: 42, wheels: 170, wheelLod0: 13, figures: 42, draw: 470, beams: 200 },
-  medium: { lod0: 32, wheels: 130, wheelLod0: 10, figures: 32, draw: 400, beams: 160 },
-  low: { lod0: 18, wheels: 80, wheelLod0: 7, figures: 20, draw: 280, beams: 110 },
+  high: { lod0: 38, wheels: 170, wheelLod0: 13, figures: 34, riders: 24, draw: 470, beams: 200 },
+  medium: { lod0: 30, wheels: 130, wheelLod0: 10, figures: 28, riders: 18, draw: 400, beams: 160 },
+  low: { lod0: 18, wheels: 80, wheelLod0: 7, figures: 16, riders: 10, draw: 280, beams: 110 },
 };
 
 const _chassis = new THREE.Matrix4();
@@ -84,7 +85,7 @@ function beamTexture() {
 
 // A batch whose instances are reassigned every frame.
 class Batch {
-  constructor(geometries, material, capacity, name) {
+  constructor(geometries, material, capacity, name, colored = false) {
     let verts = 0;
     let indices = 0;
     for (const g of geometries) {
@@ -104,12 +105,14 @@ class Batch {
     for (let i = 0; i < capacity; i++) {
       this.mesh.addInstance(first);
       this.mesh.setVisibleAt(i, false);
+      // Instance data texture exists from the start, so the shader is compiled once, at warm-up.
+      if (colored) this.mesh.setColorAt(i, WHITE);
     }
     this.used = 0;
     this.prevUsed = 0;
     this.tris = 0;
-    this.triCount = new Map();
-    for (const g of geometries) this.triCount.set(this.ids.get(g), g.index.count / 3);
+    this.triCount = [];
+    for (const g of geometries) this.triCount[this.ids.get(g)] = g.index.count / 3;
   }
 
   id(geometry) {
@@ -133,7 +136,7 @@ class Batch {
       this.visible[i] = 1;
       m.setVisibleAt(i, true);
     }
-    this.tris += this.triCount.get(gid) || 0;
+    this.tris += this.triCount[gid];
     return i;
   }
 
@@ -191,7 +194,7 @@ export class VehicleRenderer {
       for (const g of [...fig.kombiPassengers, ...fig.busPassengers]) add(opaque, g);
     }
     const cap = Math.max(16, opts.capacity || 200);
-    this.opaque = new Batch(opaque, this.bodyMat, cap * 7 + 300, 'traffic-opaque');
+    this.opaque = new Batch(opaque, this.bodyMat, cap * 7 + 300, 'traffic-opaque', true);
     this.glass = new Batch(glass, this.glassMat, cap + 16, 'traffic-glass');
     this.glass.mesh.sortObjects = true; // blended: back to front
     this.opaque.mesh.castShadow = !!opts.castShadows;
@@ -222,6 +225,9 @@ export class VehicleRenderer {
       kombiPassengers: fig ? fig.kombiPassengers.map((g) => this.opaque.id(g)) : [],
       busPassengers: fig ? fig.busPassengers.map((g) => this.opaque.id(g)) : [],
     };
+    // The batches hold their own copies of the vertex data: let the baked sources go.
+    for (const m of Object.values(lib.models)) m.lods = null;
+    if (fig) lib.figures = null;
 
     const total = cap;
     const shadowGeo = new THREE.PlaneGeometry(1, 1);
@@ -263,6 +269,9 @@ export class VehicleRenderer {
     this.camPos = new THREE.Vector3();
     this.stats = { vehicles: 0, instances: 0, tris: 0 };
     this._envT = 0;
+    // Decide the reflections now, so the shaders compile once at the boot warm-up.
+    this._palette = opts.palette || null;
+    this._environment(0, 0);
   }
 
   // The shadow pass sees only the instances inside the light's frustum (the sun's shadow box follows the
@@ -438,16 +447,16 @@ export class VehicleRenderer {
       }
     }
 
-    if (d < cfg.figures && v.crew) this._crew(v, m, hwindiPose, time);
+    if (d < cfg.figures && v.crew) this._crew(v, m, hwindiPose, time, d < cfg.riders);
   }
 
-  _crew(v, m, hwindiPose, time) {
+  _crew(v, m, hwindiPose, time, riders) {
     const O = this.opaque;
     const F = this.fig;
     const cr = v.crew;
     const seat = m.crew;
     if (cr.driver >= 0 && seat.driver) {
-      const gid = v.type === 'bus' ? F.busDriver : F.drivers[cr.driver % F.drivers.length];
+      const gid = m.key === 'bus_zupco' ? F.busDriver : F.drivers[cr.driver % F.drivers.length];
       if (gid >= 0) {
         _local.makeTranslation(seat.driver[0], seat.driver[1], seat.driver[2]);
         _out.multiplyMatrices(_body, _local);
@@ -459,9 +468,9 @@ export class VehicleRenderer {
       _out.multiplyMatrices(_body, _local);
       O.put(F.mates[cr.mate % F.mates.length], _out, WHITE);
     }
-    if (cr.passengers >= 0) {
-      const list = v.type === 'bus' ? F.busPassengers : F.kombiPassengers;
-      if (list.length) O.put(list[cr.passengers % list.length], _body, WHITE);
+    if (riders && cr.passengers >= 0) {
+      const list = m.key === 'bus_zupco' ? F.busPassengers : m.key === 'kombi' ? F.kombiPassengers : null;
+      if (list?.length) O.put(list[cr.passengers % list.length], _body, WHITE);
     }
     const door = m.door;
     if (!hwindiPose || !door) return;
@@ -470,7 +479,7 @@ export class VehicleRenderer {
       // Inside the sliding door, forearms on the window sill, head and arms out, beckoning.
       const f = Math.floor(phase) % F.hwindiLean.length;
       _local.makeRotationY(Math.PI / 2);
-      _local.setPosition(door.x + 0.34, F.leanPelvis + 0.28, door.z);
+      _local.setPosition(door.x + 0.22, F.leanPelvis + 0.28, door.z);
       _out.multiplyMatrices(_body, _local);
       O.put(F.hwindiLean[f], _out, WHITE);
     } else if (hwindiPose === 2 && F.hwindiKerb.length) {

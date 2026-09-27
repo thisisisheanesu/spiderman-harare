@@ -1,0 +1,442 @@
+{
+ "_doc": "Street / facade dressing metadata merged into public/models/dressing/dressing.json by pack.cjs. attach: ground | wall | window | shopfront | wall_top.",
+ "items": [
+  {
+   "name": "ac_unit_weathered",
+   "group": "facade",
+   "attach": "wall",
+   "tags": [
+    "facade",
+    "aircon",
+    "wall"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Air Conditioner Outdoor Unit",
+    "author": "Pert Doherty",
+    "url": "https://sketchfab.com/3d-models/air-conditioner-outdoor-unit-940781484cb64c6db6c615473bee996a",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "ac_unit_small",
+   "group": "facade",
+   "attach": "wall",
+   "tags": [
+    "facade",
+    "aircon",
+    "wall"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Lowpoly Air Conditioner Outdoor Unit",
+    "author": "qb",
+    "url": "https://sketchfab.com/3d-models/lowpoly-air-conditioner-outdoor-unit-cbb20b6c0e0f4312bce9ceb0a6bedcd8",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "satellite_dish_wall",
+   "group": "facade",
+   "attach": "wall",
+   "tags": [
+    "facade",
+    "dish",
+    "dstv",
+    "wall",
+    "roof"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Rusty House Satellite Dish",
+    "author": "TomasKiniulis",
+    "url": "https://sketchfab.com/3d-models/rusty-house-satellite-dish-929f056abe02416da19d7b1aa805d235",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "meter_boxes",
+   "group": "facade",
+   "attach": "wall",
+   "tags": [
+    "facade",
+    "electric",
+    "meter",
+    "wall"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Electric Meter with fuse boxes",
+    "author": "BarrySArt",
+    "url": "https://sketchfab.com/3d-models/electric-meter-with-fuse-boxes-33c41e0176cd41d8bbc40185683ee441",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "downpipe",
+   "group": "facade",
+   "attach": "wall",
+   "tags": [
+    "facade",
+    "pipe",
+    "drain",
+    "wall"
+   ],
+   "source": {
+    "kind": "polyhaven",
+    "title": "Modular Metal Gutter",
+    "author": "Maxim Domnin",
+    "url": "https://polyhaven.com/a/modular_metal_gutter",
+    "license": "CC0 1.0"
+   },
+   "texMax": 128
+  },
+  {
+   "name": "burglar_bars_grid",
+   "group": "facade",
+   "attach": "window",
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "welded 16 mm square bar grille, from the street photos (PHOTOS.md sec. 20/21)"
+   }
+  },
+  {
+   "name": "burglar_bars_diamond",
+   "group": "facade",
+   "attach": "window",
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "diagonal lattice guard"
+   }
+  },
+  {
+   "name": "burglar_bars_sunrise",
+   "group": "facade",
+   "attach": "window",
+   "tags": [
+    "facade",
+    "window",
+    "security",
+    "burglar_bars"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "\"sunrise\" fan pattern common on Zimbabwean houses and flats"
+   }
+  },
+  {
+   "name": "roller_shutter_shop",
+   "group": "shopfront",
+   "attach": "shopfront",
+   "tags": [
+    "shopfront",
+    "shutter",
+    "security"
+   ],
+   "source": {
+    "kind": "polyhaven",
+    "title": "Rollershutter Door",
+    "author": "MP",
+    "url": "https://polyhaven.com/a/rollershutter_door",
+    "license": "CC0 1.0"
+   },
+   "texMax": 512
+  },
+  {
+   "name": "roller_shutter_window",
+   "group": "shopfront",
+   "attach": "shopfront",
+   "tags": [
+    "shopfront",
+    "shutter",
+    "window",
+    "security"
+   ],
+   "source": {
+    "kind": "polyhaven",
+    "title": "Rollershutter Window 01",
+    "author": "MP",
+    "url": "https://polyhaven.com/a/rollershutter_window_01",
+    "license": "CC0 1.0"
+   },
+   "texMax": 512
+  },
+  {
+   "name": "security_mesh_grille",
+   "group": "shopfront",
+   "attach": "shopfront",
+   "tags": [
+    "shopfront",
+    "security",
+    "mesh",
+    "grille"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "cream expanded-metal grille, as in \"Vendors in pavements\" (ProtaJkz03, CC BY-SA 4.0 - reference only)"
+   }
+  },
+  {
+   "name": "trellis_gate",
+   "group": "shopfront",
+   "attach": "shopfront",
+   "tags": [
+    "shopfront",
+    "security",
+    "gate"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "collapsible trellis door gate"
+   }
+  },
+  {
+   "name": "awning_corrugated",
+   "group": "shopfront",
+   "attach": "wall",
+   "tags": [
+    "shopfront",
+    "awning",
+    "canopy"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Shop Awning",
+    "author": "Nodeaxis Interactive",
+    "url": "https://sketchfab.com/3d-models/shop-awning-e8720eef53cc4202a44657e28dfbda96",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "awning_canvas_red",
+   "group": "shopfront",
+   "attach": "wall",
+   "tags": [
+    "shopfront",
+    "awning",
+    "canvas"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "striped canvas awning (BUSINESSES.md awning kind: h 0.9 m, ~1 m projection)"
+   }
+  },
+  {
+   "name": "awning_canvas_green",
+   "group": "shopfront",
+   "attach": "wall",
+   "tags": [
+    "shopfront",
+    "awning",
+    "canvas"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "striped canvas awning"
+   }
+  },
+  {
+   "name": "sign_bracket",
+   "group": "shopfront",
+   "attach": "wall",
+   "tags": [
+    "shopfront",
+    "sign",
+    "bracket"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "projecting sign bracket with blank board for decals"
+   }
+  },
+  {
+   "name": "tuckshop_kiosk",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "street",
+    "kiosk",
+    "tuckshop",
+    "vendor"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Rusty Kiosk 01",
+    "author": "randombug",
+    "url": "https://sketchfab.com/3d-models/rusty-kiosk-01-882bfc1b677f48eb82d6dc9f7516c299",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 512
+  },
+  {
+   "name": "vendor_stall",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "street",
+    "vendor",
+    "stall",
+    "market"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "timber table under a blue tarp on four poles (PHOTOS.md sec. 25)",
+    "textures": [
+     {
+      "kind": "polyhaven-texture",
+      "title": "Weathered Planks",
+      "author": "Dario Barresi, Dimitrios Savva",
+      "url": "https://polyhaven.com/a/weathered_planks",
+      "license": "CC0 1.0"
+     }
+    ]
+   }
+  },
+  {
+   "name": "umbrella_airtime",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "street",
+    "vendor",
+    "umbrella",
+    "airtime"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "White outdoor Umbrella",
+    "author": "Ngo.Phuoc.Truong",
+    "url": "https://sketchfab.com/3d-models/white-outdoor-umbrella-d6c9705a4f8e421ea473196ab9910088",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "razor_wire_coil",
+   "group": "street",
+   "attach": "wall_top",
+   "tags": [
+    "wall",
+    "security",
+    "razor_wire"
+   ],
+   "source": {
+    "kind": "sketchfab",
+    "title": "Circular Barbed Wire",
+    "author": "GameDevMoot",
+    "url": "https://sketchfab.com/3d-models/circular-barbed-wire-b51abfa01a434fe2b619b7d9774c35a5",
+    "license": "CC BY 4.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "durawall_panel",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "wall",
+    "durawall",
+    "boundary"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "precast panel boundary wall",
+    "textures": [
+     {
+      "kind": "polyhaven-texture",
+      "title": "Precast Concrete Wall",
+      "author": "Dimitrios Savva",
+      "url": "https://polyhaven.com/a/precast_concrete_wall",
+      "license": "CC0 1.0"
+     }
+    ]
+   },
+   "texMax": 512
+  },
+  {
+   "name": "gate_iron_ornate",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "gate",
+    "boundary"
+   ],
+   "source": {
+    "kind": "polyhaven",
+    "title": "Large Iron Gate",
+    "author": "Josh Dean",
+    "url": "https://polyhaven.com/a/large_iron_gate",
+    "license": "CC0 1.0"
+   },
+   "texMax": 256
+  },
+  {
+   "name": "bollard_steel_banded",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "street",
+    "bollard"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "steel pipe bollard, painted bands"
+   }
+  },
+  {
+   "name": "barrier_block_redwhite",
+   "group": "street",
+   "attach": "ground",
+   "tags": [
+    "street",
+    "barrier",
+    "median"
+   ],
+   "source": {
+    "kind": "procedural",
+    "title": "modelled for this project (tools/dressing/items_build.py)",
+    "license": "CC0 1.0",
+    "note": "red and white painted precast median-nose block (PHOTOS.md sec. 20)"
+   }
+  }
+ ]
+}

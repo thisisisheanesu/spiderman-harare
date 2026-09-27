@@ -3,7 +3,7 @@ import './hud.css';
 import { headingDeg } from '../core/geo.js';
 import { Settings } from './settings.js';
 import { Places } from './places.js';
-import { ShopIndex } from './shops.js';
+import { ShopIndex, STREET_FLOORS } from './shops.js';
 import { MapPainter } from './mapPainter.js';
 import { Minimap } from './minimap.js';
 import { Compass } from './compass.js';
@@ -68,6 +68,7 @@ export class Hud {
     this.shops = new ShopIndex(game); // loads in the background
     this._shop = null;
     this._shopUntil = 0;
+    this._lockH = 0; // measured height of the mouse-capture hint (0 = measure again)
     this.overlay = null;
     this.waypoint = null;
     this.started = false;
@@ -333,6 +334,7 @@ export class Hud {
   // --- system hooks -----------------------------------------------------------------------------
 
   onResize() {
+    this._lockH = 0;
     this._layout();
     this.minimap.resize();
     this.compass.resize();
@@ -455,22 +457,27 @@ export class Hud {
     return { street: title, detail, shop: detail.startsWith('outside ') ? shop : null };
   }
 
-  // At street level: the business Spider-Man is standing outside. The city's shopNear() when it has
-  // one (it knows which signs it built), else the HUD's own index of public/data/shops.json. The
-  // current shop keeps the label until another is clearly nearer (no flicker walking past a row of
-  // shop fronts) and through a hop or a vault (SHOP_HOLD_MS).
+  // At street level: the business Spider-Man is standing outside. The city's shopNear() once its
+  // signs are built (the same businesses the player sees), else the HUD's own index of
+  // public/data/shops.json, which also stands in when the city's nearest sign is an office upstairs
+  // and there is a shop front in range. The current shop keeps the label until another is clearly
+  // nearer (no flicker walking past a row of shop fronts) and through a hop or a vault (SHOP_HOLD_MS).
   _shopAt(p) {
     const now = performance.now();
-    const ground = this.game.city?.heightAt?.(p.x, p.z) ?? 0;
+    const city = this.game.city;
+    const ground = city?.heightAt?.(p.x, p.z) ?? 0;
     if (p.y - ground > STREET_LEVEL) return now < this._shopUntil ? this._shop : null;
-    let found;
-    try {
-      found = this.game.city?.shopNear?.(p.x, p.z, SHOP_RANGE);
-    } catch {
-      found = undefined;
+    const cityReady = typeof city?.shopNear === 'function' && (city.shops?.length ?? 1) > 0;
+    let found = null;
+    if (cityReady) {
+      try {
+        found = city.shopNear(p.x, p.z, SHOP_RANGE);
+      } catch {
+        found = null;
+      }
+      if (Array.isArray(found)) found = found[0] ?? null;
     }
-    if (Array.isArray(found)) found = found[0] ?? null;
-    if (found === undefined) found = this.shops.nearest(p.x, p.z, SHOP_RANGE);
+    if (!cityReady || (found?.floor ?? 0) > STREET_FLOORS) found = this.shops.nearest(p.x, p.z, SHOP_RANGE) || found;
     const name = found && String(found.name || found.label || found.text || '').trim();
     let next = name ? { name, x: found.x, z: found.z, road: found.road || '' } : null;
     const cur = this._shop;
@@ -505,7 +512,13 @@ export class Hud {
 
     // Desktop without pointer lock: briefly say how to look around (and get the mouse back).
     const unlocked = this.started && !this.game.paused && !this.touch.enabled && (mode === 'keyboard' || mode === 'free') && !this.game.input.pointerLocked;
-    toggleClass(this.lockHint, 'shown', unlocked && performance.now() < this._lockHintUntil);
+    const lockOn = unlocked && performance.now() < this._lockHintUntil;
+    toggleClass(this.lockHint, 'shown', lockOn);
+    // Toasts line up under it (hud.css --lock-h); measured again after a text change or a resize.
+    if (lockOn && !this._lockH) {
+      this._lockH = this.lockHint.offsetHeight;
+      this.root.style.setProperty('--lock-h', `${this._lockH}px`);
+    }
 
     const wp = this.waypoint;
     if (wp && !wp.tour && Math.hypot(wp.x - p.x, wp.z - p.z) < WAYPOINT_REACHED) {
@@ -586,6 +599,7 @@ export class Hud {
     const changed = this.lockless !== on;
     this.lockless = on;
     setText(this.lockHint, !on ? LOCK_TEXT : this.lockBlocked ? FREE_TEXT : `${FREE_TEXT} · click to capture the mouse`);
+    this._lockH = 0;
     if (!changed) return;
     if (!on) toggleClass(this.lockHint, 'shown', false);
     this._textT = TEXT_INTERVAL; // refresh hints and the objective's "how" line on the next frame

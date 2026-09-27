@@ -6,7 +6,7 @@ import * as THREE from 'three';
 //                (-sin yaw, 0, -cos yaw), so yaw 0 looks north. pitch < 0 looks down.
 //   shake(amount)   add trauma (0..1); decays quickly
 //   fovKick(amount) add degrees of FOV that ease back out (dives, zips, boosted releases)
-//   preset          0 = close, 1 = far (V toggles)
+//   preset          0 = close, 1 = far (V toggles; remembered in localStorage)
 //   snap()          jump straight behind the player (used on teleports)
 // Orbit with mouse / right stick; while swinging, diving or zipping the rig swings in behind the motion
 // unless the player moved the camera in the last 1.5 s, and running on the ground it drifts in behind
@@ -42,6 +42,25 @@ const RUN_FOLLOW = 0.09; // 1/s of yaw follow per m/s of running speed (ground, 
 const RUN_FOLLOW_MIN = 3;
 const COL_HOLD = 0.35; // s a pulled-in boom waits before easing back out
 const SOFT_IDS = new Set([-5, -6, -8, -9, -10]); // world collider ids of street furniture (city.js)
+const PRESET_KEY = 'spiderman-harare.cameraPreset';
+
+// The V preset survives reloads (storage may be unavailable: private windows, blocked site data).
+function loadPreset() {
+  try {
+    const v = Number(window.localStorage?.getItem(PRESET_KEY));
+    return Number.isInteger(v) && v >= 0 && v < PRESETS.length ? v : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function savePreset(v) {
+  try {
+    window.localStorage?.setItem(PRESET_KEY, String(v));
+  } catch {
+    // (not persisted)
+  }
+}
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));
@@ -63,10 +82,10 @@ export class CameraRig {
   constructor() {
     this.yaw = 0;
     this.pitch = -0.18;
-    this.preset = 0;
+    this.preset = typeof window !== 'undefined' ? loadPreset() : 0;
     this.follow = new THREE.Vector3();
-    this.distance = PRESETS[0].dist;
-    this._col = PRESETS[0].dist;
+    this.distance = PRESETS[this.preset].dist;
+    this._col = PRESETS[this.preset].dist;
     this._fov = BASE_FOV;
     this._kick = 0;
     this._trauma = 0;
@@ -114,7 +133,10 @@ export class CameraRig {
     const p = game.player;
     const cam = game.camera;
     this._time += dt;
-    if (input.pressed('camera')) this.preset = (this.preset + 1) % PRESETS.length;
+    if (input.pressed('camera')) {
+      this.preset = (this.preset + 1) % PRESETS.length;
+      savePreset(this.preset);
+    }
     const preset = PRESETS[this.preset];
 
     if (input.look.x || input.look.y) {

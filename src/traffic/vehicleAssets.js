@@ -89,7 +89,7 @@ const CREW = {
   suv_landcruiser: { driver: [0.43, 0.83, -0.2], mate: [-0.43, 0.83, -0.2] },
   police_landcruiser: { driver: [0.43, 0.83, -0.2], mate: [-0.43, 0.83, -0.2] },
   bus_zupco: { driver: [0.72, 1.28, -4.95] },
-  truck_isuzu: { driver: [0.52, 1.42, -2.72], mate: [-0.45, 1.42, -2.72] },
+  truck_isuzu: { driver: [0.52, 1.3, -2.72], mate: [-0.45, 1.3, -2.72] },
 };
 
 // Seated passengers baked into blocks (vehicle space hips + yaw), several variants per vehicle.
@@ -540,6 +540,7 @@ export async function loadVehicleLibrary(game, opts = {}) {
       crew: CREW[name] || { driver: [0.37, 0.5, 0] },
       door: name === 'kombi' ? { x: CREW.kombi.door[0], z: CREW.kombi.door[1] } : null,
       toggleGroups: groupsOf(lods[0].toggles),
+      toggleDefaults: Object.keys(lods[0].toggles).filter((k) => lods[0].toggles[k].defaultVisible),
     };
   }
 
@@ -721,7 +722,8 @@ async function bakeFigures(assets, albedo, models, opts) {
   // waving (three frames); the renderer steps through the frames.
   const leanDur = clips.get('call_out')?.duration || 2.5;
   for (const t of [0.15, 0.45 * leanDur]) {
-    const f = single(HWINDI, clips.has('call_out') ? 'call_out' : 'idle', t, false);
+    // (lower legs dropped: they are behind the door)
+    const f = single(HWINDI, clips.has('call_out') ? 'call_out' : 'idle', t, true);
     if (f) figures.hwindiLean.push(f);
   }
   const waveDur = clips.get('wave')?.duration || 2.5;
@@ -744,7 +746,7 @@ async function bakeFigures(assets, albedo, models, opts) {
   };
   if (models.kombi) {
     for (let s = 0; s < 3; s++) {
-      const g = block(KOMBI_SEATS, s, 0.75, s === 1 ? 'sit_talk' : 'sit_idle');
+      const g = block(KOMBI_SEATS, s, 0.62, s === 1 ? 'sit_talk' : 'sit_idle');
       if (g) figures.kombiPassengers.push(g);
     }
   }

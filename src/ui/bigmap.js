@@ -42,6 +42,7 @@ export class BigMap {
     this.streets = buildStreetCandidates(hud.game.data.roads);
     this.shops = hud.shops;
     this._shopsVersion = -1;
+    this._placeNames = new Set(this.places.list.map((p) => p.name.toLowerCase()));
     this._hits = []; // [x, y, name, wx, wz] of the businesses / places drawn, for taps
     this._build();
   }
@@ -421,25 +422,27 @@ export class BigMap {
     return out;
   }
 
-  // Names beside the dots (right, else left) where they fit, verified businesses first.
+  // Names beside the dots where they fit (right, left, below, above), verified businesses first. A
+  // business named like a landmark already labelled (Meikles Hotel) is left to the landmark's label.
   _drawShopLabels(ctx, shops, fits) {
     let shown = 0;
     ctx.textBaseline = 'middle';
     for (const [x, y, s] of shops) {
       if (shown >= SHOP_LABELS_MAX) break;
+      if (this._placeNames.has(s.name.toLowerCase())) continue;
       const size = s.rank === 0 ? 11.5 : 11;
       ctx.font = `${s.rank <= 1 ? 700 : 600} ${size}px system-ui, sans-serif`;
       const tw = this._measure(ctx, s.name);
       const color = SHOP_LABEL[s.rank] || MAP_COLORS.label;
-      if (fits(x + 6, y - 7, x + 8 + tw, y + 7)) {
-        ctx.textAlign = 'left';
-        haloText(ctx, s.name, x + 7, y, 3, color);
-      } else if (fits(x - 8 - tw, y - 7, x - 6, y + 7)) {
-        ctx.textAlign = 'right';
-        haloText(ctx, s.name, x - 7, y, 3, color);
-      } else {
-        continue;
-      }
+      const h = tw / 2 + 1;
+      let at = null;
+      if (fits(x + 6, y - 7, x + 8 + tw, y + 7)) at = ['left', x + 7, y];
+      else if (fits(x - 8 - tw, y - 7, x - 6, y + 7)) at = ['right', x - 7, y];
+      else if (fits(x - h, y + 5, x + h, y + 19)) at = ['center', x, y + 12];
+      else if (fits(x - h, y - 19, x + h, y - 5)) at = ['center', x, y - 12];
+      if (!at) continue;
+      ctx.textAlign = at[0];
+      haloText(ctx, s.name, at[1], at[2], 3, color);
       shown++;
     }
     ctx.textAlign = 'left';

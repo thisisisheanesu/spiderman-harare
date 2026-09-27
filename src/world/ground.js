@@ -1,7 +1,7 @@
 import { GeoBuffer } from './geoBuffer.js';
 import { cleanRing, orientedBox, pointInRing } from './polygon.js';
 import { polylineNormals, arcLengths } from './lines.js';
-import { ribbon, faceUp } from './roads.js';
+import { ribbon, ribbonAlong, faceUp } from './roads.js';
 import { tint } from './palette.js';
 
 // Ground-level surfaces: land-use areas (lawns, dry veld, school grounds...), parking lots and kombi
@@ -59,7 +59,13 @@ export function buildGround(ctx) {
     const [layer, color] = style;
     paths.brush(tint(color), G[layer], 0, 0);
     const w = p.cls === 'pedestrian' ? p.w : Math.min(p.w, 3);
-    ribbon(paths, p.pts, polylineNormals(p.pts), -w / 2, w / 2, heightAt, groundScale[layer]);
+    if (p.cls === 'pedestrian') {
+      // Malls: uv along / across in metres so the paver grid follows the mall.
+      paths.surface(255, 255, 0, 1);
+      ribbonAlong(paths, p.pts, polylineNormals(p.pts), -w / 2, w / 2, heightAt);
+    } else {
+      ribbon(paths, p.pts, polylineNormals(p.pts), -w / 2, w / 2, heightAt, groundScale[layer]);
+    }
   }
 
   const { minX, maxX, minZ, maxZ } = data.meta.bounds;

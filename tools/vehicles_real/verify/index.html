@@ -45,7 +45,7 @@ scene.environmentIntensity = night ? 0.08 : 0.8;
 const sun = new THREE.DirectionalLight(0xfff4e0, night ? 0.05 : 2.4);
 sun.position.set(-30, 50, 25);
 sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096);
+sun.shadow.mapSize.set(+(q.get('shadow') || 2048), +(q.get('shadow') || 2048));
 sun.shadow.bias = -0.0003;
 Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 150 });
 scene.add(sun);
@@ -108,6 +108,7 @@ loaded.forEach(([name, gltf, err], i) => {
           mat.emissive.fromArray(mat.userData.emissiveNight);
           mat.emissiveIntensity = mat.name === 'light_rear' ? 1.5 : 2.5;
         }
+        if (raw && q.get('rawopaque') === '1' && !/glass|window|windshield|lens|light/i.test(mat.name)) { mat.transparent = false; mat.opacity = 1; mat.depthWrite = true; }
         if (q.get('wire') === '1') mat.wireframe = true;
         if (q.get('backface') === '1' && !mat.transparent) {
           mat.side = THREE.DoubleSide;
@@ -164,32 +165,46 @@ const items = [...group.children].sort((a, b) => a.userData.idx - b.userData.idx
 const box = new THREE.Box3().setFromObject(group);
 const center = box.getCenter(new THREE.Vector3());
 const size = box.getSize(new THREE.Vector3());
-const cam = new THREE.PerspectiveCamera(q.get('fov') ? +q.get('fov') : 30, W / H, 0.05, 1000);
-if (q.get('cam')) {
-  const c = q.get('cam').split(',').map(Number);
-  cam.position.set(c[0], c[1], c[2]);
-  cam.lookAt(c[3], c[4], c[5]);
-} else {
-  const R = Math.max(0.5 * Math.hypot(size.x, size.y, size.z), 2);
-  const dirs = { front34: [-0.75, 0.42, -1], rear34: [0.8, 0.42, 1], side: [-1, 0.12, 0], top: [0, 1, 0.001], high: [-0.6, 1.2, -1], front: [0, 0.15, -1], rear: [0, 0.15, 1], rside: [1, 0.12, 0] };
-  const d = new THREE.Vector3(...(dirs[view] || dirs.front34)).normalize();
-  const dist = (+(q.get('zoom') || 1)) * R / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2)) * 0.8;
-  cam.position.copy(center).addScaledVector(d, dist);
-  cam.lookAt(center.x, (view === 'top' ? 0 : size.y * 0.3), center.z);
-}
-cam.updateMatrixWorld();
-renderer.render(scene, cam);
+const dirs = { front34: [-0.75, 0.42, -1], rear34: [0.8, 0.42, 1], side: [-1, 0.12, 0], top: [0, 1, 0.001], high: [-0.6, 1.2, -1], front: [0, 0.15, -1], rear: [0, 0.15, 1], rside: [1, 0.12, 0], front34r: [0.75, 0.42, -1], rear34l: [-0.8, 0.42, 1] };
+const viewList = (q.get('views') || view).split(',');
+const gcols = +(q.get('gcols') || Math.ceil(Math.sqrt(viewList.length)));
+const grows = Math.ceil(viewList.length / gcols);
+const cw = Math.floor(W / gcols), ch = Math.floor(H / grows);
+renderer.setScissorTest(true);
+const cams = [];
+viewList.forEach((vw, k) => {
+  const cam = new THREE.PerspectiveCamera(q.get('fov') ? +q.get('fov') : 30, cw / ch, 0.05, 1000);
+  if (q.get('cam') && viewList.length === 1) {
+    const c = q.get('cam').split(',').map(Number);
+    cam.position.set(c[0], c[1], c[2]);
+    cam.lookAt(c[3], c[4], c[5]);
+  } else {
+    const R = Math.max(0.5 * Math.hypot(size.x, size.y, size.z), 2);
+    const d = new THREE.Vector3(...(dirs[vw] || dirs.front34)).normalize();
+    const dist = (+(q.get('zoom') || 1)) * R / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2)) * 0.8 * (cw / ch < 1.3 ? 1.25 : 1);
+    cam.position.copy(center).addScaledVector(d, dist);
+    cam.lookAt(center.x, (vw === 'top' ? 0 : size.y * 0.3), center.z);
+  }
+  cam.updateMatrixWorld();
+  const cx = (k % gcols) * cw, cy = H - (Math.floor(k / gcols) + 1) * ch;
+  renderer.setViewport(cx, cy, cw, ch);
+  renderer.setScissor(cx, cy, cw, ch);
+  renderer.render(scene, cam);
+  cams.push([cam, cx, H - cy - ch, vw]);
+});
 if (q.get('labels') !== '0') {
-  for (const it of items) {
-    const b = new THREE.Box3().setFromObject(it);
-    const p = new THREE.Vector3((b.min.x + b.max.x) / 2, b.max.y + 0.15, (b.min.z + b.max.z) / 2).project(cam);
-    if (p.z > 1) continue;
-    const el = document.createElement('div');
-    el.className = 'tag';
-    el.textContent = it.userData.name;
-    el.style.left = `${(p.x * 0.5 + 0.5) * W}px`;
-    el.style.top = `${(-p.y * 0.5 + 0.5) * H - 18}px`;
-    document.body.appendChild(el);
+  for (const [cam, ox, oy] of cams) {
+    for (const it of items) {
+      const b = new THREE.Box3().setFromObject(it);
+      const p = new THREE.Vector3((b.min.x + b.max.x) / 2, b.max.y + 0.15, (b.min.z + b.max.z) / 2).project(cam);
+      if (p.z > 1) continue;
+      const el = document.createElement('div');
+      el.className = 'tag';
+      el.textContent = it.userData.name;
+      el.style.left = `${ox + (p.x * 0.5 + 0.5) * cw}px`;
+      el.style.top = `${oy + (-p.y * 0.5 + 0.5) * ch - 18}px`;
+      document.body.appendChild(el);
+    }
   }
 }
 document.getElementById('lbl').textContent = `lod${lod}  ${view}${night ? ' night' : ''}`;

@@ -11,11 +11,11 @@ const CONTROLS = {
     title: 'Keyboard & mouse',
     rows: [
       [['W', 'A', 'S', 'D'], 'Run'],
-      [['Alt', 'CapsLock'], 'Walk (hold Alt, or CapsLock on)'],
+      [['Alt', 'CapsLock'], 'Walk (hold / toggle)'],
       [['Mouse'], 'Look'],
       [['Space'], 'Jump · wall-run'],
-      [['Left click', 'Shift'], 'Hold: swing · sprint on the ground'],
-      [['Shift', 'Space'], 'Web-launch (jump mid-sprint)', '+'],
+      [['Left click', 'Shift'], 'Swing / sprint (hold)'],
+      [['Shift', 'Space'], 'Web-launch mid-sprint', '+'],
       [['E', 'Right click'], 'Web-zip'],
       [['C'], 'Dive'],
       [['F'], 'Change suit'],
@@ -39,11 +39,11 @@ const CONTROLS = {
   gamepad: {
     title: 'Gamepad',
     rows: [
-      [['Left stick'], 'Run (push lightly to walk)'],
+      [['Left stick'], 'Run / walk (light push)'],
       [['Right stick'], 'Look'],
       [['A'], 'Jump · wall-run'],
-      [['RT'], 'Hold: swing · sprint on the ground'],
-      [['RT', 'A'], 'Web-launch (jump mid-sprint)', '+'],
+      [['RT'], 'Swing / sprint (hold)'],
+      [['RT', 'A'], 'Web-launch mid-sprint', '+'],
       [['LB', 'RB', 'LT'], 'Web-zip'],
       [['B'], 'Dive'],
       [['Y'], 'Change suit'],
@@ -62,11 +62,11 @@ const CONTROLS = {
   touch: {
     title: 'Touch',
     rows: [
-      [['Left thumb'], 'Run (push lightly to walk)'],
+      [['Left thumb'], 'Run / walk (light push)'],
       [['Right thumb'], 'Drag to look'],
-      [['Swing'], 'Hold: swing · sprint on the ground'],
+      [['Swing'], 'Swing / sprint (hold)'],
       [['Jump'], 'Jump · wall-run'],
-      [['Swing', 'Jump'], 'Web-launch (jump mid-sprint)', '+'],
+      [['Swing', 'Jump'], 'Web-launch mid-sprint', '+'],
       [['Zip'], 'Web-zip'],
       [['Dive'], 'Dive'],
       [['Suit'], 'Change suit'],
@@ -86,11 +86,11 @@ const CONTROLS = {
 const FREE = {
   rows: [
     [['W', 'A', 'S', 'D'], 'Run'],
-    [['Alt', 'CapsLock'], 'Walk (hold Alt, or CapsLock on)'],
+    [['Alt', 'CapsLock'], 'Walk (hold / toggle)'],
     [['Drag'], 'Look (hold a mouse button)'],
     [['Space'], 'Jump · wall-run'],
-    [['Shift'], 'Hold: swing · sprint on the ground'],
-    [['Shift', 'Space'], 'Web-launch (jump mid-sprint)', '+'],
+    [['Shift'], 'Swing / sprint (hold)'],
+    [['Shift', 'Space'], 'Web-launch mid-sprint', '+'],
     [['E', 'Q'], 'Web-zip'],
     [['C'], 'Dive'],
     [['F'], 'Change suit'],
@@ -159,7 +159,7 @@ const TIPS = {
   keyboard:
     'On the ground, hold Shift to sprint: it vaults railings and runs up walls. Press Space mid-sprint to web-launch into a swing, and keep holding Shift to swing on. Hold Alt (or switch CapsLock on) to walk. Press M for the map of Harare CBD and drop a waypoint anywhere.',
   touch:
-    'On the ground, hold Swing to sprint: it vaults railings and runs up walls. Tap Jump mid-sprint to web-launch into a swing, and keep holding Swing to swing on. Push the stick lightly to walk. Tap the minimap for the map of Harare CBD and drop a waypoint anywhere.',
+    'On the ground the Swing button reads Sprint: hold it to sprint, vaulting railings and running up walls. Tap Jump mid-sprint to web-launch into a swing, and keep holding to swing on. Push the stick lightly to walk. Tap the minimap for the map of Harare CBD and drop a waypoint anywhere.',
   gamepad:
     'On the ground, hold RT to sprint: it vaults railings and runs up walls. Press A mid-sprint to web-launch into a swing, and keep holding RT to swing on. Push the left stick lightly to walk. Press Back for the map of Harare CBD and drop a waypoint anywhere.',
 };

@@ -60,12 +60,17 @@ vec3 cityUnpackNormal(vec2 xy, float strength) {
 `;
 
 // Fragment declarations for the facade material. `pbr` = the facade PbrSet.
+// Albedo contrast per material (1 = as scanned): the peeling plaster scan reads as camouflage on a
+// 20 m wall at full strength.
+const CONTRAST = { plaster_peeling: 0.45, concrete_weathered: 0.75, plaster_textured: 0.8, roof_gravel: 0.85 };
+
 export function facadeFragmentDecl(pbr, { normals, interiors }) {
   const N = pbr.count;
   const info = [];
   const avg = [];
   for (let i = 0; i < N; i++) {
-    info.push(v4(pbr.info.subarray(i * 4, i * 4 + 4)));
+    const c = CONTRAST[pbr.names[i]] ?? 1;
+    info.push(v4([pbr.info[i * 4], pbr.info[i * 4 + 1], pbr.info[i * 4 + 2], c]));
     avg.push(v3([Math.max(0.02, pbr.avg[i * 3]), Math.max(0.02, pbr.avg[i * 3 + 1]), Math.max(0.02, pbr.avg[i * 3 + 2])]));
   }
   const names = Object.keys(STYLES);
@@ -108,6 +113,11 @@ uniform float uNight;
 uniform float uShutterFrac;
 uniform vec3 uInterior;
 uniform vec3 uSunDir;
+uniform vec3 uBounce;
+uniform vec3 uCanyonLit;
+uniform vec3 uCanyonShade;
+uniform sampler2D urbanMap;
+uniform vec4 urbanRect;
 uniform vec3 uSkyHorizon;
 varying vec4 vFac;
 varying vec4 vPbr;
@@ -142,7 +152,8 @@ ${GLSL_HELPERS}
 
 vec3 cityAlbedo(vec4 a, float mat, vec3 tint) {
   int m = int(mat + 0.5);
-  return PBR_INFO[m].z > 0.5 ? a.rgb * tint * (PAINT / PBR_AVG[m]) : a.rgb * tint;
+  vec3 c = mix(PBR_AVG[m], a.rgb, PBR_INFO[m].w);
+  return PBR_INFO[m].z > 0.5 ? c * tint * (PAINT / PBR_AVG[m]) : c * tint;
 }
 
 // Interior mapping (public/textures/README.md, "Projection"): ray-box hit in room space, then the
@@ -240,6 +251,11 @@ vec4 cNz = texture(noiseMap, cPlan * 0.011 + vec2(cSeed * 0.137, cSeed * 0.071))
 vec4 cNz2 = texture(noiseMap, vec2(cPlan.x * 0.23, cPlan.y * 0.021) + cSeed * 0.031);
 float cMacro = mix(0.86, 1.1, cNz.r) * mix(0.94, 1.04, cNz.g);
 
+// Street canyon: how tall the buildings around are (urban mask) and how high up this point is.
+float cUrban = texture(urbanMap, (vWPos.xz - urbanRect.xy) / urbanRect.zw).r;
+float cCanyonH = mix(5.0, 26.0, smoothstep(0.15, 0.7, cUrban));
+float cYRel = max(vWPos.y, 0.0);
+
 // Surface outputs.
 vec3 sAlb = vec3(0.6);
 float sRough = cA.a;
@@ -251,7 +267,7 @@ vec3 sF0 = vec3(0.04);
 vec3 sEmit = vec3(0.0);
 float sSun = 1.0;
 
-if (cIsVirtual || (cHasPbr && !cIsStyle && cLayer < 127.5 && false)) {
+if (cIsVirtual) {
   sAlb = cIsVirtual && cMatX > 254.5 ? cA.rgb * cTint * cColScale : cityAlbedo(cA, cMat, cTint);
   sAlb *= cMacro;
 } else if (cIsStyle) {
@@ -268,7 +284,7 @@ if (cIsVirtual || (cHasPbr && !cIsStyle && cLayer < 127.5 && false)) {
   vec2 fr = vFacUv - cell;
   vec2 p = fr * vec2(bayW, fh);
   vec2 pw = cFw * vec2(bayW, fh);
-  float lod = smoothstep(0.1, 0.3, max(cFw.x, cFw.y));
+  float lod = smoothstep(0.3, 0.75, max(cFw.x, cFw.y));
   vec3 V = normalize(vWPos - cameraPosition);
   vec3 Tu = cT * cUSign;
   vec3 vts = vec3(dot(V, Tu), V.y, -dot(V, cN));
@@ -475,7 +491,7 @@ if (cIsVirtual || (cHasPbr && !cIsStyle && cLayer < 127.5 && false)) {
 #else
   roomCol = vec3(0.18, 0.16, 0.14);
 #endif
-  float dayVar = mix(0.45, 1.25, rh3) * (shop ? 1.5 : 1.0);
+  float dayVar = mix(0.35, 1.1, rh3) * (shop ? 0.85 : 1.0);
   float roomLight = mix(dayVar, mix(uInterior.y, 1.0 + (shop ? 0.6 : 0.0), lit), uNight);
   // Blinds and curtains (not in shops).
   float blind = 0.0;
@@ -627,5 +643,37 @@ if (cIsVirtual || (cHasPbr && !cIsStyle && cLayer < 127.5 && false)) {
 if (cIsVirtual) {
   sAlb *= mix(0.84, 1.0, smoothstep(0.0, 1.2, vWPos.y));
 }
+// Sunlight bounced off the pavement lights canopy soffits and eaves from below.
+sEmit += sAlb * uBounce * smoothstep(0.2, 1.0, -cN.y) * sAO;
 diffuseColor.rgb = sAlb;
+`;
+
+// Injected after <lights_fragment_maps>: in the city's street canyons, low reflections see the
+// buildings across the street (a lit or shaded facade with rows of windows), not open sky, and
+// street-level walls see less of the sky.
+export const FACADE_CANYON = /* glsl */ `
+#if defined( USE_ENVMAP )
+{
+  vec3 Vw = normalize(vWPos - cameraPosition);
+  vec3 Rw = reflect(Vw, sNw);
+  float rh = length(Rw.xz);
+  float street = 22.0;
+  float hitY = cYRel + street * Rw.y / max(rh, 1e-3);
+  float inCanyon = smoothstep(-0.5, 0.5, hitY) * (1.0 - smoothstep(cCanyonH - 3.0, cCanyonH + 3.0, hitY)) * smoothstep(0.15, 0.35, rh) * cVert;
+  if (inCanyon > 0.001) {
+    vec2 hitXZ = vWPos.xz + Rw.xz / max(rh, 1e-3) * street;
+    vec4 nz = texture(noiseMap, hitXZ * 0.021);
+    vec3 nOpp = vec3(-Rw.x, 0.0, -Rw.z) / max(rh, 1e-3);
+    float litK = max(0.0, dot(nOpp, uSunDir));
+    vec3 wallC = mix(vec3(0.34, 0.31, 0.27), vec3(0.45, 0.43, 0.4), nz.r) * (uCanyonShade + uCanyonLit * litK);
+    float fl = fract(hitY / 3.4);
+    float win = smoothstep(0.28, 0.34, fl) * (1.0 - smoothstep(0.78, 0.84, fl)) * step(0.3, nz.g);
+    float litWin = step(0.72, fract(sin(dot(floor(vec2(hitXZ.x + hitXZ.y, hitY / 3.4)), vec2(12.9898, 78.233))) * 43758.5453));
+    vec3 winC = mix(wallC * 0.25 + uCanyonShade * 0.15, vec3(1.0, 0.7, 0.4) * 0.35 * litWin, uNight);
+    vec3 canyon = mix(wallC, winC, win);
+    radiance = mix(radiance, canyon, inCanyon * 0.9);
+  }
+  iblIrradiance *= mix(0.72, 1.0, smoothstep(0.0, cCanyonH, cYRel)) * mix(1.0, 0.85, cVert * (1.0 - smoothstep(0.0, cCanyonH, cYRel)));
+}
+#endif
 `;

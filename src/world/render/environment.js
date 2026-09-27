@@ -47,6 +47,10 @@ void main() {
   float fwd = max(dot(d, uSunDir), 0.0);
   sky += uGlow * (pow(fwd, 5.0) * 0.28 + pow(fwd, 48.0) * 0.45) * uSunVis;
   vec3 col = toLin(sky);
+  // The light the sky throws is less saturated than its look straight up (haze, the dusty dry
+  // season): pull it towards grey so shade reads warm-neutral like the tuned hemisphere light.
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col = mix(col, vec3(lum) * vec3(1.02, 1.0, 0.97), 0.45);
   // The HDRI supplies what surrounds a street: asphalt below the horizon, buildings and trees up to
   // ~35 deg. Its own sky is replaced by the procedural one (so reflections follow the hour).
   vec3 ground = toLin(uGround);
@@ -62,6 +66,8 @@ void main() {
     float blue = (h.b - h.r) / (h.b + h.r + 1e-3);
     float hSky = smoothstep(0.18, 0.34, blue) * step(0.0, y);
     near = h * uHdrTint;
+    // Dusty red-brown Harare ground rather than the source's grey asphalt.
+    near *= mix(vec3(1.0), vec3(1.18, 1.0, 0.8), 0.6 * (1.0 - smoothstep(-0.05, 0.05, y)));
     skyW = y < 0.0 ? 0.0 : max(hSky, smoothstep(0.45, 0.62, y));
   }
   // Haze: distant things take the colour of the horizon air.

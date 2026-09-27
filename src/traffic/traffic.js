@@ -103,6 +103,9 @@ export class Traffic {
     this.game = game;
     const q = game.quality || {};
     const scale = q.traffic ?? 1;
+    const level = q.level || 'high';
+    // The models download while the road graph is built.
+    const lib = loadVehicleLibrary(game, { textureSize: level === 'low' ? 256 : 512, anisotropy: level === 'low' ? 2 : 4 });
     this.rng = makeRng(hashString('harare-traffic'));
     this.graph = new RoadGraph(game.data);
     this.signals = new Signals(this.graph, game.data, this.rng);
@@ -110,8 +113,7 @@ export class Traffic {
     this.sim = new Simulation(this.graph, this.signals, this.rng);
     this.target = Math.max(12, Math.round(140 * scale));
     const maxParked = Math.round(120 * scale);
-    const level = q.level || 'high';
-    this.lib = await loadVehicleLibrary(game, { textureSize: level === 'low' ? 256 : 512, anisotropy: level === 'low' ? 2 : 4 });
+    this.lib = await lib;
     this.mix = new TrafficMix();
     this.mix.setModels(this.lib.models);
     this.renderer = new VehicleRenderer(game.scene, this.lib, {
@@ -120,8 +122,8 @@ export class Traffic {
       castShadows: !!q.shadows,
       receiveShadows: !!q.shadows,
       level,
+      palette: game.sky?.palette,
     });
-    this.renderer.setSkyPalette(game.sky?.palette);
     this.models = this.lib.models;
     this.bubbles = new SpeechBubbles(game.scene, 3);
     this.voices = streetVoices(game);
@@ -438,6 +440,7 @@ export class Traffic {
       if (v.blinkT > 0) v.blinkT -= dt;
       if (v.honkCd > 0) v.honkCd -= dt;
       if (v.sirenT > 0 && (v.sirenT -= dt) <= 0) v.siren = false;
+      if (v.leanT > 0) v.leanT -= dt;
       const pulling = v.dwell > 0 || (v.stopLane === v.path && v.stopS - v.s < 30);
       const want = pulling ? Math.max(0, Math.min(1.5, v.path.kerbSpace - v.width / 2 - 0.25)) : 0;
       v.kerbShift += Math.max(-0.9 * dt, Math.min(0.9 * dt, want - v.kerbShift));
@@ -535,7 +538,10 @@ export class Traffic {
       if (blinkOn && (bl === 1 || bl === 2)) f |= FLAG.RIGHT;
       if (v.siren) f |= beacon;
       if (v.routeGroup) this.mix.routeCard(v, this.rng);
-      r.add(v, f, v.hwindi ? (v.dwell > 0 ? 2 : 1) : 0, time);
+      // Hwindi: on the kerb while loading, leaning out of the door while calling or pulling in to a stop.
+      let hw = 0;
+      if (v.hwindi) hw = v.dwell > 0 ? 2 : v.leanT > 0 || (v.stopLane === v.path && v.stopS - v.s < 40) ? 1 : 0;
+      r.add(v, f, hw, time);
     }
     for (const v of this.kombis.near) {
       if (v.routeGroup) this.mix.routeCard(v, this.rng);

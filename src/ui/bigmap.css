@@ -202,8 +202,9 @@
 
 /* ---------------------------------------------------------------- search (mapSearch.js) */
 
+/* The panel hangs from the whole top bar (.bigmap-top is its containing block), right-aligned under the
+   close button and below the waypoint row when that wraps (portrait phones). */
 .bigmap-top .bigmap-searchbox {
-  position: relative;
   flex: none;
   margin-left: auto;
 }
@@ -227,7 +228,11 @@
   max-height: min(430px, calc(100vh - var(--top) - var(--bottom) - 70px));
   padding: 8px;
   flex-direction: column;
-  background: rgba(11, 15, 21, 0.94);
+}
+
+/* Opaque: map labels must not show through the results. */
+.bigmap-searchbox .search-panel {
+  background: rgb(13, 18, 26);
 }
 
 .bigmap-searchbox.open .search-panel {

@@ -1,0 +1,428 @@
+{
+ "types": {
+  "ribbon": [
+   {
+    "photo": "wc_Harare_Zimbabwe_04.jpg",
+    "shows": "Throgmorton House: mint-teal spandrel panels under continuous white aluminium ribbon windows, face-brick end wall with vertical letters, window AC units, pavement canopy",
+    "title": "Harare, Zimbabwe. 04.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._04.JPG",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_e504fe94_Harare_4.jpg",
+    "shows": "slab tower with orange-tan spandrel bands and grey mosaic end walls",
+    "title": "Harare 4",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14685506386",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_8b8ae35f_Harare_3.jpg",
+    "shows": "tan ribbon-window slab tower above the jacaranda canopy",
+    "title": "Harare 3",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14521848209",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_CBD.jpg",
+    "shows": "Batanai Gardens (Jason Moyo / First St): continuous sloped green sunshade hoods over ribbon windows (bay_hood)",
+    "title": "Harare CBD.jpg",
+    "author": "Agororo1",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_CBD.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Mapillary_138205998291259_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+    "shows": "beige office slab with sloped hoods, AC units and a cantilevered pavement canopy",
+    "title": "Mapillary (138205998291259, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H13M11S000.jpg",
+    "author": "rubynikki",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(138205998291259,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H13M11S000.jpg",
+    "reference_only": false
+   }
+  ],
+  "fins": [
+   {
+    "photo": "ov_7ee7b21e_P1000988.jpg",
+    "shows": "left: beige office block with close full-height concrete fins; right: tan block with deep fins",
+    "title": "P1000988",
+    "author": "damien_farrell",
+    "licence": "Public Domain Mark",
+    "url": "https://www.flickr.com/photos/92094658@N00/7661984166",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_First_Street_Harare_Zimbabwe.jpg",
+    "shows": "left: grey 1970s block with angled sawtooth fins (bay_angled)",
+    "title": "First Street, Harare, Zimbabwe.jpg",
+    "author": "Gary Bembridge",
+    "licence": "CC BY 2.0",
+    "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Downtown1.jpg",
+    "shows": "left: grey office block with fins and deep spandrels (Samora Machel)",
+    "title": "Harare Downtown1.jpg",
+    "author": "Macvivo at English Wikipedia (Original text: Samwise Gamgee)",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_Downtown1.jpg",
+    "reference_only": false
+   }
+  ],
+  "eggcrate": [
+   {
+    "photo": "wc_Harare_CBD.jpg",
+    "shows": "tower behind Edgars: deep concrete egg-crate grid of shelves and fins",
+    "title": "Harare CBD.jpg",
+    "author": "Agororo1",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_CBD.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_First_Street_Harare_Zimbabwe_2.jpg",
+    "shows": "white egg-crate grid (top right, First Street Mall)",
+    "title": "First Street, Harare, Zimbabwe 2.jpg",
+    "author": "Gary Bembridge",
+    "licence": "CC BY 2.0",
+    "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe_2.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare.jpg",
+    "shows": "left: white grid block with brick end walls (1995)",
+    "title": "Harare.jpg",
+    "author": "No machine-readable author provided. Greenmnm69 assumed (based on copyright claims).",
+    "licence": "CC BY-SA 2.5",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Mapillary_138205998291259_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+    "shows": "left: white balcony / grid tower on a brick base",
+    "title": "Mapillary (138205998291259, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H13M11S000.jpg",
+    "author": "rubynikki",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(138205998291259,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H13M11S000.jpg",
+    "reference_only": false
+   }
+  ],
+  "curtain": [
+   {
+    "photo": "wc_Harare_Zimbabwe_04.jpg",
+    "shows": "blue reflective curtain-wall tower with wide light-grey corner piers",
+    "title": "Harare, Zimbabwe. 04.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._04.JPG",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_The_Avenues_Harare.jpg",
+    "shows": "blue-glass tower with a white needle spire (probably Karigamombe Centre)",
+    "title": "The Avenues, Harare.jpg",
+    "author": "Maipo",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:The_Avenues,_Harare.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_7ee7b21e_P1000988.jpg",
+    "shows": "Reserve Bank: teal curtain glass between slim granite piers",
+    "title": "P1000988",
+    "author": "damien_farrell",
+    "licence": "Public Domain Mark",
+    "url": "https://www.flickr.com/photos/92094658@N00/7661984166",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Zimbabwe_02.jpg",
+    "shows": "curved blue curtain-wall office on Samora Machel Ave",
+    "title": "Harare, Zimbabwe. 02.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._02.JPG",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Downtown_Harare.jpg",
+    "shows": "dark glass curtain-wall block (left)",
+    "title": "Downtown Harare.jpg",
+    "author": "Croquant",
+    "licence": "CC BY 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Downtown_Harare.jpg",
+    "reference_only": false
+   }
+  ],
+  "glassgranite": [
+   {
+    "photo": "ov_70b81282_Harare_5.jpg",
+    "shows": "grey granite piers and spandrels with recessed blue glass ribbons and set-back galleries",
+    "title": "Harare 5",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14708114552",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_2024_6.jpg",
+    "shows": "right: beige panel spandrels + blue glass, 1990s office",
+    "title": "Harare 2024 6.jpg",
+    "author": "Peter in s",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_2024_6.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_4dff88b3_P1000987.jpg",
+    "shows": "banded white / dark-glass offices along Samora Machel",
+    "title": "P1000987",
+    "author": "damien_farrell",
+    "licence": "Public Domain Mark",
+    "url": "https://www.flickr.com/photos/92094658@N00/7661982950",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_6ef347af_P1000984.jpg",
+    "shows": "Kingdom Bank block: granite, glass and a fan canopy",
+    "title": "P1000984",
+    "author": "damien_farrell",
+    "licence": "Public Domain Mark",
+    "url": "https://www.flickr.com/photos/92094658@N00/7661980608",
+    "reference_only": false
+   }
+  ],
+  "brick": [
+   {
+    "photo": "wc_First_Street_Harare_Zimbabwe.jpg",
+    "shows": "CABS building on First Street Mall: red-brown face brick, punched grid of white-framed windows, light concrete corner piers, blade signs",
+    "title": "First Street, Harare, Zimbabwe.jpg",
+    "author": "Gary Bembridge",
+    "licence": "CC BY 2.0",
+    "url": "https://commons.wikimedia.org/wiki/File:First_Street,_Harare,_Zimbabwe.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Zimbabwe_03.jpg",
+    "shows": "Union Buildings: brown face brick, white steel windows with AC units, concrete window surround bay",
+    "title": "Harare, Zimbabwe. 03.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._03.JPG",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_8b8ae35f_Harare_3.jpg",
+    "shows": "large red-brown brick slab with punched windows",
+    "title": "Harare 3",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14521848209",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_e504fe94_Harare_4.jpg",
+    "shows": "brick towers with punched windows (right)",
+    "title": "Harare 4",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14685506386",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_2024_5.jpg",
+    "shows": "two-storey face-brick shops with a first-floor gallery and pavement canopy",
+    "title": "Harare 2024 5.jpg",
+    "author": "Peter in s",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_2024_5.jpg",
+    "reference_only": false
+   }
+  ],
+  "colonial": [
+   {
+    "photo": "wc_Stanley_Avenue_Salisbury_1936.jpg",
+    "shows": "Stanley Ave (Jason Moyo) 1936: pavement verandahs on slender posts, giant-order colonnades, parapet names",
+    "title": "Stanley Avenue, Salisbury, 1936.jpg",
+    "author": "Department of Publicity, Southern Rhodesia",
+    "licence": "Public domain",
+    "url": "https://commons.wikimedia.org/wiki/File:Stanley_Avenue,_Salisbury,_1936.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Zimbabwe_03.jpg",
+    "shows": "left: cream neo-classical block with maroon trim, pilasters, cornice and round-arched ground windows with burglar bars",
+    "title": "Harare, Zimbabwe. 03.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._03.JPG",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_cef77ace_Harare_1.jpg",
+    "shows": "low cream shops with fascia signs and canopies",
+    "title": "Harare 1",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14521853568",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Downtown1.jpg",
+    "shows": "right: white colonial offices with hip roofs, pilasters and sash windows",
+    "title": "Harare Downtown1.jpg",
+    "author": "Macvivo at English Wikipedia (Original text: Samwise Gamgee)",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare_Downtown1.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_5a87b2d6_Station_Furnishers.jpg",
+    "shows": "Station Furnishers: verandah fascia with shop name, shopfront glazing (NON-COMMERCIAL: looked at only)",
+    "title": "Station Furnishers",
+    "author": "Artbandito",
+    "licence": "CC BY-NC-ND 2.0",
+    "url": "https://www.flickr.com/photos/33859819@N00/75735799",
+    "reference_only": true
+   },
+   {
+    "photo": "ov_7d6a94d3_Robert_Mugabe_Road_First_Street_Harare_Zimbabwe_20.jpg",
+    "shows": "cream cast-iron verandah column with lace spandrels (NON-COMMERCIAL: looked at only)",
+    "title": "Robert Mugabe Road/First Street, Harare - Zimbabwe 2019",
+    "author": "eriktorner",
+    "licence": "CC BY-NC-SA 2.0",
+    "url": "https://www.flickr.com/photos/39267804@N05/50606754501",
+    "reference_only": true
+   }
+  ],
+  "deco": [
+   {
+    "photo": "ov_d706b8c1_Harare_2.jpg",
+    "shows": "cream rendered 1930s-50s blocks with ground-floor arcades; grey block with deep horizontal ledges",
+    "title": "Harare 2",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14522064757",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_cef77ace_Harare_1.jpg",
+    "shows": "cream render walk-ups with steel windows and AC units",
+    "title": "Harare 1",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14521853568",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare.jpg",
+    "shows": "Pearl House: golden ochre render with vertical window strips",
+    "title": "Harare.jpg",
+    "author": "No machine-readable author provided. Greenmnm69 assumed (based on copyright claims).",
+    "licence": "CC BY-SA 2.5",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare_Zimbabwe_03.jpg",
+    "shows": "left: rendered corner block with cornice and pilasters",
+    "title": "Harare, Zimbabwe. 03.JPG",
+    "author": "Suesen",
+    "licence": "CC BY-SA 3.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare,_Zimbabwe._03.JPG",
+    "reference_only": false
+   }
+  ],
+  "avenues": [
+   {
+    "photo": "wc_Mapillary_196761335623742_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+    "shows": "Avenues flat block: cream render, recessed balconies with solid parapets; brick walk-up",
+    "title": "Mapillary (196761335623742, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H17M11S000.jpg",
+    "author": "rubynikki",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(196761335623742,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H17M11S000.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "ov_cef77ace_Harare_1.jpg",
+    "shows": "flat blocks with blue-painted projecting balcony slabs and AC units",
+    "title": "Harare 1",
+    "author": "SqueakyMarmot",
+    "licence": "CC BY-SA 2.0",
+    "url": "https://www.flickr.com/photos/37804160@N00/14521853568",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Harare.jpg",
+    "shows": "left: balcony grid block with brick end walls",
+    "title": "Harare.jpg",
+    "author": "No machine-readable author provided. Greenmnm69 assumed (based on copyright claims).",
+    "licence": "CC BY-SA 2.5",
+    "url": "https://commons.wikimedia.org/wiki/File:Harare.jpg",
+    "reference_only": false
+   },
+   {
+    "photo": "wc_Mapillary_138205998291259_6Rd1ig7CTn2kV9_YgGdUEw_rubynikki_2.jpg",
+    "shows": "left: white balcony tower",
+    "title": "Mapillary (138205998291259, 6Rd1ig7CTn2kV9-YgGdUEw) (rubynikki) 2019-01-09 13H13M11S000.jpg",
+    "author": "rubynikki",
+    "licence": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:Mapillary_(138205998291259,_6Rd1ig7CTn2kV9-YgGdUEw)_(rubynikki)_2019-01-09_13H13M11S000.jpg",
+    "reference_only": false
+   }
+  ]
+ },
+ "attachments": [
+  {
+   "source": "Sketchfab",
+   "title": "Air Conditioner Unit, Low Poly",
+   "authors": [
+    "MC_RightLeft"
+   ],
+   "url": "https://sketchfab.com/3d-models/air-conditioner-unit-low-poly-11d7c77bfe804f448a516928adf3f05d",
+   "licence": "CC Attribution",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "use": "weathered split-system outdoor unit (ac_split attachment)"
+  },
+  {
+   "source": "Sketchfab",
+   "title": "Old window air conditioner",
+   "authors": [
+    "HASSAN"
+   ],
+   "url": "https://sketchfab.com/3d-models/old-window-air-conditioner-df7687570458444cb66fecdbfea2adc4",
+   "licence": "CC Attribution",
+   "licence_url": "http://creativecommons.org/licenses/by/4.0/",
+   "use": "window / through-wall box air conditioner (ac_window attachment)"
+  },
+  {
+   "source": "Poly Haven",
+   "title": "Modular Metal Gutter",
+   "authors": [
+    "Maxim Domnin"
+   ],
+   "url": "https://polyhaven.com/a/modular_metal_gutter",
+   "licence": "CC0 1.0",
+   "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "use": "downpipe, offset bend, shoe and hopper (drainpipe attachments)"
+  },
+  {
+   "source": "Poly Haven",
+   "title": "Rollershutter Door",
+   "authors": [
+    "MP"
+   ],
+   "url": "https://polyhaven.com/a/rollershutter_door",
+   "licence": "CC0 1.0",
+   "licence_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+   "use": "shopfront roll-down steel shutter + shutter box (ground-floor shop bays)"
+  }
+ ]
+}

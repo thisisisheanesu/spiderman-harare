@@ -86,16 +86,18 @@ export function creditsPage(game) {
         link('Universal Animation Library', 'https://quaternius.itch.io/universal-animation-library'),
         ' and ',
         link('Universal Animation Library 2', 'https://quaternius.itch.io/universal-animation-library-2'),
-        ' by Quaternius (animations with Gonzalo Furnier), CC0 1.0, retargeted to the MakeHuman rig. The swing, zip, dive, skydive and web-shooting clips and both suit designs were made for this game (CC0 1.0).',
+        ' by Quaternius (animations with Gonzalo Furnier), CC0 1.0, retargeted to the MakeHuman rig. The swing, zip, dive, skydive, web-shooting and other procedural clips and both suit designs were made for this game (CC0 1.0).',
       ]),
       clothesBox,
+      details('models/humans/CREDITS.md'),
     ]),
     section('Vehicles', [
       para(
         'Kombi, ZUPCO bus, taxi, ZRP Land Cruiser and the other cars and trucks were modelled and textured for this game by script (Blender), CC0 1.0. They follow the published dimensions of the real models; no manufacturer logos or badges are reproduced. Lettering and number plates (all invented) use DejaVu Sans (Bitstream Vera licence).',
       ),
+      details('models/vehicles/CREDITS.md'),
     ]),
-    section('Street props & textures', [propsLine, texLine]),
+    section('Street props & textures', [propsLine, texLine, details('models/props/CREDITS.md', 'textures/CREDITS.md')]),
     section('Voices', [
       para(
         'Shona (sn_zw) speech recordings from FLEURS (Conneau et al., 2022, Google), licensed CC BY 4.0. English translations of the lines come from FLoRes (CC BY-SA 4.0).',
@@ -254,6 +256,11 @@ async function fetchText(url) {
   } catch {
     return null;
   }
+}
+
+// "Full list: <file>, <file>" (the credit files are served next to the assets).
+function details(...files) {
+  return el('p', 'credits-details', null, ['Full list: ', ...files.flatMap((f, i) => [i ? ', ' : '', link(f, f)])]);
 }
 
 // A paragraph mixing text and link nodes.

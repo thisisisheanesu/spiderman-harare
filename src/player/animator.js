@@ -132,6 +132,7 @@ class Arm {
     this.length = this.lower.position.length() + this.hand.position.length();
     this.w = 0;
     this.want = 0;
+    this.reach = 0.97; // share of the arm's length the hand reaches out along the line
     this.shooting = 0; // 0..1: the "thwip" hand
     this.target = new THREE.Vector3();
     this.fingers = [];
@@ -175,6 +176,15 @@ export class Animator {
       for (const f of arm.fingers) this.overlay.push(f.bone);
     }
     this.saved = this.overlay.map((b) => b.quaternion.clone());
+    // Warm up: bind every track and build every interpolant now, not on the first frame each clip
+    // plays (that costs a hitch of tens of ms).
+    for (const s of this.list) {
+      for (const o of this.list) o.action.enabled = o === s;
+      s.action.weight = 1;
+      this.mixer.update(0);
+      s.action.weight = 0;
+    }
+    for (const s of this.list) s.action.enabled = false;
 
     this.mode = '';
     this.prevState = '';
@@ -192,6 +202,8 @@ export class Animator {
     this.lean = 0;
     this.trail = 0;
     this._trailK = 0;
+    this.pullK = 0;
+    this.pullPhase = 0;
     this.fade = 10;
     // Body orientation / placement (eased).
     this.body = new THREE.Quaternion();
@@ -200,7 +212,7 @@ export class Animator {
     this._fwd = new THREE.Vector3(0, 0, -1);
     this._offset = new THREE.Vector3();
     this._rate = 14;
-    this.stats = { mixerMs: 0 };
+    this.stats = { mixerMs: 0, totalMs: 0 }; // last frame: mixer.update / the whole animator
   }
 
   // The "thwip" hand (index and pinky out, middle and ring folded) from web_shoot, both hands.
@@ -238,9 +250,9 @@ export class Animator {
     this._mix(snap ? 1 : damp(this.fade, dt), dt);
     this._placeBody(dt, p, ctrl, snap);
     this.object.updateMatrixWorld(true);
-    this._arms(dt, p, snap);
+    this._arms(dt, p, ctrl, snap);
     this._legs(dt, p, ctrl);
-    this.stats.mixerMs = performance.now() - t0;
+    this.stats.totalMs = performance.now() - t0;
     this.prevState = p.state;
   }
 
@@ -597,7 +609,9 @@ export class Animator {
         a.weight = 0;
       }
     }
+    const t0 = performance.now();
     this.mixer.update(0);
+    this.stats.mixerMs = performance.now() - t0;
     for (let i = 0; i < this.overlay.length; i++) this.saved[i].copy(this.overlay[i].quaternion);
   }
 
@@ -629,13 +643,16 @@ export class Animator {
     this.model.root.position.y = -PIVOT_Y + this.model.groundOffset;
   }
 
-  // Web hands: IK onto each line that is out (flying or holding), towards its anchor.
-  _arms(dt, p, snap) {
+  // Web hands: IK onto each line that is out (flying or holding), towards its anchor. Reeling in on
+  // a swing, both hands haul on the line, hand over hand.
+  _arms(dt, p, c, snap) {
     const arms = this.arms;
     arms.L.want = 0;
     arms.R.want = 0;
     arms.L.shooting = 0;
     arms.R.shooting = 0;
+    arms.L.reach = 0.97;
+    arms.R.reach = 0.97;
     const lines = p.webs?.lines;
     if (lines) {
       for (const l of lines) {
@@ -647,6 +664,19 @@ export class Animator {
         if (l.state === 'shoot') arm.shooting = 1;
       }
     }
+    const sw = c.swing;
+    const pull = this.mode === 'swing' && sw.taut >= 0 ? smooth(0.8, 2.5, sw.reelSpeed) : 0;
+    this.pullK += (pull - this.pullK) * damp(pull > this.pullK ? 10 : 4, dt);
+    if (this.pullK > 0.01) {
+      this.pullPhase = (this.pullPhase + dt * (1.6 + 0.5 * sw.reelSpeed)) % 1;
+      const web = sw.side >= 0 ? arms.R : arms.L;
+      const off = sw.side >= 0 ? arms.L : arms.R;
+      off.want = Math.max(off.want, this.pullK);
+      if (off.want <= this.pullK) off.target.copy(sw.anchor);
+      const wave = Math.sin(this.pullPhase * TAU);
+      web.reach = 0.97 - this.pullK * (0.16 + 0.1 * wave);
+      off.reach = 0.97 - this.pullK * (0.16 - 0.1 * wave);
+    }
     for (const side of SIDES) {
       const arm = arms[side];
       arm.w += (arm.want - arm.w) * (snap ? 1 : damp(arm.want > arm.w ? 28 : 7, dt));
@@ -655,7 +685,7 @@ export class Animator {
       _target.subVectors(arm.target, _shoulder);
       const d = _target.length();
       if (d < 0.05) continue;
-      _target.multiplyScalar((arm.length * 0.97) / d).add(_shoulder);
+      _target.multiplyScalar((arm.length * arm.reach) / d).add(_shoulder);
       solveTwoBone(arm.upper, arm.lower, arm.hand, _target, arm.w, 0.99);
       if (arm.shooting > 0) {
         for (const f of arm.fingers) f.bone.quaternion.slerp(f.thwip, arm.w);

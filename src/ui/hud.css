@@ -487,12 +487,14 @@
 
   .hud:not(.compact):not(.touch) .lock-hint {
     top: var(--lane);
+    width: max-content; /* not capped at the 50 % that left: 50% leaves it */
     max-width: calc(100% - var(--col) - var(--right));
+    text-align: center;
     transform: translateX(max(-50%, calc(var(--col) - 50vw)));
   }
 
   .hud:not(.compact):not(.touch):has(.lock-hint.shown) .toasts {
-    top: calc(var(--lane) + 46px);
+    top: calc(var(--lane) + var(--lock-h, 40px) + 6px);
   }
 }
 
@@ -516,6 +518,7 @@
 @media (max-height: 560px) {
   .hud:not(.touch) .controls-hint {
     left: 50%;
+    width: max-content; /* rows as long as max-width allows, not the 50 % that left: 50% leaves */
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
