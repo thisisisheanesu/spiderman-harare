@@ -681,6 +681,12 @@ export const FACADE_CANYON = /* glsl */ `
     float litWin = step(0.72, fract(sin(dot(floor(vec2(hitXZ.x + hitXZ.y, hitY / 3.4)), vec2(12.9898, 78.233))) * 43758.5453));
     vec3 winC = mix(wallC * 0.25 + uCanyonShade * 0.15, vec3(1.0, 0.7, 0.4) * 0.35 * litWin, uNight);
     vec3 canyon = mix(wallC, winC, win);
+    // Street level across the road: shaded shopfronts under their canopies, lit displays at night.
+    float bay = fract((hitXZ.x - hitXZ.y) * 0.21);
+    vec3 shopC = uCanyonShade * mix(0.35, 0.8, step(0.55, bay) * nz.b) + vec3(1.0, 0.8, 0.55) * 0.3 * uNight * step(0.4, nz.g);
+    float fascia = smoothstep(3.0, 3.1, hitY) * (1.0 - smoothstep(3.5, 3.6, hitY));
+    canyon = mix(canyon, shopC, 1.0 - smoothstep(3.0, 3.1, hitY));
+    canyon = mix(canyon, wallC * 1.1, fascia);
     radiance = mix(radiance, canyon, inCanyon * 0.9);
   }
   iblIrradiance *= mix(0.72, 1.0, smoothstep(0.0, cCanyonH, cYRel)) * mix(1.0, 0.85, cVert * (1.0 - smoothstep(0.0, cCanyonH, cYRel)));

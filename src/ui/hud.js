@@ -39,6 +39,7 @@ const SHOP_RANGE = 30; // m
 const SHOP_SWITCH = 4; // m: another shop must be this much nearer to take over the label
 const STREET_LEVEL = 4; // m above the ground
 const SHOP_HOLD_MS = 1500; // the label survives a hop / vault this long
+const ROOF_EDGE = 2.5; // m: a perch this far outside a footprint still counts as atop it (_edgeRoofName)
 // npc:speak clip kinds that appear as speech bubbles, not subtitles (FLEURS barks, extras greetings).
 const BUBBLE_KINDS = new Set(['bark', 'greet', 'exclaim', 'call']);
 
@@ -445,7 +446,7 @@ export class Hud {
     const near = this.places.nearest(p.x, p.z, 350);
     const district = this.places.district(p.x, p.z);
     const roof = world.buildingAt(p.x, p.z);
-    const roofName = roof && p.y > roof.h - 3 ? this.places.nameOf(roof) : '';
+    const roofName = (roof && p.y > roof.h - 3 ? this.places.nameOf(roof) : '') || this._edgeRoofName(p);
     const shop = roofName || area ? null : this._shopAt(p);
     const title = street || shop?.road || area || near?.name || district;
     let detail = '';
@@ -455,6 +456,24 @@ export class Hud {
     else if (near && near.name !== title) detail = `near ${near.name}`;
     else if (title !== district) detail = district;
     return { street: title, detail, shop: detail.startsWith('outside ') ? shop : null };
+  }
+
+  // Perched on a roof's edge or standing at it, the feet can be just outside the mapped footprint
+  // (the RBZ crown at the start said "near Reserve Bank of Zimbabwe" at 121 m): the named building
+  // within ROOF_EDGE m whose roof is level with the feet.
+  _edgeRoofName(p) {
+    const st = this.game.player.state;
+    if (p.y < 6 || (st !== 'perch' && st !== 'ground')) return '';
+    const world = this.game.world;
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4;
+      const b = world.buildingAt(p.x + Math.cos(a) * ROOF_EDGE, p.z + Math.sin(a) * ROOF_EDGE);
+      if (b && Math.abs(p.y - b.h) < 3) {
+        const name = this.places.nameOf(b);
+        if (name) return name;
+      }
+    }
+    return '';
   }
 
   // At street level: the business Spider-Man is standing outside. The city's shopNear() once its

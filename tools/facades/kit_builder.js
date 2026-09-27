@@ -621,6 +621,13 @@ diffuseColor.rgb *= 1.0 + facMask.r * (vT0 - 1.0) + facMask.g * (vT1 - 1.0) + fa
                 v = v * P.sy + P.v0;
               }
             }
+            if (bkey === 'sign' && opts.signAtlas) {
+              // spread boards over a sign atlas of cols x rows cells (one cell per board, hashed)
+              const { cols, rows } = opts.signAtlas;
+              const cell = hash32(seed, P.u0 | 0, P.v0 | 0, P.key) % (cols * rows);
+              u = ((cell % cols) + THREE.MathUtils.clamp(u, 0.02, 0.98)) / cols;
+              v = (Math.floor(cell / cols) + THREE.MathUtils.clamp(v, 0.02, 0.98)) / rows;
+            }
             B.uv.push(u, v);
             if (B.col) B.col.push(...(tf || [1, 1, 1]));
             if (B.tint) B.tint.push(...atlasTint[0], ...atlasTint[1], ...atlasTint[2]);

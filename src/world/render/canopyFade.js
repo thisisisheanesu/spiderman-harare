@@ -24,7 +24,7 @@ export function applyCanopyFade(materials, uniforms) {
       if (prev) prev.call(this, shader, renderer);
       Object.assign(shader.uniforms, uniforms);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vCanopyW;')
+        .replace('#include <common>', '#include <common>\nvarying vec3 vCanopyW;\nvarying float vCanopyH;')
         .replace(
           '#include <project_vertex>',
           `#include <project_vertex>
@@ -32,7 +32,8 @@ export function applyCanopyFade(materials, uniforms) {
 vCanopyW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
 #else
 vCanopyW = (modelMatrix * vec4(transformed, 1.0)).xyz;
-#endif`,
+#endif
+vCanopyH = position.y;`,
         );
       shader.fragmentShader = shader.fragmentShader
         .replace(
@@ -41,14 +42,16 @@ vCanopyW = (modelMatrix * vec4(transformed, 1.0)).xyz;
 uniform vec3 uFadeCam;
 uniform vec3 uFadeTarget;
 uniform float uFadeOn;
-varying vec3 vCanopyW;`,
+varying vec3 vCanopyW;
+varying float vCanopyH;`,
         )
         .replace(
           '#include <clipping_planes_fragment>',
           `#include <clipping_planes_fragment>
 {
   float dc = distance(vCanopyW, uFadeCam);
-  float nearK = 1.0 - smoothstep(2.0, 7.5, dc);
+  // Leave the lowest couple of metres (trunks you walk past) solid.
+  float nearK = (1.0 - smoothstep(2.0, 6.5, dc)) * smoothstep(1.6, 2.6, vCanopyH);
   vec3 ab = uFadeTarget - uFadeCam;
   float t = clamp(dot(vCanopyW - uFadeCam, ab) / max(dot(ab, ab), 1e-3), 0.0, 1.0);
   float dSeg = distance(vCanopyW, uFadeCam + ab * t);

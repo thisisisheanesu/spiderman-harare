@@ -368,6 +368,8 @@ export class PostFX {
     c.uFadeFar.value = fadeFar;
     c.uStrength.value = A.strength * (1 - 0.35 * night);
     r.autoClear = false;
+    // debugAO: show the occlusion term alone (replace the frame instead of multiplying).
+    this.compMat.blending = this.debugAO ? THREE.NoBlending : THREE.CustomBlending;
     this._pass(this.compMat, null);
   }
 

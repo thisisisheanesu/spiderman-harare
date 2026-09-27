@@ -372,6 +372,7 @@
   background: var(--panel-solid);
   border: 1px solid var(--panel-border);
   font: 650 14px/1.2 var(--font);
+  text-wrap: balance; /* two even lines, not one word left over */
   opacity: 0;
   transition: opacity 0.3s ease;
 }

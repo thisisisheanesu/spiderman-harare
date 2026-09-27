@@ -101,6 +101,31 @@ async function main() {
   window.__info = { stats: [] };
   const lod = Q.lod !== undefined ? Number(Q.lod) : -1;
   const pickLevel = (b) => (lod === 0 ? b.lod0 : lod === 1 ? b.lod1 : lod === 2 ? b.lod2 : b.lod);
+  // generic shop-sign atlas (4 x 4 boards) for the sign role
+  const sc = document.createElement('canvas');
+  sc.width = 1024;
+  sc.height = 512;
+  const cx = sc.getContext('2d');
+  const names = ['CASH & CARRY', 'PHARMACY', 'BOUTIQUE', 'HARDWARE', 'BUTCHERY', 'CELL SHOP', 'SUPERMARKET', 'SALON',
+    'FURNISHERS', 'BAKERY', 'WHOLESALERS', 'OUTFITTERS', 'OPTICIANS', 'TAKEAWAY', 'BANK', 'SHOES'];
+  const cols = [['#c8201e', '#ffffff'], ['#f2c21a', '#1b1b1b'], ['#1f6e3a', '#ffffff'], ['#1d4f9a', '#ffffff'], ['#f4f1e8', '#b01818'], ['#222222', '#f2c21a']];
+  names.forEach((n, i) => {
+    const x = (i % 4) * 256;
+    const y = Math.floor(i / 4) * 128;
+    const [bg, fg] = cols[i % cols.length];
+    cx.fillStyle = bg;
+    cx.fillRect(x, y, 256, 128);
+    cx.fillStyle = fg;
+    cx.font = 'bold 34px sans-serif';
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    cx.fillText(n, x + 128, y + 64, 236);
+  });
+  const signTex = new THREE.CanvasTexture(sc);
+  signTex.colorSpace = THREE.SRGBColorSpace;
+  signTex.flipY = false;
+  const signMaterial = new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.55, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: Q.night === '1' ? 0.5 : 0 });
+  const signOpts = { signMaterial, signAtlas: { cols: 4, rows: 4 } };
   if (Q.night === '1') kit.setNight(1);
 
   if ((Q.scene || 'lineup') === 'lineup') {
@@ -160,7 +185,7 @@ async function main() {
     scene.add(group);
     // impostor strip: a 4-bay x 6-floor wall
     const fp = [x + 1, 0, x + 1 + 4 * T.bay, 0, x + 1 + 4 * T.bay, -8, x + 1, -8];
-    const b = kit.build(fp, T.groundFloor + 4 * T.floor + T.cap, { type: t, seed: 7 });
+    const b = kit.build(fp, T.groundFloor + 4 * T.floor + T.cap, { type: t, seed: 7, ...signOpts });
     const imp = lod === 1 ? b.lod1 : lod === 2 ? b.lod2 : b.lod0;
     scene.add(imp);
     window.__info.stats.push(b.stats);
@@ -198,7 +223,7 @@ async function main() {
       const sp = spec[b.id] || {};
       const type = sp.type || forced[b.id] || (ids.includes(b.id) ? Q.type : null) || autoType(b);
       if (sp.h) b.h = sp.h;
-      const built = kit.build(b.fp, b.h, { type, seed: b.id, closedShops: Q.night === '1' ? 0.7 : 0.12, ...sp });
+      const built = kit.build(b.fp, b.h, { type, seed: b.id, closedShops: Q.night === '1' ? 0.7 : 0.12, ...signOpts, ...sp });
       scene.add(pickLevel(built));
       scene.add(flatRoof(b, roofMat));
       window.__info.stats.push({ id: b.id, name: b.name, type, h: b.h, ...built.stats, plan: built.plan });
