@@ -10,6 +10,7 @@ const TAU = Math.PI * 2;
 const HASH_SIZE = 4096;
 const HASH_CELL = 2.5;
 const LOOK = 2.6; // avoidance look-ahead (m)
+const PLAN = 8; // choose the next edge this far before a node (m)
 
 export function wrapAngle(a) {
   a = (a + Math.PI) % TAU;
@@ -77,6 +78,9 @@ export class Agent {
     this.state = kind === 'walker' ? 'walk' : kind === 'vendor' ? 'vendor' : kind === 'group' ? 'chat' : 'idle';
     this.role = '';
     this.edge = -1;
+    this.next = -1; // edge chosen for the coming node (-1 = not chosen yet)
+    this.nextLo = 0;
+    this.nextHi = 0;
     this.fwd = true;
     this.s = 0;
     this.lat = 0;
@@ -203,6 +207,7 @@ export class Crowd {
   putOnEdge(a, ei, fwd, s, lat) {
     const e = this.walk.edges[ei];
     a.edge = ei;
+    a.next = -1;
     a.fwd = fwd;
     a.s = s;
     a.latGoal = this._laneGoal(a, e);
@@ -310,7 +315,10 @@ export class Crowd {
     const px = a.position.x;
     const pz = a.position.z;
     a.s += a.speed * dt;
-    a.lat = approach(a.lat, Math.max(-spread, Math.min(spread, a.latGoal)), 0.8 * dt);
+    if (a.next < 0 && e.len - a.s < PLAN) this._plan(a, ctx);
+    const lo = a.next >= 0 ? a.nextLo : -spread;
+    const hi = a.next >= 0 ? a.nextHi : spread;
+    a.lat = approach(a.lat, Math.max(lo, Math.min(hi, a.latGoal)), 0.8 * dt);
     if (a.s >= e.len) this._arrive(a, ctx);
     this._place(a);
     // Hard guarantee: never step inside a building (the network is validated, avoidance may not be).
@@ -416,6 +424,7 @@ export class Crowd {
   _turnAround(a) {
     const e = this.walk.edges[a.edge];
     a.fwd = !a.fwd;
+    a.next = -1;
     a.s = Math.max(0, e.len - a.s);
     a.lat = -a.lat;
     a.latGoal = a.lat;
@@ -423,8 +432,8 @@ export class Crowd {
     if (a.state === 'cross' || a.state === 'wait') a.state = 'walk';
   }
 
-  // Reached the end of the edge: pick the next one (or turn back at a dead end).
-  _arrive(a, ctx) {
+  // Choose the edge to take at the node ahead (-1: dead end, turn back).
+  _chooseNext(a, ctx) {
     const W = this.walk;
     const e = W.edges[a.edge];
     const nodeId = a.fwd ? e.b : e.a;
@@ -459,12 +468,7 @@ export class Crowd {
       weights.push(w);
       total += w;
     }
-    const over = a.s - e.len;
-    if (total <= 0) {
-      this._turnAround(a);
-      a.s = 0;
-      return;
-    }
+    if (total <= 0) return -1;
     let r = Math.random() * total;
     for (let i = 0; i < opts.length; i++) {
       r -= weights[i];
@@ -473,7 +477,50 @@ export class Crowd {
         break;
       }
     }
-    if (pick < 0) pick = opts[opts.length - 1];
+    return pick < 0 ? opts[opts.length - 1] : pick;
+  }
+
+  // Commit to the next edge a few metres early and keep our lateral offset inside the band that maps
+  // onto it (across it: |c*lat| <= its spread; along it: not behind its start), so walkers drift into
+  // a narrow crossing or link in time instead of snapping sideways at the node.
+  _plan(a, ctx) {
+    const W = this.walk;
+    const e = W.edges[a.edge];
+    a.next = this._chooseNext(a, ctx);
+    a.nextLo = -e.spread;
+    a.nextHi = e.spread;
+    if (a.next < 0) return;
+    const n = W.edges[a.next];
+    const ux = a.fwd ? e.ux : -e.ux;
+    const uz = a.fwd ? e.uz : -e.uz;
+    const out = n.a === (a.fwd ? e.b : e.a) ? 1 : -1;
+    const c = (ux * n.ux + uz * n.uz) * out;
+    const k = (uz * n.ux - ux * n.uz) * out;
+    if (Math.abs(c) > 0.05) {
+      const m = n.spread / Math.abs(c);
+      a.nextLo = Math.max(a.nextLo, -m);
+      a.nextHi = Math.min(a.nextHi, m);
+    }
+    if (k > 0.05) a.nextLo = Math.max(a.nextLo, -0.5 / k);
+    else if (k < -0.05) a.nextHi = Math.min(a.nextHi, 0.5 / -k);
+  }
+
+  // Reached the end of the edge: move onto the chosen next one (or turn back at a dead end).
+  _arrive(a, ctx) {
+    const W = this.walk;
+    const e = W.edges[a.edge];
+    const nodeId = a.fwd ? e.b : e.a;
+    const node = W.nodes[nodeId];
+    const ux = a.fwd ? e.ux : -e.ux;
+    const uz = a.fwd ? e.uz : -e.uz;
+    const pick = a.next >= 0 ? a.next : this._chooseNext(a, ctx);
+    a.next = -1;
+    const over = a.s - e.len;
+    if (pick < 0) {
+      this._turnAround(a);
+      a.s = 0;
+      return;
+    }
     const n = W.edges[pick];
     const fwd = n.a === nodeId;
     // Re-express the current position in the new edge's travel frame.
@@ -626,7 +673,7 @@ export class Crowd {
     const toward = this._ux(a) * (px - a.position.x) + this._uz(a) * (pz - a.position.z) > 0;
     const atKerb = a.state === 'wait' || (a.state === 'react' && a.resume === 'wait');
     if (toward || atKerb) this._turnAround(a);
-    if (a.state === 'react') a.state = 'walk';
+    a.next = -1; // route away from him from the next node on
     a.state = 'flee';
     a.timer = dur;
     a.react = null;
