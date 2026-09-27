@@ -33,8 +33,9 @@ void main() {
   float y = d.y;
   float t = pow(clamp(y, 0.0, 1.0), 0.42);
   vec3 col = mix(uHorizon, uZenith, t);
-  // Dusty haze band hugging the horizon (veld-fire season).
-  col = mix(col, uFog, exp(-max(y, 0.0) * 22.0) * 0.75);
+  // Dusty haze band hugging the horizon (veld-fire season). It reaches exactly the fog colour at
+  // the horizon, so the fully fogged ground meets the sky without a seam.
+  col = mix(col, uFog, exp(-max(y, 0.0) * 20.0));
   float mu = dot(d, uSunDir);
   float fwd = max(mu, 0.0);
   col += uGlow * (pow(fwd, 5.0) * 0.28 + pow(fwd, 48.0) * 0.45) * uSunVis;
@@ -45,10 +46,13 @@ void main() {
   col += vec3(0.55, 0.62, 0.75) * pow(max(mm, 0.0), 180.0) * 0.35 * uMoonVis;
   float moon = smoothstep(0.99982, 0.99990, mm) * uMoonVis;
   col = mix(col, vec3(0.93, 0.93, 0.88), moon);
-  // Distant hills, hazy.
+  // Distant hills: a faint aerial-perspective silhouette whose foot dissolves into the haze (a
+  // hard dark band sitting on the fogged ground read as a seam from the rooftops).
   float a = atan(d.x, d.z);
   float hz = hills(a);
-  col = mix(col, mix(uFog, uZenith * 0.5 + uFog * 0.5, 0.25) * (1.0 - 0.15 * uNight), smoothstep(hz + 0.002, hz - 0.002, y));
+  vec3 hillCol = mix(uFog, uZenith * 0.5 + uFog * 0.5, 0.25) * (1.0 - 0.15 * uNight);
+  float hillHaze = 0.1 + 0.55 * smoothstep(-0.004, hz, y);
+  col = mix(col, mix(uFog, hillCol, hillHaze), smoothstep(hz + 0.003, hz - 0.003, y));
   col = mix(col, uFog, smoothstep(0.004, -0.02, y));
   gl_FragColor = vec4(col, 1.0);
 }`;

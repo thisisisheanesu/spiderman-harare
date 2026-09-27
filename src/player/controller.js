@@ -39,6 +39,7 @@ const PLUNGE_OUT = 4.5; // m/s outward hop when diving off
 const PLUNGE_HS = 5.5; // max horizontal drift while plunging
 const PLUNGE_DRIFT = 3.5; // ...and the least
 const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
+const PLUNGE_RUN_HS = 10; // running / jumping off a tower's roof: the plunge keeps up to this drift
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, x) => {
@@ -100,6 +101,8 @@ export class Controller {
     this.wallImpact = 0;
     this.plunge = false;
     this.plungeArmed = false;
+    this.plungeHs = PLUNGE_HS;
+    this.fromRoof = false; // airborne straight off a roof / the ground (not a swing, zip or wall)
     this.contact = {
       hit: false,
       ground: false,
@@ -166,6 +169,7 @@ export class Controller {
         if (this.vault.active || p.state === 'perch') break;
       }
     }
+    if (p.state === 'swing' || p.state === 'zip' || p.state === 'wall' || p.state === 'perch') this.fromRoof = false;
     this._safety(dt);
     this._checkPerch(dt);
     this._updateHeading();
@@ -228,6 +232,8 @@ export class Controller {
 
   launch(vx, vy, vz) {
     const p = this.p;
+    // (Off the ground, or a coyote-time jump just after running off an edge.)
+    this.fromRoof = p.state === 'ground' || (p.state === 'air' && this.fromRoof);
     p.velocity.set(vx, vy, vz);
     p.state = 'air';
     this.coyote = 0;
@@ -252,6 +258,14 @@ export class Controller {
     return p.position.y - this.floorAt(x, z);
   }
 
+  // Nothing to land on for PLUNGE_DROP below the feet (a lookup first; a ray cast confirms, since
+  // landmark crowns and ledges stick out of the footprints the lookup knows).
+  _bigDrop() {
+    const pos = this.p.position;
+    if (pos.y - this.floorAt(pos.x, pos.z) <= PLUNGE_DROP) return false;
+    return !this.world.raycast(_a.copy(pos), _down, PLUNGE_DROP);
+  }
+
   // Roof / terrain height under x, z (lookups only, no ray cast).
   floorAt(x, z) {
     const g = this.game.city?.heightAt?.(x, z);
@@ -259,8 +273,11 @@ export class Controller {
   }
 
   _startPlunge() {
+    const v = this.p.velocity;
+    this.plungeHs = clamp(Math.hypot(v.x, v.z), PLUNGE_HS, PLUNGE_RUN_HS);
     this.p.state = 'dive';
     this.plunge = true;
+    this.fromRoof = false;
     this.plungeArmed = false;
     this.trick = null;
     this.game.cameraRig?.fovKick?.(6);
@@ -448,6 +465,7 @@ export class Controller {
         p.state = 'air';
         v.y = 0;
         this.coyote = 0.14;
+        this.fromRoof = true;
         return;
       }
     }
@@ -464,9 +482,21 @@ export class Controller {
     if (this.plungeArmed && v.y < -1) {
       this._startPlunge();
       dive = true;
+    } else if (!dive && this.fromRoof && v.y < -1 && this._bigDrop()) {
+      // Ran or jumped off a tower's roof (not from a perch): the same head-first plunge down its
+      // face, so holding swing catches a web back up it instead of falling past every roof in
+      // reach with nothing to swing from.
+      const hs = Math.hypot(v.x, v.z);
+      if (hs > 1) this.perchOut.set(v.x / hs, 0, v.z / hs);
+      else this.perchOut.set(-Math.sin(p.heading), 0, -Math.cos(p.heading));
+      this._startPlunge();
+      dive = true;
     }
     let g = dive ? DIVE_G : G;
-    if (!dive && this.jumpHeld && v.y > 0) g *= JUMP_HOLD_GRAVITY;
+    // Floatier rise only while the jump button that launched us is still held (launches by swing /
+    // wall moves set jumpHeld too, and without the button check it stuck until the next Space tap,
+    // making every later swing release climb half as high again).
+    if (!dive && this.jumpHeld && v.y > 0 && this.game.input.down('jump')) g *= JUMP_HOLD_GRAVITY;
     v.y -= g * h;
     v.multiplyScalar(1 - (dive ? DIVE_DRAG : AIR_DRAG) * v.length() * h);
     // Air control steers but never adds speed beyond what you already carry.
@@ -485,7 +515,7 @@ export class Controller {
     if (dive && this.plunge) {
       // Plunging down a facade: a steady drift out from it (air drag would stall it against the
       // piers); near the bottom the normal carve takes over.
-      const drift = clamp(hs1, PLUNGE_DRIFT, PLUNGE_HS);
+      const drift = clamp(hs1, PLUNGE_DRIFT, this.plungeHs);
       if (hs1 > 0.1 && drift !== hs1) {
         v.x *= drift / hs1;
         v.z *= drift / hs1;

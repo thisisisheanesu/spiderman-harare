@@ -235,11 +235,57 @@ const FACADE_STYLES = {
       p.rect(0.525, 0, 0.53, 1, 'rgba(0,0,0,0.15)');
     },
   },
+  // Round-arched attic storey under the roof line (the Meikles hotel tower): off-white precast
+  // with one tall arched window per bay.
+  arches: {
+    tileW: 5.6,
+    draw(p) {
+      const { c, m, S } = p;
+      p.rect(0, 0, 1, 1, '#ece9e2');
+      p.grime(0.16, 1);
+      const x0 = 0.22;
+      const x1 = 0.78;
+      const r = (x1 - x0) / 2;
+      const spring = 0.16 + r;
+      const y1 = 0.86;
+      const arch = (ctx) => {
+        ctx.beginPath();
+        ctx.moveTo(x0 * S, y1 * S);
+        ctx.lineTo(x0 * S, spring * S);
+        ctx.arc(0.5 * S, spring * S, r * S, Math.PI, 0);
+        ctx.lineTo(x1 * S, y1 * S);
+        ctx.closePath();
+      };
+      // Deep reveal around the opening, then the glass (mask gradient as in Painter.glass).
+      c.strokeStyle = 'rgba(0,0,0,0.28)';
+      c.lineWidth = 0.05 * S;
+      arch(c);
+      c.stroke();
+      const g = c.createLinearGradient(0, 0.16 * S, 0, y1 * S);
+      g.addColorStop(0, '#5d6b76');
+      g.addColorStop(1, '#35414a');
+      c.fillStyle = g;
+      arch(c);
+      c.fill();
+      const gm = m.createLinearGradient(0, 0.16 * S, 0, y1 * S);
+      gm.addColorStop(0, '#fff');
+      gm.addColorStop(1, '#808080');
+      m.fillStyle = gm;
+      arch(m);
+      m.fill();
+      p.solid(0.485, spring - 0.02, 0.515, y1, '#e2ded5');
+      p.solid(x0, 0.6, x1, 0.625, '#e2ded5');
+      p.rect(0, 0.86, 1, 0.9, 'rgba(0,0,0,0.18)');
+      p.rect(0, 0.9, 1, 1, '#dedad1');
+    },
+  },
   // X-braced precast service tower (Eastgate).
   lattice: {
     tileW: 4,
     draw(p) {
-      p.rect(0, 0, 1, 1, '#2f302f');
+      // The open bays show the dim shaft behind the X-bracing (pure dark read as black slabs).
+      p.rect(0, 0, 1, 1, '#55534e');
+      p.vgrad(0, 0, 1, 1, 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0)');
       const c = p.c;
       const S = p.S;
       c.strokeStyle = '#e4ddd2';

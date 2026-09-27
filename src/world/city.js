@@ -160,7 +160,9 @@ export class City {
       const detail = this._mesh(e.detail, this.facadeMat, true);
       if (base || detail) this.chunks.push({ base, detail, x: e.cx, z: e.cz });
     }
-    this.detailRange = game.quality.level === 'low' ? 380 : 560;
+    // Rooftop clutter, parapet caps, canopies, signs and furniture vanish into sub-pixel detail
+    // well before this on a phone screen; each detail chunk is a draw call and ~25k triangles.
+    this.detailRange = game.quality.level === 'low' ? 300 : 520;
     const { minX, maxX, minZ, maxZ } = data.meta.bounds;
     const pad = 3500;
     const plane = new GeoBuffer(8);
@@ -220,12 +222,23 @@ export class City {
     // Chunk LOD: drop the detail layer away from the camera and whole chunks beyond the fog.
     const half = CHUNK / 2;
     const far = (game.scene.fog?.far ?? 3000) + half;
+    // The key light's shadow box spans about +-shadowSize around a focus just ahead of the player,
+    // so only chunks near the camera can cast into it (tall buildings a little further: long
+    // shadows); the rest would only add whole-chunk draws to the shadow pass.
+    const shadows = this.game.sky?.sun?.castShadow;
+    const reach = (this.game.sky?.shadowSize ?? 110) * 1.6;
     for (const c of this.chunks) {
       const dx = Math.max(0, Math.abs(cam.x - c.x) - half);
       const dz = Math.max(0, Math.abs(cam.z - c.z) - half);
       const d = Math.hypot(dx, dz);
-      if (c.base) c.base.visible = d < far;
-      if (c.detail) c.detail.visible = d < this.detailRange;
+      if (c.base) {
+        c.base.visible = d < far;
+        if (shadows) c.base.castShadow = d < reach + 90;
+      }
+      if (c.detail) {
+        c.detail.visible = d < this.detailRange;
+        if (shadows) c.detail.castShadow = d < reach;
+      }
     }
     for (const fx of this.effects) fx.update(this.uniforms.uTime.value);
   }

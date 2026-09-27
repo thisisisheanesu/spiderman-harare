@@ -187,8 +187,8 @@ function blockedAt(x, z, y) {
 // opts: {speed, fall (downward speed), side (+1 right / -1 left, gently alternates hands),
 //        street (ground height under the hand), alt (preferred lowest swing height above the street),
 //        minRope, pivotRise / liftMax (how the swing lifts its pivot over low anchors), planar (how far
-//        the pivot slides from the anchor to the line of travel), fallback?, accept? (point => bool:
-//        prefer candidates it approves of, e.g. a clear swing arc)}.
+//        the pivot slides from the anchor to the line of travel), fallback?, accept? (point => true to
+//        approve, false to prefer others (still usable if nothing better), -1 to veto it outright)}.
 // Writes {point, normal, side, buildingId, kind: 'roof'|'facade'|'prop', clear (accept() approved)}
 // into out.
 export function findSwingAnchor(world, from, dir, opts, out) {
@@ -263,15 +263,17 @@ function readFallback(list) {
 }
 
 // Best of the ranked candidates the hand can actually see and `accept` (optional) approves of;
-// failing approval, the best visible one. Written into out.
+// failing approval, the best visible one that accept() did not veto outright (a negative return:
+// e.g. a swing that would hit the street before the web could hold). Written into out.
 function pickVisible(world, from, out, accept) {
   let spare = null;
   for (const c of _best) {
     if (c.score === -Infinity) break;
     anchorPoint(c, _v);
     if (!visible(world, from, _v)) continue;
-    if (accept && !accept(_v)) {
-      if (!spare) spare = c;
+    const ok = accept ? accept(_v) : true;
+    if (!ok || ok < 0) {
+      if (!spare && ok === false) spare = c;
       continue;
     }
     out.clear = true;

@@ -4,19 +4,21 @@ import { pointInRing, cleanRing, distToRing } from './polygon.js';
 import { SegmentGrid } from './lines.js';
 import { makeCanvas } from './atlas.js';
 import { KERB_HEIGHT } from './streetMetrics.js';
-import { leafTexture, modelFor } from './treeModels.js';
+import { leafTexture, modelFor, farBlobGeometry, farBlobFit } from './treeModels.js';
 
 // Trees of late-September Harare: jacarandas in full lavender bloom lining the avenues and filling
 // the parks, African flame trees (Spathodea) with orange-red flower clusters, msasa with their
 // wine-red spring flush, plain green shade trees and eucalyptus, cypresses and palms in the squares
-// and hotel frontages. Instanced per species with a distance LOD rebuilt as the camera moves
-// (models in treeModels.js), plus fallen-petal carpets under the jacarandas.
+// and hotel frontages. Instanced per species and LOD level (all distant broadleaf trees share one
+// blob mesh), updated incrementally as the camera moves (models in treeModels.js), plus
+// fallen-petal carpets under the jacarandas.
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _s = new THREE.Vector3();
 const _p = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
+const _v = new THREE.Vector3();
 
 const LEAF_NOISE = /* glsl */ `
 varying vec3 vLeafPos;
@@ -93,66 +95,144 @@ function petalTexture() {
   return tex;
 }
 
-// Distance-LOD instancing: all instances of one kind with one mesh per LOD level ({geo, dist,
-// shadow}); the instance lists are rebuilt whenever the camera has moved far enough.
+// One InstancedMesh per LOD geometry. Slots [0, n) are live; `ids` maps slot -> item.
+class Bucket {
+  constructor(group, geo, material, cap, shadow) {
+    cap = Math.max(1, cap);
+    const m = new THREE.InstancedMesh(geo, material, cap);
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
+    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    m.instanceColor.setUsage(THREE.DynamicDrawUsage);
+    m.count = 0;
+    m.visible = false;
+    m.frustumCulled = false;
+    m.castShadow = !!shadow;
+    m.receiveShadow = true;
+    group.add(m);
+    this.mesh = m;
+    this.ids = new Int32Array(cap);
+    this.n = 0;
+    this.lo = Infinity;
+    this.hi = -1;
+  }
+
+  _touch(s) {
+    if (s < this.lo) this.lo = s;
+    if (s > this.hi) this.hi = s;
+  }
+
+  // Uploads only the slot range touched since the last flush.
+  flush() {
+    const m = this.mesh;
+    m.count = this.n;
+    m.visible = this.n > 0;
+    const hi = Math.min(this.hi, this.n - 1);
+    if (hi >= this.lo) {
+      m.instanceMatrix.clearUpdateRanges();
+      m.instanceMatrix.addUpdateRange(this.lo * 16, (hi - this.lo + 1) * 16);
+      m.instanceMatrix.needsUpdate = true;
+      m.instanceColor.clearUpdateRanges();
+      m.instanceColor.addUpdateRange(this.lo * 3, (hi - this.lo + 1) * 3);
+      m.instanceColor.needsUpdate = true;
+    }
+    this.lo = Infinity;
+    this.hi = -1;
+  }
+}
+
+// Distance-LOD instancing with incremental updates. Every item sits in at most one bucket; a
+// refresh moves only the items whose LOD level changed (swap-remove from the old bucket, append to
+// the new one), so swinging across the city costs a distance test per tree instead of re-copying
+// every instance matrix. levels: [{dist, bucket(item) -> Bucket, far?}]; `far` levels read the
+// item's canonical far-blob matrix/colour (one bucket shared by all species).
 class InstanceLOD {
-  constructor(group, levels, material, items) {
+  constructor(items, levels) {
+    const N = items.length;
     this.items = items;
-    this.matrices = new Float32Array(items.length * 16);
-    this.colors = new Float32Array(items.length * 3);
+    this.levels = levels.map((l) => ({ d2: l.dist * l.dist, far: !!l.far, bucket: items.map(l.bucket) }));
+    this.x = new Float32Array(N);
+    this.z = new Float32Array(N);
+    this.matrices = new Float32Array(N * 16);
+    this.colors = new Float32Array(N * 3);
+    // Items with a far fit (broadleaf trees) read the fitted blob on `far` levels; others (palms)
+    // keep their ordinary matrix there.
+    this.hasFar = new Uint8Array(N);
+    const hasFar = levels.some((l) => l.far);
+    this.farMatrices = hasFar ? new Float32Array(N * 16) : null;
+    this.farColors = hasFar ? new Float32Array(N * 3) : null;
+    this.cur = new Int8Array(N).fill(-1);
+    this.slot = new Int32Array(N);
     items.forEach((it, i) => {
+      this.x[i] = it.x;
+      this.z[i] = it.z;
       _q.setFromAxisAngle(_up, it.rot);
       _s.set(it.s, it.s, it.s);
       _p.set(it.x, it.y, it.z);
       _m.compose(_p, _q, _s).toArray(this.matrices, i * 16);
-      this.colors[i * 3] = it.c[0];
-      this.colors[i * 3 + 1] = it.c[1];
-      this.colors[i * 3 + 2] = it.c[2];
+      this.colors.set(it.c, i * 3);
+      if (hasFar && it.far) {
+        this.hasFar[i] = 1;
+        // Canonical unit blob -> this species' far blob: offset to the crown centre, stretched.
+        const f = it.far;
+        _p.set(f.cx * it.s, f.cy * it.s, f.cz * it.s).applyQuaternion(_q).add(_v.set(it.x, it.y, it.z));
+        _s.set(f.hx * it.s, f.hy * it.s, f.hz * it.s);
+        _m.compose(_p, _q, _s).toArray(this.farMatrices, i * 16);
+        this.farColors[i * 3] = f.color.r * it.c[0];
+        this.farColors[i * 3 + 1] = f.color.g * it.c[1];
+        this.farColors[i * 3 + 2] = f.color.b * it.c[2];
+      }
     });
-    const cap = Math.max(1, items.length);
-    this.levels = levels.map(({ geo, dist, shadow }) => {
-      const m = new THREE.InstancedMesh(geo, material, cap);
-      m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3), 3);
-      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      m.count = 0;
-      m.frustumCulled = false;
-      m.castShadow = !!shadow;
-      m.receiveShadow = true;
-      group.add(m);
-      return { mesh: m, d2: dist * dist, n: 0 };
-    });
+    this.buckets = [...new Set(this.levels.flatMap((l) => l.bucket))];
+  }
+
+  _remove(b, s) {
+    const last = --b.n;
+    if (s !== last) {
+      const moved = b.ids[last];
+      b.ids[s] = moved;
+      this.slot[moved] = s;
+      const m = b.mesh.instanceMatrix.array;
+      const c = b.mesh.instanceColor.array;
+      m.copyWithin(s * 16, last * 16, last * 16 + 16);
+      c.copyWithin(s * 3, last * 3, last * 3 + 3);
+      b._touch(s);
+    }
+  }
+
+  _add(b, i, far) {
+    far = far && this.hasFar[i] === 1;
+    const s = b.n++;
+    b.ids[s] = i;
+    this.slot[i] = s;
+    const mSrc = far ? this.farMatrices : this.matrices;
+    const cSrc = far ? this.farColors : this.colors;
+    b.mesh.instanceMatrix.array.set(mSrc.subarray(i * 16, i * 16 + 16), s * 16);
+    b.mesh.instanceColor.array.set(cSrc.subarray(i * 3, i * 3 + 3), s * 3);
+    b._touch(s);
   }
 
   refresh(cx, cz) {
     const lv = this.levels;
-    for (const l of lv) l.n = 0;
-    for (let i = 0; i < this.items.length; i++) {
-      const it = this.items[i];
-      const dx = it.x - cx;
-      const dz = it.z - cz;
+    const L = lv.length;
+    const cur = this.cur;
+    for (let i = 0, N = this.items.length; i < N; i++) {
+      const dx = this.x[i] - cx;
+      const dz = this.z[i] - cz;
       const d2 = dx * dx + dz * dz;
       let k = 0;
-      while (k < lv.length && d2 >= lv[k].d2) k++;
-      if (k === lv.length) continue;
-      const l = lv[k];
-      const m = l.mesh.instanceMatrix.array;
-      const c = l.mesh.instanceColor.array;
-      for (let e = 0; e < 16; e++) m[l.n * 16 + e] = this.matrices[i * 16 + e];
-      for (let e = 0; e < 3; e++) c[l.n * 3 + e] = this.colors[i * 3 + e];
-      l.n++;
+      while (k < L && d2 >= lv[k].d2) k++;
+      if (k === L) k = -1;
+      const old = cur[i];
+      if (old === k) continue;
+      cur[i] = k;
+      const ob = old >= 0 ? lv[old].bucket[i] : null;
+      const nb = k >= 0 ? lv[k].bucket[i] : null;
+      // Same mesh and same instance data (palms use one model for two levels): nothing moves.
+      if (ob && ob === nb && lv[old].far === lv[k].far) continue;
+      if (ob) this._remove(ob, this.slot[i]);
+      if (nb) this._add(nb, i, lv[k].far);
     }
-    // Upload only the part of the instance buffers that is in use.
-    for (const l of lv) {
-      const { mesh } = l;
-      mesh.count = l.n;
-      mesh.visible = l.n > 0;
-      mesh.instanceMatrix.clearUpdateRanges();
-      mesh.instanceMatrix.addUpdateRange(0, Math.max(16, l.n * 16));
-      mesh.instanceMatrix.needsUpdate = true;
-      mesh.instanceColor.clearUpdateRanges();
-      mesh.instanceColor.addUpdateRange(0, Math.max(3, l.n * 3));
-      mesh.instanceColor.needsUpdate = true;
-    }
+    for (const b of this.buckets) b.flush();
   }
 }
 
@@ -316,22 +396,38 @@ export function createVegetation(group, trees, uniforms, quality, shadows, drawD
   const near = quality.trees >= 1 ? 170 : 110;
   const mid = quality.trees >= 1 ? 450 : 300;
   const far = Math.min(2600, drawDistance);
-  const bySpecies = new Map();
-  for (const t of trees) {
-    let list = bySpecies.get(t.species);
-    if (!list) bySpecies.set(t.species, (list = []));
-    list.push(t);
+  const counts = new Map();
+  for (const t of trees) counts.set(t.species, (counts.get(t.species) || 0) + 1);
+  // Per species: near + mid models; one far-blob mesh shared by all broadleaf species. Palms keep
+  // their full model out to `mid` and a light one beyond.
+  const models = new Map();
+  let broadleaf = 0;
+  for (const [name, n] of counts) {
+    if (name === 'palm') {
+      const b0 = new Bucket(group, modelFor(name, 0), mat, n, shadows);
+      models.set(name, [b0, b0, new Bucket(group, modelFor(name, 1), mat, n, false)]);
+    } else {
+      models.set(name, [new Bucket(group, modelFor(name, 0), mat, n, shadows), new Bucket(group, modelFor(name, 1), mat, n, false), null]);
+      broadleaf += n;
+    }
   }
-  const fields = [];
-  for (const [name, items] of bySpecies) {
-    const levels = name === 'palm'
-      ? [{ geo: modelFor(name, 0), dist: mid, shadow: shadows }, { geo: modelFor(name, 1), dist: far }]
-      : [{ geo: modelFor(name, 0), dist: near, shadow: shadows }, { geo: modelFor(name, 1), dist: mid }, { geo: modelFor(name, 2), dist: far }];
-    fields.push(new InstanceLOD(group, levels, mat, items));
-  }
+  const farBlob = broadleaf ? new Bucket(group, farBlobGeometry(), mat, broadleaf, false) : null;
+  const fits = new Map();
+  const items = trees.map((t) => {
+    if (t.species === 'palm') return t;
+    let fit = fits.get(t.species);
+    if (!fit) fits.set(t.species, (fit = farBlobFit(t.species)));
+    return { ...t, far: fit };
+  });
+  const bucketAt = (k) => (it) => models.get(it.species)[k] || farBlob;
+  const fields = [new InstanceLOD(items, [
+    { dist: near, bucket: bucketAt(0) },
+    { dist: mid, bucket: bucketAt(1) },
+    { dist: far, bucket: bucketAt(2), far: true },
+  ])];
   // Alpha-tested shadows (dappled light under the canopies).
   const depth = new THREE.MeshDepthMaterial({ map: leaves, alphaTest: 0.45, depthPacking: THREE.RGBADepthPacking, side: THREE.DoubleSide });
-  for (const f of fields) for (const l of f.levels) l.mesh.customDepthMaterial = depth;
+  for (const b of fields[0].buckets) b.mesh.customDepthMaterial = depth;
 
   // Purple petal carpets under the jacarandas close to the camera.
   const jac = trees.filter((t) => t.species === 'jacaranda').map((t) => ({ ...t, y: t.y + 0.02, s: t.s * (1.6 + (t.rot % 1) * 0.8), c: [1, 1, 1] }));
@@ -341,7 +437,8 @@ export function createVegetation(group, trees, uniforms, quality, shadows, drawD
       map: petalTexture(), transparent: true, depthWrite: false, roughness: 1,
       polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
     });
-    fields.push(new InstanceLOD(group, [{ geo: disc, dist: 160 }], petalMat, jac));
+    const petals = new Bucket(group, disc, petalMat, jac.length, false);
+    fields.push(new InstanceLOD(jac, [{ dist: 160, bucket: () => petals }]));
   }
 
   let lastX = Infinity;
@@ -351,7 +448,7 @@ export function createVegetation(group, trees, uniforms, quality, shadows, drawD
     update(cam) {
       const dx = cam.x - lastX;
       const dz = cam.z - lastZ;
-      if (dx * dx + dz * dz < 20 * 20) return;
+      if (dx * dx + dz * dz < 12 * 12) return;
       lastX = cam.x;
       lastZ = cam.z;
       for (const f of fields) f.refresh(cam.x, cam.z);

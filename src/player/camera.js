@@ -28,6 +28,10 @@ const PLUNGE_YAW = Math.PI - 0.55; // from the dive direction
 const PLUNGE_PITCH = -0.9;
 const PLUNGE_DIST = 3.2; // extra boom length
 const WHIP_TIME = 1.4; // s of faster re-alignment after a plunge
+// On a wall, the boom's horizontal direction must point at least this much out of the wall (dot
+// with its normal); otherwise the rig turns towards facing the wall at this rate.
+const WALL_BACK = 0.45;
+const WALL_YAW_RATE = 3;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));
@@ -195,11 +199,19 @@ export class CameraRig {
 
   _autoAlign(dt, p) {
     this._whip = Math.max(0, this._whip - dt);
-    if (this._time - this._lastManual < MANUAL_HOLD) return;
-    const v = p.velocity;
-    const hs = Math.hypot(v.x, v.z);
     const st = p.state;
     const ctrl = p.controller;
+    if (this._time - this._lastManual < MANUAL_HOLD) return;
+    if (st === 'wall' && ctrl) {
+      // Clinging to a wall with the view looking along it or out of it (a swing that ended against
+      // a facade at an angle): the boom runs into the wall and jams the camera against the
+      // player's back. Turn round until the boom clears the wall.
+      const n = ctrl.wall.normal;
+      const back = Math.sin(this.yaw) * n.x + Math.cos(this.yaw) * n.z;
+      if (back < WALL_BACK) this.yaw = dampAngle(this.yaw, Math.atan2(n.x, n.z), WALL_YAW_RATE, dt);
+    }
+    const v = p.velocity;
+    const hs = Math.hypot(v.x, v.z);
     if (st === 'dive' && ctrl?.plunge) {
       const out = ctrl.perchOut;
       this.yaw = dampAngle(this.yaw, Math.atan2(-out.x, -out.z) + PLUNGE_YAW, 2.6, dt);

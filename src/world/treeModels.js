@@ -262,6 +262,42 @@ function treeGeometry(name, lod) {
   return mergeGeometries([trunk, canopy]);
 }
 
+// Canonical far-LOD blob shared by every broadleaf species (one instanced draw for all distant
+// trees): a unit octahedron with spherical normals and the canopy's vertical shading gradient
+// (mean 1). farBlobFit(name) maps it onto that species' own far blob: centre offset, half-sizes
+// and mean colour (at scale 1, before the per-tree rotation and scale).
+export function farBlobGeometry() {
+  const g = new THREE.OctahedronGeometry(1, 0).toNonIndexed();
+  g.deleteAttribute('uv');
+  const pos = g.attributes.position;
+  const nrm = g.attributes.normal;
+  for (let k = 0; k < pos.count; k++) {
+    _p.set(pos.getX(k), pos.getY(k), pos.getZ(k)).normalize();
+    nrm.setXYZ(k, _p.x, _p.y, _p.z);
+  }
+  return finish(g, (x, y, z, c) => c.setScalar((0.72 + 0.38 * (y * 0.5 + 0.5)) / 0.91));
+}
+
+export function farBlobFit(name) {
+  const g = treeGeometry(name, 2);
+  g.computeBoundingBox();
+  const bb = g.boundingBox;
+  const col = g.attributes.color;
+  const color = new THREE.Color(0, 0, 0);
+  for (let k = 0; k < col.count; k++) {
+    color.r += col.getX(k);
+    color.g += col.getY(k);
+    color.b += col.getZ(k);
+  }
+  color.multiplyScalar(1 / Math.max(1, col.count));
+  g.dispose();
+  return {
+    cx: (bb.min.x + bb.max.x) / 2, cy: (bb.min.y + bb.max.y) / 2, cz: (bb.min.z + bb.max.z) / 2,
+    hx: (bb.max.x - bb.min.x) / 2, hy: (bb.max.y - bb.min.y) / 2, hz: (bb.max.z - bb.min.z) / 2,
+    color,
+  };
+}
+
 function palmGeometry(lod) {
   const rng = makeRng(404 + lod);
   const h = 11;

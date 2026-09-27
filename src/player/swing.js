@@ -32,13 +32,22 @@ const LIFT = 4; // ...of up to this many m/s
 const BAND_TOP = 22; // releases above this height over the street fling / boost less upwards...
 const BAND_FADE = 16; // ...fading out over this many metres
 const BOOST_UP = 9; // m/s up from a boosted (jump) release, low in the band
+const AIR_G = 26; // gravity once airborne (controller.js G)
+const APEX_OVER = -1; // releases climb at most to this far over (under) the tallest roof ahead (_capApex)...
+const BOOST_ROOM = 6; // ...plus this for a boosted (jump) release
+const APEX_LOOK = 22; // roofs ahead: sampled every APEX_LOOK m out to 3x that, within APEX_LOOK_R
+const APEX_LOOK_R = 26;
+const APEX_TRADE = 0.35; // share of the capped climb's energy turned into forward speed...
+const APEX_FWD_MAX = 36; // ...up to this horizontal speed
 // Plunge catch: diving head-first down a tall facade, the web goes back up that facade (CATCH_RISE
 // above the hand) and the pivot sits CATCH_AHEAD out over the street, so the fall whips out into a
-// big swing away from the tower. Only below CATCH_ALT, so the plunge itself gets its moment.
-const CATCH_ALT = 62;
+// big swing away from the tower. Only below CATCH_ALT, so the plunge itself gets its moment and the
+// pull-out comes out at about roof height, where the next webs are (caught higher, it flung you far
+// above the blocks around the tower with nothing in reach for seconds).
+const CATCH_ALT = 40;
 const CATCH_RISE = 16;
 const CATCH_AHEAD = 17;
-const CATCH_STREET_COS = Math.cos(0.6); // ...out along the street below if it runs within this of the dive
+const CATCH_STREET_COS = Math.cos(1.25); // ...out along the street below if it runs within this of the dive
 // Street following: within STREET_COS (cos of the angle) of a street at least STREET_MIN_W wide,
 // the swing direction bends up to STREET_PULL of the way onto it.
 const STREET_REACH = 35;
@@ -49,6 +58,9 @@ const STREET_CENTER = 0.7; // how much of the way the swing line drifts to the s
 const STREET_SHIFT_MAX = 10;
 const AIM_COS = Math.cos(1.1); // input within this of the swing direction steers along the latter
 const ARC_SAMPLES = 5;
+const SAFE_STEP = 1 / 30; // _arcSafe: step and horizon (s) of the look-ahead swing simulation...
+const SAFE_HORIZON = 1.2;
+const SAFE_FEET = 0.3; // ...which fails if the feet get this close to the street / a roof
 const HELD_LEAP = 0.3; // s standing with swing held before it leaps into the next swing
 const HELD_WALL = 0.6; // s on a wall with swing held before springing off it...
 const HELD_WALL_ROOF = 7; // ...unless its top is closer than this (then climb over)
@@ -94,8 +106,13 @@ export class SwingMove {
       planar: PLANAR,
       // Street lights / trees for low-rise streets, if the city provides them.
       fallback: (x, z, r) => ctrl.game.city?.anchorsNear?.(x, z, r),
-      // Prefer anchors whose swing has a clear arc (see _arcClear).
-      accept: (point) => this._plan(point, this._planHand, this._planDir) && this._arcClear(),
+      // Prefer anchors whose swing has a clear arc (see _arcClear); never one whose web can't take
+      // the weight before the fall reaches the street or a roof (see _arcSafe).
+      accept: (point) => {
+        if (!this._plan(point, this._planHand, this._planDir)) return false;
+        if (!this._arcSafe(point, this._planHand)) return -1;
+        return this._arcClear();
+      },
     };
   }
 
@@ -211,9 +228,25 @@ export class SwingMove {
   _plungeCatch(hand, dir) {
     const c = this.c;
     const out = c.perchOut;
-    // Whip out along the street below if there is one, else straight out from the facade.
-    if (this.street.active && this.street.dir.dot(out) > CATCH_STREET_COS) dir.copy(this.street.dir);
-    else if (dir.dot(out) < 0.3) dir.copy(out);
+    // Whip out along the street below the tower, the way that leads away from it (the opening dive
+    // off the Reserve Bank pulls out down Samora Machel Avenue), else straight out from the facade.
+    const near = c.world.nearestRoad?.(hand.x + out.x * 10, hand.z + out.z * 10, STREET_REACH);
+    const r = near?.road;
+    let along = false;
+    if (r && r.w >= STREET_MIN_W && !r.link) {
+      const i = near.seg * 2;
+      _a.set(r.pts[i + 2] - r.pts[i], 0, r.pts[i + 3] - r.pts[i + 1]);
+      const len = _a.length();
+      if (len > 1) {
+        _a.divideScalar(len);
+        if (_a.dot(out) < 0) _a.negate();
+        if (_a.dot(out) > CATCH_STREET_COS) {
+          dir.copy(_a);
+          along = true;
+        }
+      }
+    }
+    if (!along && dir.dot(out) < 0.3) dir.copy(out);
     _c.set(hand.x, hand.y + CATCH_RISE, hand.z);
     const hit = c.world.raycast(_c, _b.set(-out.x, 0, -out.z), 30);
     if (!hit || Math.abs(hit.normal.y) > 0.5) return false;
@@ -267,6 +300,60 @@ export class SwingMove {
     plan.L0 = L0;
     plan.target = Math.min(L0, pivot.y - bottom);
     return plan.target >= 4;
+  }
+
+  // Would the planned swing hold? Runs the swing's own rope physics (web flight, reel-in, gravity;
+  // no steering) forward from the current state and fails if the feet would reach the street or a
+  // roof before the arc turns upwards: e.g. falling fast just above the street, a web to a lamp
+  // post 50 m ahead goes taut far too late (the rope is nearly horizontal and only drags).
+  _arcSafe(point, hand) {
+    const c = this.c;
+    const v = c.p.velocity;
+    const { pivot, L0, target } = this.plan;
+    const center = c.center;
+    let x = center.x;
+    let y = center.y;
+    let z = center.z;
+    let vx = v.x;
+    let vy = v.y;
+    let vz = v.z;
+    let rope = L0;
+    let delay = Math.max(0.05, hand.distanceTo(point) / 520);
+    const h = SAFE_STEP;
+    for (let t = 0; t < SAFE_HORIZON; t += h) {
+      vy -= SWING_G * h;
+      if (delay > 0) delay -= h;
+      const excess = rope - target;
+      const reel = delay <= 0 && excess > 0 ? Math.min(MAX_REEL, Math.max(REEL, excess * 6)) : 0;
+      rope -= Math.min(Math.max(excess, 0), reel * h);
+      x += vx * h;
+      y += vy * h;
+      z += vz * h;
+      if (delay <= 0) {
+        let dx = x - pivot.x;
+        let dy = y - pivot.y;
+        let dz = z - pivot.z;
+        const len = Math.hypot(dx, dy, dz);
+        if (len > rope && len > 1e-3) {
+          dx /= len;
+          dy /= len;
+          dz /= len;
+          x -= dx * (len - rope);
+          y -= dy * (len - rope);
+          z -= dz * (len - rope);
+          const vr = vx * dx + vy * dy + vz * dz;
+          if (vr > -reel) {
+            vx += dx * (-reel - vr);
+            vy += dy * (-reel - vr);
+            vz += dz * (-reel - vr);
+          }
+        }
+        // Up past the pivot's level: the swing lets go there anyway.
+        if (vy > 0 && y > pivot.y - 1) return true;
+      }
+      if (y - c.centerHeight < c.floorAt(x, z) + SAFE_FEET) return false;
+    }
+    return true;
   }
 
   // Would the planned arc (from here, down under the pivot and up to the release angle) run into a
@@ -420,6 +507,7 @@ export class SwingMove {
         const above = p.position.y - this._street(p.position.x, p.position.z);
         v.y += (2 + 0.12 * sp) * this._bandScale(above, 0.2);
         if (above < LIFT_BELOW) v.y += LIFT * (1 - Math.max(0, above) / LIFT_BELOW);
+        this._capApex(0);
         if (sp > 24 && Math.random() < 0.55) c.startTrick(TRICKS[Math.floor(Math.random() * TRICKS.length)]);
         this.lateBoost = LATE_BOOST;
       }
@@ -441,6 +529,7 @@ export class SwingMove {
     // Just after an automatic release the fling is already in v.y: boost from before it.
     const vy = this.lateBoost > 0 ? Math.min(v.y, this.preFling) : v.y;
     v.y = Math.max(vy, 2) + up;
+    this._capApex(BOOST_ROOM);
     this.lateBoost = 0;
     c.startTrick('flip');
     c.jumpHeld = true;
@@ -450,6 +539,37 @@ export class SwingMove {
   // 1 up to BAND_TOP over the street, easing to `min` BAND_FADE higher.
   _bandScale(above, min) {
     return Math.max(min, Math.min(1, 1 - (above - BAND_TOP) / BAND_FADE));
+  }
+
+  // Keep a release's climb within reach of the next web: over low-rise blocks a full fling sails far
+  // above every roof in range and then hangs there, swing held and nothing to catch, for seconds.
+  // The climb is capped just under the tallest roof ahead (APEX_OVER, + room for a boosted release;
+  // at least the swing band over the street), so the next roof-edge web is in reach as soon as the
+  // fall begins, and part of the surplus goes into forward speed instead.
+  _capApex(room) {
+    const c = this.c;
+    const p = c.p;
+    const v = p.velocity;
+    if (v.y <= 0) return;
+    const hs = Math.hypot(v.x, v.z);
+    const dx = hs > 1 ? v.x / hs : this.aim.x;
+    const dz = hs > 1 ? v.z / hs : this.aim.z;
+    const pos = p.position;
+    let top = this._street(pos.x, pos.z) + ALT;
+    for (let s = APEX_LOOK; s <= APEX_LOOK * 3; s += APEX_LOOK) {
+      const list = c.world.buildingsNear(pos.x + dx * s, pos.z + dz * s, APEX_LOOK_R);
+      for (let i = 0; i < list.length; i++) if (list[i].h > top) top = list[i].h;
+    }
+    const climb = top + APEX_OVER + room - pos.y;
+    const vyMax = climb > 0 ? Math.sqrt(2 * AIR_G * climb) : 0;
+    if (v.y <= vyMax) return;
+    const surplus = v.y * v.y - vyMax * vyMax;
+    v.y = vyMax;
+    if (hs > 1) {
+      const nh = Math.min(Math.max(hs, APEX_FWD_MAX), Math.sqrt(hs * hs + surplus * APEX_TRADE));
+      v.x *= nh / hs;
+      v.z *= nh / hs;
+    }
   }
 
   dropLine() {

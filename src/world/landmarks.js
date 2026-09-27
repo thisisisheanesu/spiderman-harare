@@ -118,6 +118,9 @@ export class Landmarks {
       case 'pearl_house':
         pearlSculpture(gb, col, L, obb, b.h, seed);
         break;
+      case 'meikles':
+        archedAttic(gb, col, L, fp, b.h, seed);
+        break;
       case 'harare_station':
         cupola(gb, col, L, obb, spec.ridgeY ?? b.h, seed);
         break;
@@ -349,6 +352,23 @@ function band(gb, col, ring, inner, y0, y1, layer, tintBytes, seed, tileW) {
       col.quad(...q, 0, ny, 0, 0, 0, 1, 1);
     }
   }
+}
+
+// Meikles hotel tower: the top storey is a row of round-arched windows (PHOTOS.md: white grid
+// with an arched attic), a skin just proud of the grid facade over a thin precast sill.
+function archedAttic(gb, col, L, fp, h, seed) {
+  const normals = edgeNormals(fp, true);
+  const skin = offsetRing(fp, normals, 0.12);
+  const n = skin.length / 2;
+  const y0 = h - 4.4;
+  gb.brush(tint('#ffffff'), L.arches, seed, 0, 1, 4);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const len = Math.hypot(skin[j * 2] - skin[i * 2], skin[j * 2 + 1] - skin[i * 2 + 1]);
+    if (len < 2) continue;
+    gb.wall(skin[i * 2], skin[i * 2 + 1], skin[j * 2], skin[j * 2 + 1], y0, h - 0.05, normals[i * 2], normals[i * 2 + 1], 0, Math.max(1, Math.round(len / 5.6)), 0, 1);
+  }
+  band(gb, col, offsetRing(fp, normals, 0.35), fp, y0 - 0.35, y0, L.concrete, tint('#e6e2da'), seed, 4);
 }
 
 // Unit vertex normals (bisectors of the adjacent edge normals) for vertex i.

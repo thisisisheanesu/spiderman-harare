@@ -9,6 +9,7 @@ const MAX_SPEED = 42;
 const ACCEL = 150;
 const SHOT_SPEED = 520;
 const ZIP_TOUCHDOWN = 4.5; // landing speed reported on flat arrivals (soft 'land' sound + knee dip)
+const STALL_TIME = 0.2; // s without getting closer to the target: snagged, let go
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
@@ -29,6 +30,8 @@ export class ZipMove {
     this.dist0 = 1;
     this.progress = 0;
     this.timeLeft = 0;
+    this.closest = Infinity;
+    this.stall = 0;
     this.launch = false;
     this.lines = [];
     this.hit = { kind: '', point: new THREE.Vector3(), normal: new THREE.Vector3(), distance: 0 };
@@ -74,6 +77,8 @@ export class ZipMove {
     this.delay = Math.max(0.05, hit.distance / SHOT_SPEED);
     this.timeLeft = this.delay + this.dist0 / (MAX_SPEED * 0.5) + 0.5;
     this.progress = 0;
+    this.closest = Infinity;
+    this.stall = 0;
     p.state = 'zip';
     c.clearActions();
     // One line from each wrist, landing a hand's width apart.
@@ -109,6 +114,17 @@ export class ZipMove {
     const dir = _a.subVectors(this.dest, p.position);
     const dist = dir.length();
     this.progress = 1 - dist / this.dist0;
+    // Snagged short of the target (wedged between a roof and a wall on the way down): let go and
+    // land or fall rather than hanging there, frozen, until the timeout.
+    if (dist < this.closest - 0.3 * this.speed * h) {
+      this.closest = dist;
+      this.stall = 0;
+    } else if ((this.stall += h) > STALL_TIME) {
+      c.dropWebs();
+      v.copy(this.dir).multiplyScalar(Math.min(this.speed, 8));
+      p.state = 'air';
+      return;
+    }
     this.speed = Math.min(MAX_SPEED, this.speed + ACCEL * h);
     const step = this.speed * h;
     if (dist <= step + 0.05) {
