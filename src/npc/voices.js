@@ -17,6 +17,8 @@ const MIN_GAP = 1.1; // s between two voice starts
 // Most FLEURS speakers have a single clip, so a bound speaker may repeat it after this long (s);
 // otherwise the few people near a player who stands still fall silent for good.
 const REPEAT_AFTER = 150;
+// Swinging away from someone mid-sentence: their subtitle goes once they are this far off (m).
+const SUBTITLE_RANGE = 45;
 
 export class VoiceDirector {
   constructor(game) {
@@ -101,7 +103,7 @@ export class VoiceDirector {
     agent.talkUntil = t + dur;
     agent.lastSpoke = t;
     this.lastStart = t;
-    this.active.push({ agent, id: agent.id, until: t + dur, handle });
+    this.active.push({ agent, id: agent.id, until: t + dur, handle, clip, heard: true });
     if (handle) this.street.noteVoice(t + dur);
     const speaker = agent.role || agent.name || 'Passer-by';
     if (clip.kind === 'line') {
@@ -126,10 +128,18 @@ export class VoiceDirector {
   update(dt, ctx, candidates) {
     if (!this.available) return;
     const t = this.game.time;
-    // Voices follow their speakers (people talk as they walk).
+    // Voices follow their speakers (people talk as they walk); a line whose speaker the player has
+    // left behind loses its subtitle.
+    const pp = this.game.player?.position;
     for (const v of this.active) {
-      if (v.until < t || v.agent.id !== v.id || !v.handle?.setPosition) continue;
+      if (v.until < t) continue;
       const a = v.agent;
+      const gone = v.agent.id !== v.id;
+      if (v.heard && v.clip.kind === 'line' && pp && (gone || Math.hypot(a.position.x - pp.x, a.position.y - pp.y, a.position.z - pp.z) > SUBTITLE_RANGE)) {
+        v.heard = false;
+        this.game.hud?.dropSubtitle?.({ sn: v.clip.sn, en: v.clip.en });
+      }
+      if (gone || !v.handle?.setPosition) continue;
       v.handle.setPosition(this._head.set(a.position.x, a.position.y + 1.6 * a.look.scale, a.position.z));
     }
     if (t < this.nextLine || !ctx.nearGround || this.busy()) return;

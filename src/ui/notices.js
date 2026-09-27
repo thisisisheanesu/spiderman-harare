@@ -11,7 +11,13 @@ export class Notices {
     this.subsRoot = el('div', 'subs', { 'aria-live': 'polite' });
     this.toastRoot = el('div', 'toasts', { 'aria-live': 'polite' });
     this.objText = el('div', 'objective-text');
-    this.objective = el('div', 'objective panel', null, [el('div', 'eyebrow', { text: 'Objective' }), this.objText]);
+    this.objHow = el('div', 'objective-how');
+    this.objStep = el('span', 'objective-step');
+    this.objective = el('div', 'objective panel', { 'aria-live': 'polite' }, [
+      el('div', 'eyebrow', null, [document.createTextNode('Objective'), this.objStep]),
+      this.objText,
+      this.objHow,
+    ]);
     parent.append(this.subsRoot, this.toastRoot);
     objectiveParent.append(this.objective);
     this.queue = [];
@@ -35,6 +41,14 @@ export class Notices {
       c.trimmed = true;
       c.left = Math.min(c.left, Math.max(MIN_LEFT_MS, c.left - READ_TAIL_MS));
     }
+  }
+
+  // The speaker is out of earshot: fade their line out now (or drop it if it is still queued).
+  dropSubtitle({ sn = '', en = '' } = {}) {
+    const same = (s) => s && s.sn === sn && s.en === en;
+    this.queue = this.queue.filter((q) => !same(q));
+    const c = this.current;
+    if (same(c)) c.left = Math.min(c.left, 250);
   }
 
   _next() {
@@ -80,8 +94,21 @@ export class Notices {
     }, ms);
   }
 
-  setObjective(text) {
-    if (text) setText(this.objText, text);
+  // text: the goal; detail: {how (one line on how to do it), step ('2/5')} (both optional).
+  setObjective(text, detail) {
+    if (text) {
+      setText(this.objText, text);
+      setText(this.objHow, detail?.how || '');
+      setText(this.objStep, detail?.step || '');
+    }
     this.objective.classList.toggle('shown', !!text);
+  }
+
+  // Brief highlight when an objective is completed.
+  flashObjective() {
+    const o = this.objective;
+    o.classList.remove('flash');
+    void o.offsetWidth; // restart the animation
+    o.classList.add('flash');
   }
 }

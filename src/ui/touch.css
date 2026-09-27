@@ -187,9 +187,11 @@
   bottom: var(--bottom);
 }
 
+/* Landscape: the hint sits low between the thumbs (Spider-Man is mid-screen); a subtitle in the same
+   spot wins. */
 .hud.touch .controls-hint {
   left: 50%;
-  bottom: calc(var(--bottom) + 110px);
+  bottom: var(--bottom);
   flex-direction: row;
   flex-wrap: wrap;
   justify-content: center;
@@ -200,6 +202,10 @@
 
 .hud.touch.hinting .controls-hint {
   transform: translateX(-50%);
+}
+
+.hud.touch.hinting:has(.subs .sub.in) .controls-hint {
+  opacity: 0;
 }
 
 /* Narrow screens (portrait phones). */
@@ -236,8 +242,8 @@
     max-width: calc(100% - var(--left) - var(--right));
   }
 
-  /* The hint sits where the objective panel grows to: an active objective wins. */
+  /* Under the objective panel when there is one (the tour's first steps). */
   .hud.touch:has(.objective.shown) .controls-hint {
-    visibility: hidden;
+    top: calc(var(--top) + 348px);
   }
 }

@@ -11,6 +11,8 @@ import { Notices } from './notices.js';
 import { PauseMenu, HelpOverlay } from './menus.js';
 import { MenuNav } from './menuNav.js';
 import { TouchControls } from './touch.js';
+import { Tour } from './tour.js';
+import { PerfWatch } from './perf.js';
 import { enableDragLook } from './dragLook.js';
 import { controlsHint } from './controls.js';
 import { el, isCoarsePointer, setText, toggleClass } from './dom.js';
@@ -19,6 +21,9 @@ const TEXT_INTERVAL = 0.2; // s between DOM text refreshes (~5 Hz)
 const HINT_SECONDS = 20;
 const WAYPOINT_REACHED = 25; // m
 const LOCK_HINT_MS = 5000;
+const FREE_HINT_MS = 9000; // first "drag to look" notice when the mouse can't be captured
+const LOCK_TEXT = 'Click to capture the mouse · or drag to look';
+const FREE_TEXT = 'Drag the mouse to look · hold Shift to swing';
 // npc:speak clip kinds that appear as speech bubbles, not subtitles (FLEURS barks, extras greetings).
 const BUBBLE_KINDS = new Set(['bark', 'greet', 'exclaim', 'call']);
 
@@ -42,6 +47,8 @@ export class Hud {
     this._textT = TEXT_INTERVAL; // refresh the text on the first frame
     this._hintT = 0;
     this._lockHintUntil = 0;
+    this.lockless = false; // desktop without pointer lock (refused, e.g. in a sandboxed iframe)
+    this.lockBlocked = false; // ...for good: the page may never capture the mouse
 
     this.root = document.getElementById('hud');
     this.root.classList.add('hud');
@@ -55,6 +62,8 @@ export class Hud {
     this.overlays = { map: this.bigMap, pause: this.pauseMenu, help: this.help };
     this.nav = new MenuNav();
     this.touch = new TouchControls(this);
+    this.tour = new Tour(this);
+    this.perf = new PerfWatch(this);
     enableDragLook(game, this.settings);
 
     for (const k of Object.keys(this.settings.values)) this._apply(k, this.settings.get(k));
@@ -73,7 +82,7 @@ export class Hud {
       el('div', 'location panel', null, [this.street, this.near, el('div', 'loc-stats', null, [this.alt, this.speed])]),
     ]);
     this.hint = el('div', 'controls-hint panel');
-    this.lockHint = el('div', 'lock-hint', { text: 'Click to capture the mouse · or drag to look' });
+    this.lockHint = el('div', 'lock-hint', { text: LOCK_TEXT });
     this.root.append(top, left, this.hint, this.lockHint);
     this.compass = new Compass(top, this.places);
     this.minimap = new Minimap(this.root, painter, this.places, this.game.quality.level);
@@ -85,23 +94,25 @@ export class Hud {
     const { game } = this;
     game.events.on('hud:toast', (e) => this.toast(e?.text, e?.ms));
     game.events.on('npc:speak', (e) => this._npcSpoke(e));
+    game.events.on('game:pause', () => this.perf.reset());
     game.events.on('game:start', () => {
       this.started = true;
       this.root.classList.add('started');
       this._showHint(true);
+      if (this.settings.get('tour')) this.tour.start();
     });
     const canvas = game.renderer.domElement;
     document.addEventListener('pointerlockchange', () => {
       if (document.pointerLockElement === canvas) {
         this._hadLock = true;
+        this._setLockless(false);
       } else if (this.started && this._hadLock && !game.paused && !this.overlay) {
         this.openOverlay('pause');
       }
     });
-    // Mouse capture refused (no user gesture yet, Esc used to resume, sandboxed iframe...).
-    document.addEventListener('pointerlockerror', () => {
-      this._lockHintUntil = performance.now() + LOCK_HINT_MS;
-    });
+    // Mouse capture refused (no user gesture yet, Esc used to resume...): browsers without the
+    // promise form of requestPointerLock only report it here.
+    document.addEventListener('pointerlockerror', () => this._lockFailed(null));
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) return;
       this.touch.reset();
@@ -122,25 +133,60 @@ export class Hud {
     return this.touch?.enabled ? 'touch' : 'keyboard';
   }
 
+  // Capture the mouse (desktop). Refusals switch the HUD to drag-to-look hints; a refusal because the
+  // page is sandboxed without pointer-lock permission is final, so later clicks stop asking.
+  requestLock() {
+    const input = this.game.input;
+    if (this.touch.enabled || input.usingTouch || this.lockBlocked || input.pointerLocked) return;
+    let req;
+    try {
+      req = input.dom.requestPointerLock?.();
+    } catch (err) {
+      this._lockFailed(err);
+      return;
+    }
+    if (req?.then) req.then(() => this._setLockless(false), (err) => this._lockFailed(err));
+  }
+
+  // 'keyboard' | 'touch' | 'gamepad', or 'free' for keyboard + mouse without pointer lock.
+  hintMode() {
+    const mode = this.inputMode;
+    return mode === 'keyboard' && this.lockless ? 'free' : mode;
+  }
+
   showSubtitle(sub) {
     this.notices.showSubtitle(sub);
+  }
+
+  // Remove a subtitle whose speaker is out of earshot ({sn, en} as it was shown).
+  dropSubtitle(sub) {
+    this.notices.dropSubtitle(sub);
   }
 
   toast(text, ms) {
     this.notices.toast(text, ms);
   }
 
-  setObjective(text) {
-    this.notices.setObjective(text);
+  // detail (optional): {how: one line on how to do it, step: e.g. '2/5'}.
+  setObjective(text, detail) {
+    this.notices.setObjective(text, detail);
   }
 
-  setWaypoint(x, z) {
-    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+  flashObjective() {
+    this.notices.flashObjective();
+  }
+
+  // opts (optional): {label, tour (set by the objective chain: no "reached" toast), quiet (no click)}.
+  // Returns the waypoint.
+  setWaypoint(x, z, opts = {}) {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
     const near = this.places.nearest(x, z, 120);
-    const label = near?.name || this.game.world.streetNameAt(x, z) || 'Marked spot';
-    this.waypoint = { x, z, label };
+    const label = opts.label || near?.name || this.game.world.streetNameAt(x, z) || 'Marked spot';
+    if (!opts.tour && this.waypoint?.tour) this.tour.yieldWaypoint(); // the player's own pin wins
+    this.waypoint = { x, z, label, tour: !!opts.tour };
     this.bigMap.syncWaypoint();
-    this.game.audio?.playSfx?.('ui');
+    if (!opts.quiet) this.game.audio?.playSfx?.('ui');
+    return this.waypoint;
   }
 
   clearWaypoint() {
@@ -151,6 +197,11 @@ export class Hud {
   setSetting(key, value) {
     this.settings.set(key, value);
     this._apply(key, value);
+    // Switching the guided tour on (again) replays it; off drops its objective and waypoint.
+    if (key === 'tour' && this.started) {
+      if (value && !this.tour.running) this.tour.start();
+      else if (!value && this.tour.running) this.tour.stop();
+    }
   }
 
   openOverlay(name) {
@@ -178,7 +229,7 @@ export class Hud {
     document.activeElement?.blur?.();
     this.game.audio?.playSfx?.('ui');
     this.game.setPaused(false);
-    if (!this.touch.enabled) this.game.input.requestPointerLock();
+    this.requestLock();
   }
 
   // "Samora Machel Avenue · near Africa Unity Square"
@@ -203,6 +254,8 @@ export class Hud {
       else if (input.pressed('help')) this.openOverlay('help');
     }
 
+    if (this.started) this.perf.update();
+
     const p = game.player?.position;
     if (!p) return;
     game.camera.getWorldDirection(this._dir);
@@ -223,6 +276,7 @@ export class Hud {
     this._textT += dt;
     if (this._textT >= TEXT_INTERVAL) {
       this._refreshText(p, speed);
+      if (this.started) this.tour.update(this._textT);
       this._textT = 0;
     }
   }
@@ -285,15 +339,15 @@ export class Hud {
     setText(this.speed, `${Math.round(speed * 3.6)} km/h`);
     this.compass.updateCaption();
 
-    const mode = this.inputMode;
+    const mode = this.hintMode();
     if (this._hintOn && this._hintMode !== mode) this._fillHint(mode);
 
-    // Desktop without pointer lock: briefly say how to get the mouse back.
-    const unlocked = this.started && !this.game.paused && !this.touch.enabled && mode === 'keyboard' && !this.game.input.pointerLocked;
+    // Desktop without pointer lock: briefly say how to look around (and get the mouse back).
+    const unlocked = this.started && !this.game.paused && !this.touch.enabled && (mode === 'keyboard' || mode === 'free') && !this.game.input.pointerLocked;
     toggleClass(this.lockHint, 'shown', unlocked && performance.now() < this._lockHintUntil);
 
     const wp = this.waypoint;
-    if (wp && Math.hypot(wp.x - p.x, wp.z - p.z) < WAYPOINT_REACHED) {
+    if (wp && !wp.tour && Math.hypot(wp.x - p.x, wp.z - p.z) < WAYPOINT_REACHED) {
       this.toast(`Waypoint reached · ${wp.label}`);
       this.clearWaypoint();
     }
@@ -302,8 +356,27 @@ export class Hud {
   _showHint(on) {
     this._hintOn = on;
     this._hintT = 0;
-    if (on) this._fillHint(this.inputMode);
+    if (on) this._fillHint(this.hintMode());
     toggleClass(this.root, 'hinting', on);
+  }
+
+  // err: the requestPointerLock rejection (null from the pointerlockerror event).
+  _lockFailed(err) {
+    if (this.touch.enabled || this.game.input.pointerLocked) return;
+    if (/sandbox/i.test(err?.message || '')) this.lockBlocked = true;
+    const first = !this.lockless;
+    this._setLockless(true);
+    const until = performance.now() + (first ? FREE_HINT_MS : LOCK_HINT_MS);
+    this._lockHintUntil = Math.max(this._lockHintUntil, until);
+  }
+
+  _setLockless(on) {
+    const changed = this.lockless !== on;
+    this.lockless = on;
+    setText(this.lockHint, !on ? LOCK_TEXT : this.lockBlocked ? FREE_TEXT : `${FREE_TEXT} · click to capture the mouse`);
+    if (!changed) return;
+    if (!on) toggleClass(this.lockHint, 'shown', false);
+    this._textT = TEXT_INTERVAL; // refresh hints and the objective's "how" line on the next frame
   }
 
   _fillHint(mode) {

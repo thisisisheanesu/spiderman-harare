@@ -28,7 +28,10 @@ export class SettingsPage {
         this._toggle('invertY', 'Invert vertical look'),
       ]),
       this._group('Display', [this._quality(), this._toggle('subtitles', 'Subtitles')]),
-      this.game.sky?.setTimeOfDay ? this._group('World', [this._timeOfDay()]) : null,
+      this._group('World', [
+        this._toggle('tour', 'Guided tour (objectives)'),
+        this.game.sky?.setTimeOfDay ? this._timeOfDay() : null,
+      ]),
     ]);
   }
 

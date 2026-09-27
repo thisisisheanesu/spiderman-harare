@@ -160,7 +160,9 @@ traffic from nearby vehicle count), `setMasterVolume(v)`, `muted`. The four real
 
 **hud**: `showSubtitle({speaker, sn, en, ms})`, `toast(text, ms)`, `setObjective(text|null)`, `bigMapOpen` (bool),
 `waypoint` ({x, z, label}|null), `setWaypoint(x, z)`, `clearWaypoint()`, `openOverlay('map'|'pause'|'help')`, `closeOverlay()`,
-`settings` (persisted user settings), `inputMode` ('mouse'|'touch'|'gamepad').
+`settings` (persisted user settings), `inputMode` ('mouse'|'touch'|'gamepad'), `setObjective(text, {how, step})`,
+`setWaypoint(x, z, {label, tour, quiet})` (returns the waypoint), `dropSubtitle({sn, en})`, `requestLock()`, `hintMode()`,
+`tour` (guided first-time objectives; `settings.tour` toggles it).
 Pause / help / map overlays are HUD-owned and call `game.setPaused(bool)`. `npc:speak` events are subtitled only for
 clip kind 'line' (deduped against `showSubtitle`); 'bark' / 'greet' / 'exclaim' / 'call' clips are left to the NPC's
 speech bubble unless the event carries `subtitle: true`.
@@ -183,7 +185,7 @@ city paints and pedestrians stay on the sidewalks the city builds.
 
 `input.move {x, y}` (y forward), `input.look {x, y}` (pixels this frame), `down/pressed/released(action)` with
 actions `jump swing zip dive suit map pause help camera time`. Keyboard: WASD/arrows, Space jump, Shift or
-left-click (pointer-locked) swing, E/Q or right-click zip, Ctrl/C dive, F suit, M map, Esc/P pause, H help, V camera,
+left-click (pointer-locked) swing, E/Q or right-click zip, C dive (not Ctrl: Ctrl+W closes the tab), F suit, M map, Esc/P pause, H help, V camera,
 T time of day. Gamepad: sticks, A jump, RT swing, LB/RB/LT zip, B dive, Y suit, Back map, Start pause.
 Touch UI calls `input.setVirtualMove(x, y)`, `input.addLook(dx, dy)`, `input.setVirtualButton(action, down)`.
 

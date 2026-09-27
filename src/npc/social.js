@@ -1,5 +1,5 @@
 import * as STREETLIFE from '../data/streetlife.js';
-import { streetVoices, greetingPart, gloss, shout, GREETINGS as GREET_CLIPS, ELDER_GREETINGS, REACT_AWE, REACT_FEAR, REACT_SWING, BANANAS } from './streetVoices.js';
+import { streetVoices, greetingPart, gloss, shout, GREET_REPEAT, GREETINGS as GREET_CLIPS, ELDER_GREETINGS, REACT_AWE, REACT_FEAR, REACT_SWING, BANANAS } from './streetVoices.js';
 
 // How the street responds to Spider-Man and to itself: reactions to landings and low swings (look,
 // point, cheer, film on a phone, cower, run), greetings as he walks past, vendors' and touts' calls,
@@ -104,7 +104,7 @@ export class Social {
     if (part === 'evening' && Math.random() < 0.5) return false;
     let ids = GREET_CLIPS[part];
     if (a.look.archetype === 'elder' && ELDER_GREETINGS[part]) ids = ids.concat(ELDER_GREETINGS[part]);
-    const clip = this.sv.choose(ids);
+    const clip = this.sv.choose(ids, GREET_REPEAT);
     return !!clip && this._speakClip(a, clip, 'greet', 'say') > 0;
   }
 

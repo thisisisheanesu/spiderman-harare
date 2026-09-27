@@ -27,12 +27,16 @@ with "GitHub Actions" as the source.
 | Jump / wall-run | Space | A | Jump |
 | Web-swing (hold) | Left click or Shift | RT | Swing |
 | Web-zip to a point | E / Q / right click | LB / RB / LT | Zip |
-| Dive | Ctrl / C | B | Dive |
+| Dive | C | B | Dive |
 | Switch suit (classic / symbiote) | F | Y | Suit |
 | Map (waypoints) | M | Back | Tap the minimap |
 | Time of day | T | — | Pause menu |
 | Camera distance | V | — | — |
 | Help / pause | H / Esc or P | — / Start | Pause button |
+
+A five-step guided tour (dive off the Reserve Bank, swing down Samora Machel Avenue, land in Africa Unity Square,
+walk First Street Mall, perch on Joina City) runs on first play; replay or hide it in Pause → Settings. If the page
+can't capture the mouse (some embedded views), drag with the mouse to look and hold Shift to swing.
 
 URL flags for testing: `?quality=low|medium|high`, `?time=17.5`, `?spawn=x,y,z` (metres from Africa Unity Square),
 `?autostart=1`, `?mute=1`.

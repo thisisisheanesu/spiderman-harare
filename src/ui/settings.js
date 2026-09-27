@@ -13,16 +13,55 @@ const DEFAULTS = {
   sensitivity: 1,
   invertY: false,
   subtitles: true,
+  tour: true, // first-time objective chain (src/ui/tour.js); switched off when finished
   quality: null,
 };
 
-function readStored() {
+// Without localStorage (blocked in some sandboxed iframes) the settings ride on window.name, which
+// survives a reload of the same frame, so "Reload to apply" (graphics quality) still works there.
+const NAME_PREFIX = `${KEY}:`;
+
+function parse(raw) {
   try {
-    const raw = window.localStorage.getItem(KEY);
     const obj = raw ? JSON.parse(raw) : null;
-    return obj && typeof obj === 'object' ? obj : {};
+    return obj && typeof obj === 'object' ? obj : null;
   } catch {
-    return {};
+    return null;
+  }
+}
+
+function readStored() {
+  let raw = null;
+  try {
+    raw = window.localStorage.getItem(KEY);
+  } catch {
+    /* storage unavailable: fall back to window.name */
+  }
+  if (raw === null) {
+    try {
+      const name = window.name || '';
+      if (name.startsWith(NAME_PREFIX)) raw = name.slice(NAME_PREFIX.length);
+    } catch {
+      /* ignore */
+    }
+  }
+  return parse(raw) || {};
+}
+
+function writeStored(values) {
+  const json = JSON.stringify(values);
+  try {
+    window.localStorage.setItem(KEY, json);
+    return;
+  } catch {
+    /* storage unavailable */
+  }
+  try {
+    const name = window.name || '';
+    // Never clobber a name the embedding page gave this frame.
+    if (!name || name.startsWith(NAME_PREFIX)) window.name = NAME_PREFIX + json;
+  } catch {
+    /* the setting still applies for this session */
   }
 }
 
@@ -50,10 +89,6 @@ export class Settings {
   set(k, v) {
     if (this.values[k] === v) return;
     this.values[k] = v;
-    try {
-      window.localStorage.setItem(KEY, JSON.stringify(this.values));
-    } catch {
-      /* storage unavailable: the setting still applies for this session */
-    }
+    writeStored(this.values);
   }
 }

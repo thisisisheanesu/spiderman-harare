@@ -67,8 +67,14 @@ export class Game {
       const s = this.order[i];
       if (s.init) await s.init(this);
       onProgress?.((i + 1) / this.order.length, s);
-      // Yield so the loading bar can repaint between heavy steps.
-      await new Promise((r) => setTimeout(r, 0));
+      // Yield a frame so the loading bar can repaint between heavy steps (timeout covers hidden tabs).
+      await new Promise((r) => {
+        const t = setTimeout(r, 50);
+        requestAnimationFrame(() => {
+          clearTimeout(t);
+          setTimeout(r, 0);
+        });
+      });
     }
   }
 

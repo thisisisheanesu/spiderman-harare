@@ -45,7 +45,7 @@ export class PauseMenu {
       else if (id === 'credits') this.pages[id] = { root: creditsPage(this.hud.game) };
     }
     // The controls page is rebuilt so the device in use comes first.
-    const page = id === 'controls' ? { root: controlsColumns(this.hud.inputMode) } : this.pages[id];
+    const page = id === 'controls' ? { root: controlsColumns(this.hud.hintMode()) } : this.pages[id];
     page.refresh?.();
     this.body.replaceChildren(page.root);
     this.body.scrollTop = 0;
@@ -85,7 +85,7 @@ export class HelpOverlay {
   }
 
   show() {
-    this.content.replaceChildren(controlsColumns(this.hud.inputMode));
+    this.content.replaceChildren(controlsColumns(this.hud.hintMode()));
     this.root.classList.add('open');
     this.root.setAttribute('aria-hidden', 'false');
     this.root.querySelector('.close-btn').focus({ preventScroll: true });

@@ -135,7 +135,8 @@ export class Compass {
         ctx.textBaseline = 'middle';
         ctx.fillText(off < 0 ? '‹' : '›', x + (off < 0 ? 12 : -12), my);
       }
-      if (Math.abs(off) < 12) ahead = { label: 'Waypoint', dist, waypoint: true };
+      // The tour's waypoints say where they lead ("Africa Unity Square · 320 m").
+      if (Math.abs(off) < 12) ahead = { label: waypoint.tour ? waypoint.label : 'Waypoint', dist, waypoint: true };
     }
 
     this.ahead = ahead;

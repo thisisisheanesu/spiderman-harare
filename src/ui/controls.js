@@ -1,7 +1,8 @@
 import { el } from './dom.js';
 
 // Control reference for the help overlay, the pause menu and the first-minute hint.
-// Each row: [keys[], action]. Mirrors the bindings in src/core/input.js.
+// Each row: [keys[], action]. Mirrors the bindings in src/core/input.js. Dive is C, not Ctrl:
+// Ctrl held with W (move) is the browser's close-tab shortcut, which no page can block.
 const CONTROLS = {
   keyboard: {
     title: 'Keyboard & mouse',
@@ -11,7 +12,7 @@ const CONTROLS = {
       [['Space'], 'Jump · wall-run'],
       [['Left click', 'Shift'], 'Swing (hold)'],
       [['E', 'Right click'], 'Web-zip'],
-      [['Ctrl', 'C'], 'Dive'],
+      [['C'], 'Dive'],
       [['F'], 'Change suit'],
       [['V'], 'Camera'],
       [['T'], 'Time of day'],
@@ -24,7 +25,7 @@ const CONTROLS = {
       [['Space'], 'Jump'],
       [['Click'], 'Swing'],
       [['E'], 'Zip'],
-      [['Ctrl'], 'Dive'],
+      [['C'], 'Dive'],
       [['M'], 'Map'],
       [['H'], 'Help'],
     ],
@@ -72,6 +73,35 @@ const CONTROLS = {
   },
 };
 
+// Keyboard + mouse when the page can't capture the mouse (sandboxed iframe): look by dragging,
+// swing with Shift (left click only swings while the mouse is captured).
+const FREE = {
+  rows: [
+    [['W', 'A', 'S', 'D'], 'Move'],
+    [['Drag'], 'Look (hold a mouse button)'],
+    [['Space'], 'Jump · wall-run'],
+    [['Shift'], 'Swing (hold)'],
+    [['E', 'Q'], 'Web-zip'],
+    [['C'], 'Dive'],
+    [['F'], 'Change suit'],
+    [['V'], 'Camera'],
+    [['T'], 'Time of day'],
+    [['M'], 'Map'],
+    [['H'], 'Help'],
+    [['Esc', 'P'], 'Pause'],
+  ],
+  hint: [
+    [['WASD'], 'Move'],
+    [['Drag'], 'Look'],
+    [['Space'], 'Jump'],
+    [['Shift'], 'Swing'],
+    [['E'], 'Zip'],
+    [['C'], 'Dive'],
+    [['M'], 'Map'],
+    [['H'], 'Help'],
+  ],
+};
+
 const CONTROL_MODES = Object.keys(CONTROLS);
 
 function keyList(keys) {
@@ -84,7 +114,10 @@ function keyList(keys) {
 }
 
 // One table per input method; `active` (the device the player is using now) comes first, highlighted.
+// 'free' is the keyboard column for a mouse that can't be captured.
 export function controlsColumns(active) {
+  const free = active === 'free';
+  if (free) active = 'keyboard';
   const modes = [active, ...CONTROL_MODES.filter((m) => m !== active)];
   return el(
     'div',
@@ -97,7 +130,10 @@ export function controlsColumns(active) {
           'dl',
           'controls-list',
           null,
-          CONTROLS[mode].rows.flatMap(([keys, action]) => [el('dt', null, null, keyList(keys)), el('dd', null, { text: action })]),
+          (free && mode === 'keyboard' ? FREE : CONTROLS[mode]).rows.flatMap(([keys, action]) => [
+            el('dt', null, null, keyList(keys)),
+            el('dd', null, { text: action }),
+          ]),
         ),
       ]),
     ),
@@ -105,5 +141,5 @@ export function controlsColumns(active) {
 }
 
 export function controlsHint(mode) {
-  return CONTROLS[mode].hint.map(([keys, action]) => el('span', 'hint-item', null, [...keyList(keys), el('span', null, { text: action })]));
+  return (mode === 'free' ? FREE : CONTROLS[mode] || CONTROLS.keyboard).hint.map(([keys, action]) => el('span', 'hint-item', null, [...keyList(keys), el('span', null, { text: action })]));
 }

@@ -17,7 +17,6 @@ const KEY_ACTIONS = {
   ShiftRight: 'swing',
   KeyE: 'zip',
   KeyQ: 'zip',
-  ControlLeft: 'dive',
   KeyC: 'dive',
   KeyF: 'suit',
   KeyM: 'map',
@@ -72,6 +71,8 @@ export class Input {
     };
     this._onKeyUp = (e) => this.keys.delete(e.code);
     this._onMouseDown = (e) => {
+      // Clicks on menus/buttons must not turn into swings once the mouse is captured.
+      if (!this.pointerLocked && e.target !== this.dom) return;
       this.mouseButtons.add(e.button);
       this.tappedMouse.add(e.button);
       this.usingGamepad = false;

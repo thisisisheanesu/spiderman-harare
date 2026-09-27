@@ -38,6 +38,18 @@ async function fetchJSON(url) {
   return res.json();
 }
 
+// Resolves after the browser has had a chance to paint (the loading bar), or after 120 ms in a
+// background tab where animation frames don't run.
+function nextPaint() {
+  return new Promise((resolve) => {
+    const t = setTimeout(resolve, 120);
+    requestAnimationFrame(() => {
+      clearTimeout(t);
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
 function setProgress(frac, label) {
   const bar = document.getElementById('load-bar');
   const txt = document.getElementById('load-text');
@@ -94,8 +106,18 @@ async function boot() {
   if (time) game.sky.setTimeOfDay?.(Number(time));
   if (params.get('mute')) game.audio.setMasterVolume?.(0);
 
+  // Shader warm-up: with KHR_parallel_shader_compile the page keeps painting while the GPU compiles.
+  setProgress(0.96, 'Warming up…');
+  await nextPaint();
+  try {
+    const r = game.renderer;
+    const parallel = r.compileAsync && r.extensions?.has?.('KHR_parallel_shader_compile');
+    const warm = parallel ? r.compileAsync(game.scene, game.camera) : r.compile(game.scene, game.camera);
+    await Promise.race([warm, new Promise((resolve) => setTimeout(resolve, 12000))]);
+  } catch (err) {
+    console.warn('[boot] shader warm-up failed', err);
+  }
   setProgress(1, 'Ready');
-  game.renderer.compile(game.scene, game.camera);
   game.start();
   window.__ready = true;
 
@@ -117,7 +139,7 @@ async function boot() {
     loading.classList.add('hidden');
     game.setPaused(false);
     game.audio.unlock?.();
-    game.input.requestPointerLock();
+    game.hud.requestLock?.();
     game.events.emit('game:start', {});
   };
   if (params.get('autostart')) {
@@ -130,9 +152,10 @@ async function boot() {
     if (!touch) start.focus({ preventScroll: true });
     window.addEventListener('keydown', onKey, true);
   }
-  // Clicking the game re-captures the mouse (after Esc, or when the browser refused the lock).
+  // Clicking the game re-captures the mouse (after Esc, or when the browser refused the lock; the
+  // HUD stops asking when the page may never capture it and shows drag-to-look hints instead).
   game.renderer.domElement.addEventListener('click', () => {
-    if (!game.paused) game.input.requestPointerLock();
+    if (!game.paused) game.hud.requestLock?.();
   });
 }
 

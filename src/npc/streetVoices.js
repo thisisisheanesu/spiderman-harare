@@ -14,7 +14,10 @@ const MIN_GAP = 1.2; // s between two clip starts
 const MAX_ACTIVE = 2; // extra clips at once
 const MAX_VOICES = 3; // extra clips + FLEURS lines at once
 const REPEAT = 30; // s before the same clip is heard again
-const PURPOSE_GAP = { greet: 3, react: 2.5, vendor: 8, hwindi: 7 };
+// Greetings come from passers-by who all share the one FSI voice: at most one every ~10 s, and each
+// recording (there are only three or four per time of day) not again within a minute and a half.
+export const GREET_REPEAT = 90;
+const PURPOSE_GAP = { greet: 8, react: 2.5, vendor: 8, hwindi: 7 };
 
 // Greetings a man on the street would give Spider-Man (a man): "baba" / "chirombowe" forms, never the
 // ones addressed to women. Mangwanani before ~11:00 (and "Mwarara here?", did you sleep well), Masikati
@@ -80,8 +83,9 @@ export class StreetVoices {
     const clips = this.game.audio?.extraClips?.();
     if (!Array.isArray(clips) || !clips.length) return false;
     for (const c of clips) this.byId.set(c.id, c);
-    // Destination calls: every 'call' clip except the banana seller's.
-    this.destinations = clips.filter((c) => c.kind === 'call' && c.id !== BANANAS).map((c) => c.id);
+    // Destination calls: every 'call' clip except the banana seller's, and "KuHarare" (to Harare),
+    // which no one calls in the middle of Harare.
+    this.destinations = clips.filter((c) => c.kind === 'call' && c.id !== BANANAS && c.id !== 'sn-ku-harare').map((c) => c.id);
     return true;
   }
 
@@ -130,22 +134,23 @@ export class StreetVoices {
     this.lastStart = Math.max(this.lastStart, t + delay - MIN_GAP * 0.5);
   }
 
-  _fresh(id, t) {
+  _fresh(id, t, repeat = REPEAT) {
     const at = this.played.get(id);
-    return id !== this.lastId && (at === undefined || t - at > REPEAT) && this.byId.has(id);
+    return id !== this.lastId && (at === undefined || t - at > repeat) && this.byId.has(id);
   }
 
-  // A random fresh clip from ids, or from [id, weight] pairs; null if none.
-  choose(list) {
+  // A random fresh clip from ids, or from [id, weight] pairs; null if none. `repeat`: s before a clip
+  // counts as fresh again (default 30).
+  choose(list, repeat = REPEAT) {
     if (!this._load()) return null;
     const t = this.game.time;
     let total = 0;
-    for (const e of list) if (this._fresh(Array.isArray(e) ? e[0] : e, t)) total += Array.isArray(e) ? e[1] : 1;
+    for (const e of list) if (this._fresh(Array.isArray(e) ? e[0] : e, t, repeat)) total += Array.isArray(e) ? e[1] : 1;
     if (total <= 0) return null;
     let r = Math.random() * total;
     for (const e of list) {
       const id = Array.isArray(e) ? e[0] : e;
-      if (!this._fresh(id, t)) continue;
+      if (!this._fresh(id, t, repeat)) continue;
       r -= Array.isArray(e) ? e[1] : 1;
       if (r <= 0) return this.byId.get(id);
     }
