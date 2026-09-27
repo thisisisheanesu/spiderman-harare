@@ -1,9 +1,11 @@
 import * as STREETLIFE from '../data/streetlife.js';
-import { FLAG, PATTERN_SHIFT } from './bodies.js';
 
-// Who is on the pavement: archetypes (weights, speeds, hours) from PEDESTRIAN_STYLES, turned into a
-// body description the crowd renderer understands: flag bits for clothing/props and eight packed
-// sRGB colours (skin, top, bottom, shoes, hair-or-load, accent, item, extra).
+// Who is on the pavement: archetypes (weights, speeds, hours) from PEDESTRIAN_STYLES, each dressed as one of
+// the realistic variants (public/models/humans) of the right role and gender. A look carries the variant,
+// a slight per-person scale and colour tint, a mirror flag (left/right swapped, for variety), the walking
+// speed matched to the variant's stride (no foot sliding), and what the person carries.
+//
+// Gender comes first (it also picks the FLEURS voice, voices.js) and the variant always matches it.
 
 const STYLES = STREETLIFE.PEDESTRIAN_STYLES || {};
 
@@ -19,33 +21,40 @@ const DEFAULT_ARCHETYPES = [
 ];
 const ARCHETYPES = STYLES.archetypes?.length ? STYLES.archetypes : DEFAULT_ARCHETYPES;
 
-const pal = (key, fallback) => (STYLES[key]?.length ? STYLES[key] : fallback);
-const SKIN = pal('skinTones', ['#3b2219', '#4a2c20', '#5a3825', '#6b4430', '#7a5038', '#8d5f42', '#a0714f']);
-const SKIN_W = STYLES.skinToneWeights?.length === SKIN.length ? STYLES.skinToneWeights : SKIN.map(() => 1);
-const HAIR = pal('hair', ['#0e0b0a', '#1a1412', '#2a1f1a', '#5c5752']);
-const SHIRT = pal('shirt', ['#ffffff', '#bcd4ec', '#1e2d55', '#b01e23', '#f2c200', '#2e6b3f']);
-const TROUSERS = pal('trousers', ['#1f2a44', '#3b3b3b', '#111111', '#6b5a43', '#5a6f8f']);
-const SKIRT = pal('skirt', ['#111111', '#1e2d55', '#6b1f2a']);
-const DRESS = pal('dress', ['#d62f3a', '#1d4fb8', '#f2c200', '#2e8b57', '#ff7f2a', '#7b2d8e']);
-const WRAPS = pal('zambiaWrap', [['#d62f3a', '#f2c200', '#111111'], ['#1d4fb8', '#ffffff', '#f2c200']]);
-const HEADWRAP = pal('headwrap', ['#d62f3a', '#f2c200', '#1d4fb8', '#2e8b57', '#ff7f2a']);
-const SUIT = pal('suit', ['#1b2233', '#22262e', '#2f3440', '#111111']);
-const SUIT_SHIRT = pal('suitShirt', ['#ffffff', '#dfe9f5']);
-const TIE = pal('tie', ['#6b1f2a', '#1e2d55', '#2e6b3f']);
-const SHOES = pal('shoes', ['#111111', '#3b2a1e', '#6b4a2e', '#ffffff']);
-const BAGS = pal('bags', ['#111111', '#6b4a2e', '#d62f3a', '#c2b28f']);
-const CARRIER = pal('shoppingBags', ['#ffffff', '#1d4fb8', '#d62f3a']);
-const JERSEYS = pal('footballJerseys', ['#1a3fa6', '#1f7a3a', '#f2c200']);
-const CAPS = STYLES.hats?.find((h) => h.id === 'baseball_cap')?.colors || ['#111111', '#d62f3a', '#1d4fb8', '#ffffff'];
-const FLAT_CAPS = STYLES.hats?.find((h) => h.id === 'flat_cap')?.colors || ['#3b3b3b', '#6b5a43'];
-const SUN_HATS = STYLES.hats?.find((h) => h.id === 'sun_hat')?.colors || ['#d8c9a3', '#ffffff'];
-const UNIFORMS = Object.fromEntries((STYLES.uniforms || []).map((u) => [u.id, u]));
+// Archetype -> variants by gender (humans README). Roles without a variant of one gender are that gender only.
+const VARIANTS = {
+  office_man: { male: ['man_business_suit', 'man_business_suit', 'man_shirt_tie'] },
+  office_woman: { female: ['woman_office_suit', 'woman_blouse_skirt'] },
+  casual_man: { male: ['man_tshirt_jeans_cap', 'man_polo_chinos', 'man_polo_chinos', 'man_shirt_tie'] },
+  casual_woman: { female: ['woman_dress_bright', 'woman_casual_tee', 'woman_jeans_top', 'woman_blouse_skirt'] },
+  market_woman: { female: ['woman_zambia_wrap', 'woman_vendor_apron'] },
+  youth: { male: ['man_hoodie', 'man_tshirt_jeans_cap'], female: ['woman_jeans_top', 'woman_casual_tee'] },
+  hwindi: { male: ['man_hoodie', 'man_tshirt_jeans_cap'] },
+  school_kid: { male: ['boy_primary_school', 'boy_high_school'], female: ['girl_primary_school', 'girl_high_school'] },
+  elder: { male: ['man_elder_flatcap'], female: ['woman_elder'] },
+  security_guard: { male: ['man_security_guard'] },
+  police: { male: ['man_police_zrp'] },
+  handcart_pusher: { male: ['man_overalls'] },
+  car_washer: { male: ['man_overalls'] },
+  street_preacher: { male: ['man_business_suit'] },
+  apostolic: { male: ['man_apostolic'], female: ['woman_apostolic'] },
+};
+// Share of men where both genders exist.
+const MALE_SHARE = { youth: 0.7, school_kid: 0.5, elder: 0.5, apostolic: 0.45 };
+// Walking pace per role (m/s) where the research gives none: patrols are slow.
+const PACE = { police: [0.8, 1.0], security_guard: [0.8, 1.0], street_preacher: [1.0, 1.2], apostolic: [0.9, 1.2], car_washer: [1.0, 1.3], hwindi: [1.2, 1.6] };
+// Walk cadence the clips look natural at (playback rate range); the pace is clamped into it.
+const RATE = [0.95, 1.45];
 const BASINS = ['#c9ced3', '#2b56a1', '#d23a2a', '#e0b23a', '#2e8b57'];
 const LOADS = ['#d6331f', '#f0d23c', '#f08c1a', '#2f7d32', '#b99b6b', '#b5654a'];
-
-const FEMALE_IDS = new Set(['office_woman', 'casual_woman', 'market_woman']);
-const MALE_SHARE = { youth: 0.7, school_kid: 0.5, elder: 0.5, hwindi: 1, security_guard: 0.85, police: 0.7, handcart_pusher: 1, street_preacher: 0.9, apostolic: 0.5, car_washer: 1 };
 const FIRST_NAMES = STREETLIFE.NPC_FIRST_NAMES?.length ? STREETLIFE.NPC_FIRST_NAMES : [{ name: 'Tendai', g: 'u' }, { name: 'Chipo', g: 'f' }, { name: 'Simba', g: 'm' }];
+
+let HUMANS = null;
+
+// The loaded variants (humans.js) every look is dressed from.
+export function useHumans(humans) {
+  HUMANS = humans;
+}
 
 function packColor(hex) {
   const v = parseInt(String(hex).replace('#', '').slice(0, 6), 16);
@@ -70,257 +79,81 @@ export function pickArchetype(rng, ctx) {
   return rng.weighted(list.length ? list : DEFAULT_ARCHETYPES);
 }
 
-// Build a complete look for an archetype id. `opts.gender` forces a gender (vendors, groups).
+export function archetypeById(id) {
+  return ARCHETYPES.find((a) => a.id === id) || { id };
+}
+
+// The walking clip a variant uses: elders shuffle, market women steady a load on the head.
+export function walkClipFor(variant, load) {
+  if (load && variant.has('carry_on_head')) return 'carry_on_head';
+  if (variant.roles.includes('elder') && variant.has('walk_slow')) return 'walk_slow';
+  return variant.has('walk') ? 'walk' : 'walk_female';
+}
+
+// Build a complete look for an archetype id. opts: {gender, variant (id), school: 'primary'|'high', load: false}.
 export function makeLook(rng, archetype, opts = {}) {
   const id = archetype.id || archetype;
-  const male = opts.gender ? opts.gender === 'male' : FEMALE_IDS.has(id) ? false : rng() < (MALE_SHARE[id] ?? 1);
+  const table = VARIANTS[id] || (opts.gender === 'female' ? VARIANTS.casual_woman : VARIANTS.casual_man);
+  let gender = opts.gender;
+  if (!gender || !table[gender]) {
+    if (table.male && table.female) gender = rng() < (MALE_SHARE[id] ?? 0.5) ? 'male' : 'female';
+    else gender = table.male ? 'male' : 'female';
+  }
+  // A forced gender the role has no clothes for (a woman guard): dress her as a casual woman.
+  const ids = table[gender] || (gender === 'male' ? VARIANTS.casual_man.male : VARIANTS.casual_woman.female);
+  let vid = opts.variant || rng.pick(ids);
+  if (id === 'school_kid' && opts.school) vid = ids.find((v) => v.includes(opts.school)) || vid;
+  const variant = HUMANS?.byId.get(vid) || HUMANS?.variants.find((v) => v.gender === gender) || null;
+  const scale = rng.range(0.96, 1.04);
+  const warm = rng.range(-0.025, 0.025);
+  const bright = rng.range(0.93, 1.05);
   const L = {
     archetype: id,
-    gender: male ? 'male' : 'female',
-    child: false,
-    flags: male ? 0 : FLAG.FEMALE,
-    col: new Float32Array(8),
-    build: rng.range(-0.25, 0.45),
-    scale: male ? rng.range(0.97, 1.08) : rng.range(0.92, 1.02),
-    speed: rng.range(...(archetype.walkSpeed || [1.1, 1.5])),
+    gender,
+    child: id === 'school_kid',
+    variant,
+    scale,
+    height: (variant?.height ?? 1.7) * scale,
+    tint: [bright * (1 + warm), bright, bright * (1 - warm)],
+    mirror: rng() < 0.5,
+    build: rng.range(-0.25, 0.45), // (voice rate seed)
+    speed: 1.2,
+    runSpeed: 0,
+    walkMax: 1.5,
     stationary: rng() < (archetype.stationary || 0),
+    load: false,
+    basinColor: 0,
+    loadColor: 0,
     name: '',
   };
-  const skin = rng.weighted(SKIN.map((c, i) => ({ c, weight: SKIN_W[i] }))).c;
-  const set = (slot, hex) => (L.col[slot] = packColor(hex));
-  set(0, skin);
-  set(3, rng.pick(SHOES));
-  set(4, rng.pick(HAIR.slice(0, 3)));
-  set(6, rng.pick(BAGS));
-  const f = (bit) => (L.flags |= bit);
-  const pattern = (type, top, bottom, alt) => {
-    L.flags |= (type << PATTERN_SHIFT) | (top ? FLAG.PAT_TOP : 0) | (bottom ? FLAG.PAT_BOTTOM : 0);
-    set(7, alt);
-  };
-  const femaleHair = () => {
-    const r = rng();
-    if (r < 0.3) {
-      f(FLAG.WRAP);
-      set(5, rng.pick(HEADWRAP));
-    } else if (r < 0.55) f(FLAG.BUN);
-  };
-
-  switch (id) {
-    case 'office_man':
-      if (rng() < 0.6) {
-        f(FLAG.SUIT);
-        const suit = rng.pick(SUIT);
-        set(1, suit);
-        set(2, suit);
-        set(7, rng.pick(SUIT_SHIRT));
-        set(5, rng.pick(TIE));
-      } else {
-        set(1, rng.pick(SUIT_SHIRT.concat(['#bcd4ec'])));
-        set(2, rng.pick(TROUSERS.slice(0, 4)));
-      }
-      set(3, rng.pick(SHOES.slice(0, 3)));
-      if (rng() < 0.45) f(FLAG.HANDBAG);
-      if (rng() < 0.2) f(FLAG.GLASSES);
-      break;
-    case 'office_woman': {
-      const r = rng();
-      if (r < 0.45) {
-        f(FLAG.SKIRT);
-        set(1, rng.pick(SHIRT.slice(0, 6)));
-        set(2, rng.pick(SKIRT));
-      } else if (r < 0.8) {
-        f(rng() < 0.6 ? FLAG.SKIRT : FLAG.LONG);
-        const dress = rng.pick(DRESS);
-        set(1, dress);
-        set(2, dress);
-      } else {
-        const suit = rng.pick(SUIT);
-        set(1, rng.pick(SUIT_SHIRT));
-        set(2, suit);
-      }
-      femaleHair();
-      if (rng() < 0.65) f(FLAG.HANDBAG);
-      set(3, rng.pick(SHOES.slice(0, 3)));
-      break;
-    }
-    case 'casual_woman': {
-      if (rng() < 0.55) {
-        f(rng() < 0.5 ? FLAG.LONG : FLAG.SKIRT);
-        const dress = rng.pick(DRESS);
-        set(1, dress);
-        set(2, dress);
-        if (rng() < 0.35) pattern(rng.int(1, 3), true, true, rng.pick(['#ffffff', '#f2c200', '#111111']));
-      } else {
-        f(FLAG.SKIRT | FLAG.SHORTSLEEVE);
-        set(1, rng.pick(SHIRT));
-        set(2, rng.pick(SKIRT.concat(TROUSERS.slice(4))));
-      }
-      femaleHair();
-      if (rng() < 0.4) f(FLAG.HANDBAG);
-      else if (rng() < 0.3) {
-        f(FLAG.BAGHAND);
-        set(6, rng.pick(CARRIER));
-      }
-      break;
-    }
-    case 'market_woman': {
-      const wrap = rng.pick(WRAPS);
-      f(FLAG.LONG | FLAG.WRAP);
-      set(2, wrap[0]);
-      set(1, rng() < 0.5 ? rng.pick(SHIRT) : wrap[0]);
-      pattern(3, false, true, wrap[1]);
-      set(5, rng.pick(HEADWRAP));
-      if (rng() < (archetype.carryOnHeadChance ?? 0.5)) {
-        f(FLAG.LOAD);
-        set(6, rng.pick(BASINS));
-        set(4, rng.pick(LOADS));
-      } else if (rng() < 0.3) {
-        f(FLAG.BAGHAND);
-        set(6, rng.pick(CARRIER));
-      }
-      if (rng() < (archetype.babyOnBackChance ?? 0.25)) f(FLAG.BABY);
-      L.build = rng.range(0.1, 0.6);
-      break;
-    }
-    case 'youth':
-    case 'hwindi':
-    case 'casual_man':
-    case 'car_washer':
-    case 'handcart_pusher': {
-      const tee = rng() < 0.6;
-      if (tee) f(FLAG.SHORTSLEEVE);
-      if (rng() < 0.2) set(1, rng.pick(JERSEYS));
-      else set(1, rng.pick(SHIRT));
-      if (!male) {
-        f(rng() < 0.5 ? FLAG.SKIRT : 0);
-        femaleHair();
-      }
-      set(2, rng.pick(TROUSERS));
-      if (id === 'car_washer' || (id === 'casual_man' && rng() < 0.12)) f(FLAG.SHORTS);
-      if (male && rng() < (id === 'hwindi' || id === 'youth' ? 0.6 : 0.3)) {
-        f(FLAG.CAP);
-        set(5, rng.pick(CAPS));
-      }
-      if (rng() < 0.12) f(FLAG.GLASSES);
-      if (rng() < 0.4) set(3, '#f2f2f2');
-      if (id === 'casual_man' && rng() < 0.25) {
-        f(FLAG.BAGHAND);
-        set(6, rng.pick(CARRIER));
-      }
-      if (id === 'handcart_pusher') {
-        set(1, '#1e2d55');
-        set(2, '#1e2d55');
-      }
-      L.build = rng.range(-0.3, 0.3);
-      break;
-    }
-    case 'school_kid': {
-      L.child = true;
-      const older = rng() < 0.5;
-      L.scale = older ? rng.range(0.86, 0.96) : rng.range(0.7, 0.8);
-      L.build = rng.range(-0.3, 0.1);
-      const pick = (idm, idf) => UNIFORMS[male ? idm : idf];
-      const u = older ? pick(rng() < 0.5 ? 'high_boy_maroon' : 'high_boy_navy', rng() < 0.5 ? 'high_girl_green' : 'high_girl_navy') : pick('primary_boy', 'primary_girl');
-      if (!older && male) {
-        f(FLAG.SHORTS | FLAG.SHORTSLEEVE);
-        set(1, u?.shirt || '#c9b27c');
-        set(2, u?.shorts || '#8b6f47');
-      } else if (!older) {
-        f(FLAG.SKIRT | FLAG.SHORTSLEEVE);
-        set(1, u?.dress || '#7fb2e5');
-        set(2, u?.dress || '#7fb2e5');
-        pattern(2, true, true, '#ffffff');
-      } else if (male) {
-        set(1, u?.blazer || u?.jersey || '#6b1f2a');
-        set(2, u?.trousers || '#6f7378');
-        set(7, u?.shirt || '#ffffff');
-        set(5, u?.tie || '#6b1f2a');
-        f(FLAG.SUIT);
-      } else {
-        f(FLAG.SKIRT);
-        set(1, u?.blazer || u?.jersey || u?.blouse || '#1e2d55');
-        set(2, u?.pinafore || u?.skirt || '#1e2d55');
-      }
-      if (!older && rng() < 0.3 && u?.hat) {
-        f(FLAG.HAT);
-        set(5, u.hat.color);
-      }
-      set(3, '#111111');
-      if (!male && !older) f(FLAG.BUN);
-      if (rng() < 0.85) {
-        f(FLAG.PACK);
-        set(6, rng.pick(['#1e2d55', '#111111', '#d62f3a', '#2b56a1', '#6b1f2a']));
-      }
-      break;
-    }
-    case 'elder':
-      set(4, rng.pick(HAIR.slice(3)));
-      if (male) {
-        set(1, rng.pick(['#6b5a43', '#3b3b3b', '#4a3b2e', '#7c8187']));
-        set(2, rng.pick(TROUSERS.slice(0, 5)));
-        if (rng() < 0.6) {
-          const cap = rng() < 0.6;
-          f(cap ? FLAG.CAP : FLAG.HAT);
-          set(5, rng.pick(cap ? FLAT_CAPS : SUN_HATS));
-        }
-      } else {
-        f(FLAG.LONG | FLAG.WRAP);
-        const d = rng.pick(DRESS);
-        set(1, d);
-        set(2, d);
-        set(5, rng.pick(HEADWRAP));
-      }
-      L.build = rng.range(0, 0.5);
-      break;
-    case 'security_guard':
-    case 'police': {
-      const u = UNIFORMS[id === 'police' ? 'zrp_officer' : 'security_guard'] || {};
-      set(1, u.shirt || '#6f7c8f');
-      set(2, u.trousers || '#1e2d55');
-      set(3, u.boots || '#111111');
-      f(FLAG.CAP);
-      set(5, u.cap || '#1e2d55');
-      if (!male) f(FLAG.SKIRT);
-      break;
-    }
-    case 'street_preacher': {
-      f(FLAG.SUIT);
-      const suit = rng.pick(SUIT);
-      set(1, suit);
-      set(2, suit);
-      set(7, '#ffffff');
-      set(5, rng.pick(TIE));
-      break;
-    }
-    case 'apostolic': {
-      const robe = UNIFORMS.apostolic?.robe || '#f8f8f4';
-      f(FLAG.LONG);
-      set(1, robe);
-      set(2, robe);
-      set(3, '#6b4a2e');
-      if (male) f(FLAG.BALD);
-      else {
-        f(FLAG.WRAP);
-        set(5, UNIFORMS.apostolic?.headscarf || robe);
-      }
-      break;
-    }
-    default:
-      set(1, rng.pick(SHIRT));
-      set(2, rng.pick(TROUSERS));
+  if (id === 'market_woman' && opts.load !== false && rng() < (archetype.carryOnHeadChance ?? 0.5)) {
+    L.load = true;
+    L.basinColor = packColor(rng.pick(BASINS));
+    L.loadColor = packColor(rng.pick(LOADS));
   }
-  if (male && id !== 'school_kid' && rng() < 0.12) f(FLAG.BALD);
-  const names = FIRST_NAMES.filter((n) => n.g === 'u' || n.g === (male ? 'm' : 'f'));
+  if (variant) {
+    // Stride-matched pace: ground speed = clip speed x stride x scale x rate, with the rate kept natural.
+    const clip = HUMANS.clips[walkClipFor(variant, L.load)];
+    const natural = (clip?.speed || 1.05) * variant.stride * scale;
+    const [lo, hi] = PACE[id] || archetype.walkSpeed || [1.1, 1.5];
+    L.speed = Math.min(natural * RATE[1], Math.max(natural * RATE[0], rng.range(lo, hi)));
+    L.walkMax = natural * 1.6;
+    if (variant.has('flee_run')) L.runSpeed = HUMANS.clips.flee_run.speed * variant.stride * scale * rng.range(0.72, 0.85);
+  }
+  const names = FIRST_NAMES.filter((n) => n.g === 'u' || n.g === (gender === 'male' ? 'm' : 'f'));
   L.name = rng.pick(names).name;
   return L;
 }
 
-// Vendors: mostly women at produce tables, young men with airtime, older men mending shoes.
+// Vendors: mostly women at produce tables (apron or wax-print wrap and dhuku), young men with airtime,
+// older men mending shoes.
 export function vendorLook(rng, type) {
-  const woman = /woman|women/i.test(type.vendor || '') ? rng() < 0.85 : /man/i.test(type.vendor || '') ? rng() < 0.2 : rng() < 0.5;
-  const arch = woman ? ARCHETYPES.find((a) => a.id === 'market_woman') || { id: 'market_woman' } : { id: /older/i.test(type.vendor || '') ? 'elder' : 'youth' };
-  const look = makeLook(rng, arch, { gender: woman ? 'female' : 'male' });
-  look.flags &= ~FLAG.LOAD;
+  const v = type.vendor || '';
+  const woman = /woman|women/i.test(v) ? rng() < 0.85 : /man/i.test(v) ? rng() < 0.2 : rng() < 0.5;
+  let look;
+  if (woman) look = makeLook(rng, archetypeById('market_woman'), { gender: 'female', variant: rng() < 0.55 ? 'woman_vendor_apron' : 'woman_zambia_wrap', load: false });
+  else if (/older/i.test(v) || type.type === 'shoe_mender') look = makeLook(rng, archetypeById(rng() < 0.6 ? 'elder' : 'handcart_pusher'), { gender: 'male' });
+  else look = makeLook(rng, archetypeById(rng() < 0.6 ? 'youth' : 'casual_man'), { gender: 'male' });
   look.archetype = 'vendor';
   return look;
 }

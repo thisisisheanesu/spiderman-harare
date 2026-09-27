@@ -806,6 +806,7 @@ export function buildProps(ctx) {
           lastFrame = game.frame;
           tick(camera.position, 1 / 60);
         };
+        result.signs = shopSigns;
         result.stats.signs = shopSigns.stats;
         result.stats.signTextureBytes = shopSigns.textureBytes;
       }

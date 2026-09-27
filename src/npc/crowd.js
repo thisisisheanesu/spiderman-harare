@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CROSS, WALK } from './walkways.js';
-import { FLAG } from './bodies.js';
+import { walkClipFor } from './appearance.js';
 
 // Crowd simulation: agents walk the pedestrian network (edge + arc length + lateral offset inside the
 // edge's validated band), wait at kerbs for a gap or a red light, dodge each other and the stalls,
@@ -27,37 +27,18 @@ function approach(v, target, maxStep) {
   return v < target ? Math.min(target, v + maxStep) : Math.max(target, v - maxStep);
 }
 
-// Arm poses: [shoulder pitch, shoulder roll, elbow] (see bodies.js for the conventions).
-const ARMS = {
-  text: [0.5, 0.1, 1.55],
-  textL: [0.42, -0.12, 1.45],
-  call: [0.3, 0.42, 2.55],
-  photo: [1.3, -0.26, 0.6],
-  cheer: [2.85, 0.32, 0.25],
-  point: [1.55, 0.05, 0.05],
-  wave: [2.55, 0.55, 0.6],
-  steady: [2.8, 0.2, 1.35],
-  cover: [2.25, -0.15, 2.1],
-  talk: [0.55, 0.15, 1.25],
-  fold: [0.38, -0.32, 1.95],
-  rest: [0.85, 0.1, 0.75],
-  prop: [-0.62, 0.3, 0.12], // sitting on the grass, leaning back on the hands
-  hwindi: [2.4, 0.7, 0.5],
-  bag: [0.05, 0.14, 0.12],
-};
-
 // Stable playback rate for a person's voice, 0.94..1.06, from their (seeded) look.
 function voiceRateOf(look) {
   const k = Math.sin((look.build + 1.3) * 7919.13 + look.scale * 1047.29 + look.speed * 357.11) * 43758.5453;
   return 0.94 + 0.12 * (k - Math.floor(k));
 }
 
-function setArm(arm, pose, w = 1) {
-  arm[0] = pose[0];
-  arm[1] = pose[1];
-  arm[2] = pose[2];
-  arm[3] = w;
-}
+// Clip swaps fade over this long (s); sitting down or getting up takes a little longer.
+const FADE = 0.25;
+const FADE_SIT = 0.45;
+// A clip a variant was not baked with falls back to the next one along.
+const FALLBACK = { flee_run: 'walk', call_out: 'wave', carry_on_head: 'walk', walk_slow: 'walk', sit_talk: 'sit_idle', phone_call: 'idle_relaxed', idle_look: 'idle_relaxed', idle_arms_folded: 'idle_relaxed' };
+const SEATED = new Set(['sit_idle', 'sit_talk', 'sit_ground']);
 
 export class Agent {
   constructor() {
@@ -69,8 +50,10 @@ export class Agent {
     this.name = '';
     this.role = '';
     this.look = null;
-    this.phase = 0;
-    this.pose = { gait: 0, headYaw: 0, headPitch: 0, lean: 0, sit: 0, flags: 0, armR: new Float32Array(4), armL: new Float32Array(4) };
+    this.pose = { headYaw: 0, headPitch: 0, sit: 0 };
+    // Animation state (bodies.js draws it): current clip and time, the clip it fades from, one-shots.
+    this.anim = { clip: null, t: 0, rate: 1, prev: null, pt: 0, prate: 1, blend: 0, fade: FADE, once: null, onceUntil: 0, moving: false, nodAt: 0 };
+    this.phone = false;
     this.vx = 0;
     this.vz = 0;
   }
@@ -97,7 +80,11 @@ export class Agent {
     this.pathPref = Math.random() * 2 - 1;
     this.speed = 0;
     this.prefSpeed = look.speed;
-    this.phase = Math.random() * TAU;
+    this.walkClip = look.variant ? walkClipFor(look.variant, look.load) : 'walk';
+    this.talkClip = Math.random() < 0.5 ? 'talk' : 'talk_2';
+    this.tempo = 0.92 + Math.random() * 0.16; // personal pace of standing clips
+    this.follow = null; // walking with a group (pupils): the one they keep up with
+    this.followId = -1;
     this.waitT = 0;
     this.checkT = 0;
     this.blocked = 0;
@@ -131,14 +118,22 @@ export class Agent {
     this.vx = 0;
     this.vz = 0;
     const p = this.pose;
-    p.gait = 0;
     p.headYaw = 0;
     p.headPitch = 0;
-    p.lean = 0;
     p.sit = 0;
-    p.flags = 0;
-    p.armR.fill(0);
-    p.armL.fill(0);
+    const an = this.anim;
+    an.clip = null;
+    an.prev = null;
+    an.blend = 0;
+    an.once = null;
+    an.moving = kind === 'walker';
+    an.nodAt = 0;
+    this.phone = false;
+  }
+
+  // Height of the mouth above the ground (seated people are lower), for voices and bubbles.
+  get mouthY() {
+    return this.position.y + this.look.height * 0.93 - (this.pose.sit ? 0.42 * this.look.scale * (this.look.variant?.stride ?? 0.9) + (this.pose.sit > 1 ? 0.1 : 0) : 0);
   }
 }
 
@@ -150,8 +145,7 @@ export class Crowd {
     this.obstaclesOn = true; // stalls are packed away at night
     this.head = new Int32Array(HASH_SIZE);
     this.next = new Int32Array(1);
-    this._armR = new Float32Array(4);
-    this._armL = new Float32Array(4);
+    this.humans = null; // set by npcs.js (clips for the animation state)
     this._near = [];
     // People out on a carriageway (crossing or fleeing across it), refreshed every frame for traffic.
     this.crossers = [];

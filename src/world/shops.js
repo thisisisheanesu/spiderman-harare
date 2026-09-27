@@ -804,6 +804,14 @@ export class ShopSigns {
     if (this._qi < this._queue.length) this._drain(this.cfg.budget);
   }
 
+  // Fills the cache for (x, z) at once (tests, or right after a teleport while the screen is dark).
+  fill(x, z) {
+    this._select(x, z);
+    this._drain(Infinity);
+    this._lastX = x;
+    this._lastZ = z;
+  }
+
   cachedCount() {
     let n = 0;
     for (let s = 0; s < this.slotCount; s++) if (this.slotFace[s] >= 0) n++;
