@@ -102,10 +102,10 @@ Other systems may be placeholders while you work — **always guard cross-system
 
 ### Public APIs other modules rely on
 
-**world** (`CollisionWorld`): `raycast(origin, dir, maxDist) → {point, normal, distance, buildingId}|null`,
+**world** (`CollisionWorld`): `raycast(origin, dir, maxDist, out?) → {point, normal, distance, buildingId}|null` (fills `out` when given),
 `collideCapsule(start, end, radius)`, `sweep(from, to, radius)`, `buildingAt(x,z)`, `roofHeightAt(x,z)`,
 `buildingsNear(x,z,r)`, `nearestRoad(x,z,maxDist)`, `streetNameAt(x,z)`, `addCollider(geometry, id)`,
-`addBuilding(record)` (index an extra volume such as a synthetic tower for the lookups), `bounds`, `data`.
+`addBuilding(record)` (index an extra volume such as a synthetic tower for the lookups; it wins over the footprint it stands on), `bounds`, `data`.
 `collideCapsule` classifies contacts by push direction (ground if the push points up, ceiling if down, otherwise a wall
 whose `wallNormal` is the horizontal push) and returns an object from a ring of 4 reused results.
 

@@ -7,7 +7,7 @@ import { pointInPoly, closestOnSegment, polyCentroid } from '../core/geo.js';
 // city renderer (landmark crowns, the Kopje hill, ...). All physics and web-anchor queries go here.
 //
 // Public API (game.world):
-//   raycast(origin, dir, maxDist)            -> {point, normal, distance, buildingId} | null
+//   raycast(origin, dir, maxDist, out?)      -> {point, normal, distance, buildingId} | null (fills `out` if given)
 //   collideCapsule(start, end, radius)       -> {hit, delta, normal, ground, groundNormal, wall, wallNormal}
 //                                               (start/end are the capsule segment endpoints; they are
 //                                               moved in place out of the geometry; the result object is
@@ -70,7 +70,7 @@ export class CollisionWorld {
     for (const b of this.buildings) this._indexBuilding(b);
   }
 
-  _indexBuilding(b) {
+  _indexBuilding(b, priority = false) {
     const fp = b.fp;
     let minX = Infinity;
     let maxX = -Infinity;
@@ -88,15 +88,17 @@ export class CollisionWorld {
       for (let gz = Math.floor(minZ / GRID); gz <= Math.floor(maxZ / GRID); gz++) {
         const k = gx * 100003 + gz;
         if (!this.bGrid.has(k)) this.bGrid.set(k, []);
-        this.bGrid.get(k).push(b);
+        if (priority) this.bGrid.get(k).unshift(b);
+        else this.bGrid.get(k).push(b);
       }
     }
   }
 
   // Index an extra building volume (e.g. a synthetic landmark tower) for buildingAt / roofHeightAt /
   // buildingsNear. Physics still comes from addCollider. record: {id, fp:[x,z,...], h, name?, lm?}.
+  // Extra volumes win over mapped footprints they stand on (e.g. a hotel tower rising from its podium).
   addBuilding(record) {
-    this._indexBuilding(record);
+    this._indexBuilding(record, true);
     this.extraBuildings.push(record);
     return record;
   }
@@ -214,20 +216,20 @@ export class CollisionWorld {
     return this.vertexBuilding[vi];
   }
 
-  raycast(origin, dir, maxDist = 500) {
+  // Pass `out` ({point: Vector3, normal: Vector3}) to receive the hit without allocating.
+  raycast(origin, dir, maxDist = 500, out = null) {
     this._ensure();
     _ray.origin.copy(origin);
     _ray.direction.copy(dir);
     const hit = this.bvh.raycastFirst(_ray, THREE.DoubleSide, 0, maxDist);
     if (!hit) return null;
-    const normal = hit.face.normal.clone();
-    if (normal.dot(dir) > 0) normal.negate();
-    return {
-      point: hit.point.clone(),
-      normal,
-      distance: hit.distance,
-      buildingId: this.buildingIdOfFace(hit.faceIndex),
-    };
+    const res = out || { point: new THREE.Vector3(), normal: new THREE.Vector3() };
+    res.point.copy(hit.point);
+    res.normal.copy(hit.face.normal);
+    if (res.normal.dot(dir) > 0) res.normal.negate();
+    res.distance = hit.distance;
+    res.buildingId = this.buildingIdOfFace(hit.faceIndex);
+    return res;
   }
 
   // Push a capsule (segment start/end + radius) out of the static geometry. start/end are modified.

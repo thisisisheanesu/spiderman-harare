@@ -246,21 +246,10 @@ export class Landmarks {
   }
 }
 
-// Index an extra volume with world.addBuilding. buildingAt() returns the first footprint that
-// contains the point, and a synthetic volume can stand on a mapped one (the hotel tower rises
-// out of the HICC podium's footprint), so the new record is moved to the front of its grid cells
-// to win there. (Relies on CollisionWorld.bGrid; without it the record is still indexed.)
+// Index an extra volume for buildingAt / roofHeightAt; core gives such records priority over the
+// mapped footprint they stand on (the hotel tower rises out of the HICC podium's footprint).
 function registerVolume(world, rec) {
-  if (!world?.addBuilding) return;
-  world.addBuilding(rec);
-  if (!(world.bGrid instanceof Map)) return;
-  for (const arr of world.bGrid.values()) {
-    const i = arr.indexOf(rec);
-    if (i > 0) {
-      arr.splice(i, 1);
-      arr.unshift(rec);
-    }
-  }
+  world?.addBuilding?.(rec);
 }
 
 // The longest wall facing a street (a street whose name matches `prefer` wins).

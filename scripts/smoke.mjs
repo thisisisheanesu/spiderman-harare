@@ -104,7 +104,7 @@ for (const s of steps) {
   }
   if (s.shot) {
     const file = path.join(out, `${s.shot}.png`);
-    await page.screenshot({ path: file });
+    await page.screenshot({ path: file, timeout: 180000 });
     trace.push({ shot: file, t: await telemetry() });
   }
 }
