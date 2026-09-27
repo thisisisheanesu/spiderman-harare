@@ -151,16 +151,16 @@ export class Animator {
         poseDive(tgt, c);
         return 6;
       case 'swing':
-        c.webSide = ctrl.webSide;
+        c.webSide = ctrl.swing.side;
         c.rising = v.y / Math.max(6, c.speed);
         poseSwing(tgt, c);
         return 9;
       case 'zip':
-        c.zipT = ctrl.zipProgress;
+        c.zipT = ctrl.zip.progress;
         poseZip(tgt, c);
         return 14;
       case 'wall': {
-        const n = ctrl.wallN;
+        const n = ctrl.wall.normal;
         c.wallMove = smooth(0.3, 2.5, c.speed);
         c.wallPhase = (c.wallPhase + dt * TAU * (0.5 + 0.2 * c.speed)) % TAU;
         c.wallLook = clamp((v.x * -n.z + v.z * n.x) / 8, -1, 1);
@@ -184,7 +184,7 @@ export class Animator {
     obj.position.y += PIVOT_Y;
     switch (player.state) {
       case 'swing':
-        up.subVectors(ctrl.anchor, obj.position).normalize();
+        up.subVectors(ctrl.swing.anchor, obj.position).normalize();
         fwd.copy(v).addScaledVector(up, -v.dot(up));
         if (fwd.lengthSq() < 0.25) fwd.set(-Math.sin(player.heading), 0, -Math.cos(player.heading));
         fwd.normalize();
@@ -205,9 +205,15 @@ export class Animator {
       case 'air':
         rate = 6;
         break;
-      case 'wall':
-        if (v.y > 7) obj.position.addScaledVector(ctrl.wallN, 0.12);
+      case 'wall': {
+        // Lean into the wall, more so when sprinting up it.
+        const n = ctrl.wall.normal;
+        const run = v.y > 7;
+        up.addScaledVector(n, run ? -0.3 : -0.12).normalize();
+        fwd.copy(n).negate();
+        if (run) obj.position.addScaledVector(n, 0.12);
         break;
+      }
       case 'perch':
         rate = 9;
         break;

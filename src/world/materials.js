@@ -9,7 +9,7 @@ export function createCityUniforms() {
     uSkyZenith: { value: new THREE.Color(0.25, 0.45, 0.8) },
     uSkyHorizon: { value: new THREE.Color(0.7, 0.72, 0.72) },
     uSkyGround: { value: new THREE.Color(0.12, 0.11, 0.1) },
-    uReflect: { value: 0.8 },
+    uReflect: { value: 0.55 },
     uShutterFrac: { value: 0.2 },
   };
 }
@@ -26,8 +26,8 @@ float cityHash(vec2 p) {
 // Per-vertex `facade` = [layer, seed, kind + 8 * class, glass preset]:
 //   kind 0 = facade (glass panes reflect the sky, random windows light up at night)
 //   kind 1 = sign (its texture glows at night)       kind 2 = plain surface (no glass)
-//   kind 3 = lamp (emissive at night, some are dead) kind 4 = always-lit panel
-//   class 0 office, 1 residential/hotel, 2 shop, 3 other.
+//   kind 3 = working lamp (emissive at night)        kind 4 = backlit panel (billboards)
+//   class 0 office, 1 residential/hotel, 2 shop, 3 other, 4 never lit (water, solar panels).
 export function createFacadeMaterial(map, uniforms, layers) {
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, metalness: 0 });
   const glass = GLASS_PRESETS.map((c) => new THREE.Vector3(...c));
@@ -115,7 +115,7 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
 {
   float isRes = step(0.5, fCls) * (1.0 - step(1.5, fCls));
   float isShop = step(1.5, fCls) * (1.0 - step(2.5, fCls));
-  float litFrac = mix(mix(0.2, 0.5, isRes), 0.62, isShop);
+  float litFrac = mix(mix(0.2, 0.5, isRes), 0.62, isShop) * (1.0 - step(3.5, fCls));
   float lit = step(fR2, litFrac) * step(0.02, fR1);
   vec3 warm = vec3(1.0, 0.7, 0.4);
   vec3 cool = vec3(0.82, 0.9, 1.0);
@@ -127,8 +127,7 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
   float signLit = step(0.25, cityHash(vec2(vFac.y, 3.0)));
   totalEmissiveRadiance += fTex.rgb * isSign * signLit * uNight * 0.9;
   float isLamp = step(2.5, fKind) * (1.0 - step(3.5, fKind));
-  float lampOn = step(0.4, cityHash(vec2(vFac.y, 9.0)));
-  totalEmissiveRadiance += vec3(1.0, 0.78, 0.5) * isLamp * lampOn * uNight * 6.0;
+  totalEmissiveRadiance += vec3(1.0, 0.78, 0.5) * isLamp * uNight * 6.0;
   float isPanel = step(3.5, fKind) * (1.0 - step(4.5, fKind));
   totalEmissiveRadiance += fTex.rgb * diffuseColor.rgb * isPanel * uNight * 1.4;
 }`,
@@ -141,7 +140,7 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
   float ry = dot(R, upV);
   vec3 refl = ry > 0.0 ? mix(uSkyHorizon, uSkyZenith, sqrt(ry)) : mix(uSkyHorizon, uSkyGround, sqrt(-ry * 3.0));
   float fres = 0.05 + 0.95 * pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), 5.0);
-  outgoingLight += refl * fClear * mix(0.28, 1.0, fres) * uReflect;
+  outgoingLight += refl * fClear * mix(0.2, 1.0, fres) * uReflect;
 }
 #include <opaque_fragment>`,
       );

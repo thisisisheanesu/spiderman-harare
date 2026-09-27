@@ -152,7 +152,7 @@ export class Painter {
   }
 
   // Glass pane: painted colour + mask gradient (255 at the top .. 128 at the bottom).
-  glass(x0, y0, x1, y1, top = '#46535c', bottom = '#2a343b') {
+  glass(x0, y0, x1, y1, top = '#5d6b76', bottom = '#35414a') {
     this.vgrad(x0, y0, x1, y1, top, bottom);
     const S = this.S;
     const g = this.m.createLinearGradient(0, y0 * S, 0, y1 * S);
@@ -192,14 +192,28 @@ export class Painter {
     this.c.restore();
   }
 
-  // Fine speckle (aggregate, render texture).
+  // Fine speckle (aggregate, render texture). Written straight into the pixels: thousands of
+  // fillRect calls are very slow on software canvases.
   speckle(count, colors, size = 1.5) {
     const S = this.S;
+    const img = this.c.getImageData(0, 0, S, S);
+    const d = img.data;
+    const cols = colors.map((c) => c.match(/[\d.]+/g).map(Number));
     for (let i = 0; i < count; i++) {
-      this.c.fillStyle = colors[Math.floor(this.rng() * colors.length)];
-      const s = size * (0.5 + this.rng());
-      this.c.fillRect(this.rng() * S, this.rng() * S, s, s);
+      const [r, g, b, a] = cols[Math.floor(this.rng() * cols.length)];
+      const s = Math.max(1, Math.round(size * (0.5 + this.rng())));
+      const x0 = Math.floor(this.rng() * S);
+      const y0 = Math.floor(this.rng() * S);
+      for (let dy = 0; dy < s; dy++) {
+        for (let dx = 0; dx < s; dx++) {
+          const o = (((y0 + dy) % S) * S + ((x0 + dx) % S)) * 4;
+          d[o] += (r - d[o]) * a;
+          d[o + 1] += (g - d[o + 1]) * a;
+          d[o + 2] += (b - d[o + 2]) * a;
+        }
+      }
     }
+    this.c.putImageData(img, 0, 0);
   }
 
   // Soft vertical streaks (rain/dirt runs) below y0.

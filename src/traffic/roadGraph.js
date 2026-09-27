@@ -14,8 +14,13 @@ export const ROAD_CLASSES = {
   residential: { rank: 1, weight: 0.3, speed: 40 },
 };
 
-// Two connectors whose paths pass closer than this (metres) cannot be used at the same time.
-const CLEARANCE = 2.1;
+// Two connectors whose paths pass closer than this (metres) cannot be used at the same time: a car's
+// width plus the sweep of its corners through a turn.
+const CLEARANCE = 2.6;
+// Roads shorter than MERGE_MAX whose lanes would shrink below MERGE_SLACK after trimming are folded
+// into the junction at either end.
+const MERGE_MAX = 16;
+const MERGE_SLACK = 4;
 const SLOT_SPACING = 18;
 export const GRID = 50;
 
@@ -38,8 +43,11 @@ export class Lane extends Path {
     // Metres of this lane already promised to vehicles committed into it from a junction.
     this.reserved = 0;
     this.stops = [];
+    // Vehicles that just changed out of this lane and still overlap it sideways.
+    this.ghosts = [];
     this.sink = false;
     this.internal = false;
+    this.signal = null;
     this.signalGroup = -1;
     this.priority = 0;
   }
@@ -70,7 +78,8 @@ export class Junction {
     this.occupants = [];
     this.maxRank = 0;
     this.degree = 0;
-    this.signal = null;
+    this.nodes = [];
+    this.ends = [];
   }
 
   conflicts(a, b) {
@@ -108,6 +117,19 @@ function roadDirAt(road, atA) {
   return { x: (tx - ox) / l, z: (tz - oz) / l };
 }
 
+// Trim for one road end so its lanes stop clear of every other road meeting it.
+function endTrim(e, ends) {
+  let t = ends.length === 1 ? Math.max(3, e.road.w * 0.5) : 1.2;
+  for (const o of ends) {
+    if (o === e) continue;
+    const cos = e.dir.x * o.dir.x + e.dir.z * o.dir.z;
+    if (cos < -0.94) continue;
+    const sin = Math.max(0.35, Math.abs(e.dir.x * o.dir.z - e.dir.z * o.dir.x));
+    t = Math.max(t, 1.2 + (o.road.w / 2 + (e.road.w / 2) * Math.max(0, cos)) / sin);
+  }
+  return t;
+}
+
 function turnKind(angle) {
   const a = Math.abs(angle);
   if (a > 2.6) return 'uturn';
@@ -122,7 +144,9 @@ export class RoadGraph {
     this.nodes = data.nodes;
     this.lanes = [];
     this.connectors = [];
+    // Node index -> Junction (several nodes share one when they were merged); junctionList has each once.
     this.junctions = new Array(data.nodes.length).fill(null);
+    this.junctionList = [];
     this.slots = [];
     this.slotGrid = new Map();
     this._build();
@@ -130,39 +154,66 @@ export class RoadGraph {
 
   _build() {
     const { roads, nodes } = this.data;
-    const incident = new Map();
-    roads.forEach((r, ri) => {
-      if (!ROAD_CLASSES[r.cls] || r.len < 1) return;
-      for (const [node, atA] of [[r.a, true], [r.b, false]]) {
-        if (!incident.has(node)) incident.set(node, []);
-        incident.get(node).push({ road: r, ri, atA, dir: roadDirAt(r, atA) });
+    const drivable = (r) => ROAD_CLASSES[r.cls] && r.len >= 1;
+    const endsAt = (keyOf) => {
+      const incident = new Map();
+      roads.forEach((r, ri) => {
+        if (!drivable(r)) return;
+        const ka = keyOf(r.a);
+        const kb = keyOf(r.b);
+        if (ka === kb) return;
+        for (const [node, atA, key] of [[r.a, true, ka], [r.b, false, kb]]) {
+          if (!incident.has(key)) incident.set(key, []);
+          incident.get(key).push({ road: r, ri, atA, node, dir: roadDirAt(r, atA) });
+        }
+      });
+      return incident;
+    };
+
+    // Crossings mapped as several nodes a few metres apart become one junction box, so no vehicle ever
+    // waits on a sliver of road that lies inside another junction.
+    const parent = Int32Array.from(nodes, (_, i) => i);
+    const find = (n) => {
+      while (parent[n] !== n) {
+        parent[n] = parent[parent[n]];
+        n = parent[n];
       }
+      return n;
+    };
+    const raw = new Map();
+    for (const ends of endsAt((n) => n).values()) for (const e of ends) raw.set(`${e.ri}:${e.atA ? 'a' : 'b'}`, endTrim(e, ends));
+    roads.forEach((r, ri) => {
+      if (!drivable(r) || r.len > MERGE_MAX) return;
+      if (r.len - raw.get(`${ri}:a`) - raw.get(`${ri}:b`) < MERGE_SLACK) parent[find(r.a)] = find(r.b);
     });
+    const incident = endsAt(find);
 
     // How far each road end is pulled back from its node so turning paths fit inside the junction box.
     const trim = new Map();
-    for (const [node, ends] of incident) {
-      const j = new Junction(node, nodes[node][0], nodes[node][1]);
+    const byKey = new Map();
+    for (const [key, ends] of incident) {
+      const members = [...new Set(ends.map((e) => e.node))];
+      let x = 0;
+      let z = 0;
+      for (const n of members) {
+        x += nodes[n][0] / members.length;
+        z += nodes[n][1] / members.length;
+      }
+      const j = new Junction(key, x, z);
+      j.nodes = members;
+      j.ends = ends;
       j.degree = ends.length;
       for (const e of ends) j.maxRank = Math.max(j.maxRank, ROAD_CLASSES[e.road.cls].rank);
-      this.junctions[node] = j;
-      for (const e of ends) {
-        let t = ends.length === 1 ? Math.max(3, e.road.w * 0.5) : 1.2;
-        for (const o of ends) {
-          if (o === e) continue;
-          const cos = e.dir.x * o.dir.x + e.dir.z * o.dir.z;
-          if (cos < -0.94) continue;
-          const sin = Math.max(0.35, Math.abs(e.dir.x * o.dir.z - e.dir.z * o.dir.x));
-          t = Math.max(t, 1.2 + (o.road.w / 2 + (e.road.w / 2) * Math.max(0, cos)) / sin);
-        }
-        trim.set(`${e.ri}:${e.atA ? 'a' : 'b'}`, Math.min(t, 24, e.road.len * 0.42));
-      }
+      for (const n of members) this.junctions[n] = j;
+      this.junctionList.push(j);
+      byKey.set(key, j);
+      for (const e of ends) trim.set(`${e.ri}:${e.atA ? 'a' : 'b'}`, Math.min(endTrim(e, ends), 24, e.road.len * 0.42));
     }
 
     // Lanes.
     const groups = new Map(); // `${ri}:${dir}` -> [lanes by index]
     roads.forEach((r, ri) => {
-      if (!ROAD_CLASSES[r.cls] || r.len < 1) return;
+      if (!drivable(r) || find(r.a) === find(r.b)) return;
       const perDir = Math.max(1, r.lanes || 1);
       for (const dir of [1, -1]) {
         if (!allowsDirection(r, dir)) continue;
@@ -187,8 +238,8 @@ export class RoadGraph {
     });
 
     // Connectors, junction by junction.
-    for (const [node, ends] of incident) {
-      const j = this.junctions[node];
+    for (const [key, ends] of incident) {
+      const j = byKey.get(key);
       const ins = [];
       const outs = [];
       for (const e of ends) {
@@ -201,19 +252,21 @@ export class RoadGraph {
       for (const inG of ins) {
         const inRank = inG[0].rank;
         for (const l of inG) l.priority = inRank >= j.maxRank ? 1 : 0;
+        // U-turns (back along the same road, or a hairpin onto the other carriageway) only where
+        // there is no other way out.
         const options = [];
+        const hairpins = [];
         for (const outG of outs) {
-          const uturn = outG[0].roadIndex === inG[0].roadIndex;
-          if (uturn && ends.length > 1) continue;
           const a = inG[0];
           const b = outG[0];
           const ax = a.pts[a.pts.length - 2] - a.pts[a.pts.length - 4];
           const az = a.pts[a.pts.length - 1] - a.pts[a.pts.length - 3];
           const bx = b.pts[2] - b.pts[0];
           const bz = b.pts[3] - b.pts[1];
-          const angle = Math.atan2(ax * bz - az * bx, ax * bx + az * bz);
-          options.push({ outG, turn: uturn ? 'uturn' : turnKind(angle) });
+          const turn = b.roadIndex === a.roadIndex ? 'uturn' : turnKind(Math.atan2(ax * bz - az * bx, ax * bx + az * bz));
+          (turn === 'uturn' ? hairpins : options).push({ outG, turn });
         }
+        if (!options.length) options.push(...hairpins);
         const only = options.length === 1;
         const linked = new Set();
         for (const { outG, turn } of options) {

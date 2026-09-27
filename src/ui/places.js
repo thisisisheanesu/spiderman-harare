@@ -132,10 +132,11 @@ export class Places {
   }
 
   _addKnownBuildings(data) {
+    const named = data.buildings.filter((b) => b.name);
     for (const [name, re] of KNOWN_BUILDINGS) {
       let best = null;
-      for (const b of data.buildings) {
-        if (b.name && re.test(b.name) && (!best || b.h > best.h)) best = b;
+      for (const b of named) {
+        if (re.test(b.name) && (!best || b.h > best.h)) best = b;
       }
       if (!best) continue;
       const c = best.cx !== undefined ? { x: best.cx, z: best.cz } : polyCentroid(best.fp);

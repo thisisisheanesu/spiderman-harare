@@ -507,7 +507,6 @@ export const HWINDI_CALLS = [
   { text: 'Tiri kuenda! Tiri kuenda!', lang: 'sn', en: "We're leaving! We're leaving!", kind: 'depart', conf: 'high' },
   { text: 'Yadya basa! Driver, famba!', lang: 'sn', en: "It's full! Driver, go!", kind: 'depart', conf: 'medium', note: '"yadya basa" = kombi full (kombi cant)' },
   { text: 'Dhora rimwe chete!', lang: 'sn', en: 'Just one dollar!', kind: 'fare', conf: 'high' },
-  { text: 'Mari yenyu, vabereki!', lang: 'sn', en: 'Your fare, folks!', kind: 'fare', conf: 'medium' },
   { text: 'Chenji iripo!', lang: 'sn', en: 'There is change!', kind: 'fare', conf: 'high' },
   { text: 'Shura! Shura!', lang: 'sn', en: 'Loads of passengers!', kind: 'cant', conf: 'medium' },
   { text: 'PaKadoma pane nzvimbo!', lang: 'sn', en: "There's space in the middle!", kind: 'cant', conf: 'medium' },
@@ -645,7 +644,6 @@ export const VENDOR_TYPES = [
     props: ['folding table', 'cardboard display board with hanging cables', 'small glass case', 'waist bag'],
     callouts: [
       { sn: 'Airtime! Airtime!', en: 'Airtime!', conf: 'high' },
-      { sn: 'Machaja, macable!', en: 'Chargers, cables!', conf: 'medium' },
     ],
   },
   {
@@ -788,7 +786,7 @@ export const NPC_SAYINGS = [
   { sn: 'Ndiripowo.', en: "I'm fine too.", conf: 'high' },
   { sn: 'Ndeipi?', en: "What's up?", conf: 'high' },
   { sn: 'Hapana, sha.', en: 'Nothing much, bro.', conf: 'high' },
-  { sn: 'Zvirisei?', en: 'How are things?', conf: 'high' },
+  { sn: 'Zviri sei?', en: 'How are things?', conf: 'high' },
   { sn: 'Zvakanaka.', en: "It's all good.", conf: 'high' },
   { sn: 'Ndatenda!', en: 'Thank you!', conf: 'high' },
   { sn: 'Maita basa!', en: 'Thank you (for your help)!', conf: 'high' },

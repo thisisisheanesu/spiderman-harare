@@ -52,7 +52,7 @@ export class Social {
     const list = this.pop.list.filter((a) => {
       const d = Math.hypot(a.position.x - px, a.position.z - pz);
       a._d = d;
-      return d < R && Math.abs(a.position.y - e.pos.y) < 8 && a.state !== 'flee';
+      return d < R && Math.abs(a.position.y - e.pos.y) < 8 && a.state !== 'flee' && a.state !== 'cross';
     });
     list.sort((p, q) => p._d - q._d);
     let bubbles = 0;
@@ -113,7 +113,7 @@ export class Social {
           const dx = a.position.x - ctx.px;
           const dz = a.position.z - ctx.pz;
           const d2 = dx * dx + dz * dz;
-          if (d2 > 22 * 22 || a.state === 'react' || a.state === 'flee' || t < (a.reactCool || 0)) continue;
+          if (d2 > 22 * 22 || a.state === 'react' || a.state === 'flee' || a.state === 'cross' || t < (a.reactCool || 0)) continue;
           if (Math.random() > 0.18 * (1 - Math.sqrt(d2) / 26)) continue;
           a.reactCool = t + 10;
           this.crowd.startReaction(a, this._excitedType(a), 2.2 + Math.random() * 2.5, Math.random() * 0.3);
@@ -132,7 +132,7 @@ export class Social {
     if (ctx.playerOnFoot && t > this.greetAt) {
       const near = this.crowd.near(ctx.px, ctx.pz, 3.4, this.near);
       for (const a of near) {
-        if (t < a.nextGreet || a.state === 'react' || a.state === 'flee') continue;
+        if (t < a.nextGreet || a.state === 'react' || a.state === 'flee' || a.state === 'cross') continue;
         const fx = -Math.sin(a.heading);
         const fz = -Math.cos(a.heading);
         if (fx * (ctx.px - a.position.x) + fz * (ctx.pz - a.position.z) < 0.2) continue;

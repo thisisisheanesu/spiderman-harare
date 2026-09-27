@@ -41,14 +41,11 @@ export class PauseMenu {
     this.title.textContent = TABS.find(([t]) => t === id)[1];
     if (!this.pages[id]) {
       if (id === 'settings') this.pages[id] = new SettingsPage(this.hud);
-      else if (id === 'controls') this.pages[id] = { root: controlsColumns(this.hud.inputMode) };
-      else this.pages[id] = { root: creditsPage(this.hud.game) };
+      else if (id === 'credits') this.pages[id] = { root: creditsPage(this.hud.game) };
     }
-    const page = this.pages[id];
+    // The controls page is rebuilt so the device in use comes first.
+    const page = id === 'controls' ? { root: controlsColumns(this.hud.inputMode) } : this.pages[id];
     page.refresh?.();
-    if (id === 'controls') {
-      for (const col of page.root.children) col.classList.toggle('is-active', col.dataset.mode === this.hud.inputMode);
-    }
     this.body.replaceChildren(page.root);
     this.body.scrollTop = 0;
   }

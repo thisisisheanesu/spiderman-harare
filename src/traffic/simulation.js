@@ -13,6 +13,7 @@ export const GAP_STOP = 3;
 export const GAP_OBSTACLE = 4;
 
 const LOOKAHEAD = 90;
+const DIVERGE = 8;
 const REQUEST_TIME = 2.8;
 
 function removeFrom(list, v) {
@@ -74,6 +75,7 @@ export class Simulation {
     this._unreserve(v, v.resLane2);
     this._unreserve(v, v.resLane);
     v.reqJ = v.grantJ = v.boxJ = null;
+    v.path = null;
     removeFrom(this.vehicles, v);
   }
 
@@ -252,8 +254,54 @@ export class Simulation {
     g.leader = leader;
   }
 
-  // Nearest constraint ahead: the vehicle in front (possibly across the junction), or the stop line.
+  // Nearest constraint ahead, including vehicles still sliding out of this lane after a lane change
+  // and vehicles that left the same lane on a diverging connector.
   _leader(v) {
+    this._leaderAhead(v);
+    this._diverging(v);
+    const lane = v.path;
+    if (!lane.isLane || !lane.ghosts.length) return;
+    const gh = lane.ghosts;
+    for (let i = gh.length - 1; i >= 0; i--) {
+      const g = gh[i];
+      if (!g.path || !g.path.isLane || g.path.siblings !== lane.siblings || Math.abs(g.lateral) < 1) {
+        gh.splice(i, 1);
+        continue;
+      }
+      const gs = (g.s * lane.length) / g.path.length;
+      if (gs <= v.s) continue;
+      const gap = gs - g.length - v.s;
+      if (gap < this._g.gap) this._setGap(gap, g.speed, GAP_LEADER, g);
+    }
+  }
+
+  // A car turning off ahead is still in the way until it is DIVERGE metres into its own connector.
+  _diverging(v) {
+    const p = v.path;
+    const g = this._g;
+    let from;
+    let base;
+    if (p.isLane) {
+      if (!v.next || g.kind === GAP_LINE || (g.leader && g.leader.path === p)) return;
+      from = p;
+      base = p.length - v.s;
+    } else {
+      from = p.from;
+      base = -v.s;
+    }
+    for (const oc of from.out) {
+      if (oc === p || oc === v.next) continue;
+      for (const u of oc.vehicles) {
+        const rear = u.s - u.length;
+        if (rear > DIVERGE || (!p.isLane && u.s <= v.s)) continue;
+        const gap = base + rear;
+        if (gap < g.gap) this._setGap(gap, u.speed, GAP_LEADER, u);
+      }
+    }
+  }
+
+  // The vehicle in front (possibly across the junction), or the stop line.
+  _leaderAhead(v) {
     const path = v.path;
     const list = path.vehicles;
     const idx = list.indexOf(v);
@@ -332,12 +380,31 @@ export class Simulation {
       }
       hard = Math.min(hard, v.obstacleGap);
     }
+    // Still sliding across from the old lane: keep clear of the vehicle we pulled out from behind.
+    const old = v.lcLeader;
+    if (old) {
+      if (Math.abs(v.lateral) < 1.0 || !old.path) v.lcLeader = null;
+      else {
+        const fx = -Math.sin(v.heading);
+        const fz = -Math.cos(v.heading);
+        const gap = (old.position.x - v.position.x) * fx + (old.position.z - v.position.z) * fz - (old.length + v.length) / 2;
+        if (gap > -1) {
+          acc = Math.min(acc, idm(v, v0, gap, old.speed, 1.0));
+          hard = Math.min(hard, gap - 0.2);
+        }
+      }
+    }
     v.acc = Math.max(-9, Math.min(v.a, acc));
     v.hardGap = hard;
   }
 
   _move(v, dt) {
     if (v.lcCooldown > 0) v.lcCooldown -= dt;
+    if (v.lateral) {
+      // Drift across into the new lane after a lane change (lateral = offset from the lane centre).
+      const step = Math.min(Math.abs(v.lateral), (0.9 + v.speed * 0.15) * dt);
+      v.lateral -= Math.sign(v.lateral) * step;
+    }
     if (v.dwell > 0) {
       v.speed = 0;
       v.dwell -= dt;
@@ -470,6 +537,8 @@ export class Simulation {
       v.blink = ti < i ? -1 : 1;
       v.blinkT = 2.5;
       v.lcCooldown = 4;
+      v.lcLeader = l;
+      lane.ghosts.push(v);
       if (v.wild && fol && gapB < fol.speed * 1.2) fol.honkIn = 0.3 + this.rng() * 0.4;
       return;
     }

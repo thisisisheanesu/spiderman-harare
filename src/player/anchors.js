@@ -111,16 +111,24 @@ function pushCandidate(score, x, y, z, nx, nz, side, id) {
 }
 
 // Best swing anchor on a roof edge ahead of `dir` (horizontal unit vector) and above `from` (the hand).
-// preferSide (+1 right / -1 left) gently alternates hands. Writes {point, normal, side, buildingId}.
-export function findSwingAnchor(world, from, dir, speed, preferSide, out) {
+// opts: {speed, fall (downward speed), side (+1 right / -1 left, gently alternates hands)}.
+// Falling fast, level anchors still catch you, so the elevation limits relax.
+// Writes {point, normal, side, buildingId} into out.
+export function findSwingAnchor(world, from, dir, opts, out) {
   for (const c of _best) c.score = -Infinity;
+  const speed = opts.speed;
+  const catchK = Math.min(1, Math.max(0, (opts.fall - 10) / 30));
+  const minRise = 3.5 - 5.5 * catchK;
+  const minElev = 0.28 - 0.4 * catchK;
+  const idealElev = 0.85 - 0.6 * catchK;
+  const preferSide = opts.side;
   const ahead = 16 + Math.min(speed, 40) * 0.5;
   const buildings = world.buildingsNear(from.x + dir.x * ahead, from.z + dir.z * ahead, 62);
   const rightX = -dir.z;
   const rightZ = dir.x;
   for (const b of buildings) {
     const ry = b.h - from.y;
-    if (b.h < 6 || ry < 3.5) continue;
+    if (b.h < 6 || ry < minRise) continue;
     const pts = edgePoints(b);
     for (let i = 0; i < pts.length; i += 5) {
       const rx = pts[i] - from.x;
@@ -130,14 +138,14 @@ export function findSwingAnchor(world, from, dir, speed, preferSide, out) {
       const d = Math.hypot(hd, ry);
       if (d < 9 || d > 82) continue;
       const elev = Math.atan2(ry, hd);
-      if (elev < 0.28 || elev > 1.35) continue;
+      if (elev < minElev || elev > 1.35) continue;
       const fwd = (rx * dir.x + rz * dir.z) / hd;
       if (fwd < 0.15) continue;
       const lat = (rx * rightX + rz * rightZ) / hd;
       const facing = Math.max(0, -(pts[i + 2] * rx + pts[i + 3] * rz) / hd);
       const score =
         1.3 * fwd -
-        ((elev - 0.85) / 0.45) ** 2 -
+        ((elev - idealElev) / 0.45) ** 2 -
         ((d - 32) / 26) ** 2 +
         0.25 * pts[i + 4] +
         0.35 * facing +

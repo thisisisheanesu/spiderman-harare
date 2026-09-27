@@ -75,6 +75,18 @@ export function sampleAt(pts, lens, s, out) {
   return out;
 }
 
+// Same polyline with extra points so no segment is longer than `step` (for draping on terrain).
+export function resample(pts, step) {
+  const out = [pts[0], pts[1]];
+  for (let i = 0; i + 3 < pts.length; i += 2) {
+    const dx = pts[i + 2] - pts[i];
+    const dz = pts[i + 3] - pts[i + 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / step));
+    for (let k = 1; k <= n; k++) out.push(pts[i] + (dx * k) / n, pts[i + 1] + (dz * k) / n);
+  }
+  return out;
+}
+
 // Sub-polyline between arc lengths s0..s1 (inclusive of interior vertices).
 export function slice(pts, lens, s0, s1) {
   const out = [];

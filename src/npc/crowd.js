@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CROSS } from './walkways.js';
+import { CROSS, WALK } from './walkways.js';
 import { FLAG } from './bodies.js';
 
 // Crowd simulation: agents walk the pedestrian network (edge + arc length + lateral offset inside the
@@ -44,9 +44,15 @@ const ARMS = {
   bag: [0.05, 0.14, 0.12],
 };
 
+function setArm(arm, pose, w = 1) {
+  arm[0] = pose[0];
+  arm[1] = pose[1];
+  arm[2] = pose[2];
+  arm[3] = w;
+}
+
 export class Agent {
-  constructor(slot) {
-    this.slot = slot;
+  constructor() {
     this.id = 0;
     this.position = new THREE.Vector3();
     this.heading = 0;
@@ -74,7 +80,10 @@ export class Agent {
     this.s = 0;
     this.lat = 0;
     this.latGoal = 0;
-    this.latPref = 0;
+    // Where in the lane this person likes to walk: on pavements from a little kerbside of the
+    // middle to the building line (away from lamp posts and trees); on paths, a side of the centre.
+    this.lanePref = Math.random() * 1.2 - 0.2;
+    this.pathPref = Math.random() * 2 - 1;
     this.speed = 0;
     this.prefSpeed = look.speed;
     this.phase = Math.random() * TAU;
@@ -124,12 +133,17 @@ export class Crowd {
     this._armR = new Float32Array(4);
     this._armL = new Float32Array(4);
     this._near = [];
-    // Static obstacles (stalls) in a coarse grid.
+    // Static obstacles (stalls) in a coarse grid; each is filed under every cell within look-ahead.
     this.obGrid = new Map();
     for (const o of obstacles) {
-      const k = this._cellKey(Math.floor(o.x / 8), Math.floor(o.z / 8));
-      if (!this.obGrid.has(k)) this.obGrid.set(k, []);
-      this.obGrid.get(k).push(o);
+      const reach = o.r + LOOK + 0.5;
+      for (let gx = Math.floor((o.x - reach) / 8); gx <= Math.floor((o.x + reach) / 8); gx++) {
+        for (let gz = Math.floor((o.z - reach) / 8); gz <= Math.floor((o.z + reach) / 8); gz++) {
+          const k = this._cellKey(gx, gz);
+          if (!this.obGrid.has(k)) this.obGrid.set(k, []);
+          this.obGrid.get(k).push(o);
+        }
+      }
     }
   }
 
@@ -178,17 +192,25 @@ export class Crowd {
     return out;
   }
 
-  // Place a walker on edge ei at arc length s (from the travel start) and lateral offset.
+  // Place a walker on edge ei at arc length s (from the travel start); lateral offset `lat`, or the
+  // walker's own preferred lane when omitted.
   putOnEdge(a, ei, fwd, s, lat) {
     const e = this.walk.edges[ei];
     a.edge = ei;
     a.fwd = fwd;
     a.s = s;
-    a.latPref = lat / Math.max(0.01, e.spread || 0.01);
-    a.lat = lat;
-    a.latGoal = lat;
+    a.latGoal = this._laneGoal(a, e);
+    a.lat = lat ?? a.latGoal;
     this._place(a);
     a.heading = headingOf(this._ux(a), this._uz(a));
+  }
+
+  _laneGoal(a, e) {
+    const out = e.kind === WALK ? e.side * (a.fwd ? 1 : -1) : 0;
+    let g = (out ? out * a.lanePref : a.pathPref) * e.spread;
+    // Pedestrian streets have benches down the middle: walk either side of them.
+    if (e.keepOut && Math.abs(g) < e.keepOut) g = (g < 0 ? -1 : 1) * Math.min(e.spread, e.keepOut);
+    return g;
   }
 
   _ux(a) {
@@ -248,15 +270,22 @@ export class Crowd {
       a.timer -= dt;
       if (a.timer <= 0) a.state = 'walk';
     }
-    // Hurry if a car bears down on the crossing.
-    if (a.state === 'cross' && (a.checkT -= dt) <= 0) {
-      a.checkT = 0.4;
-      a.hurry = this._vehicleThreat(a.position.x, a.position.z, 7) ? 1 : 0;
+    // Cars: hurry across when one bears down on the crossing; on the pavement, give a kombi that
+    // mounts the kerb a wide berth.
+    if ((a.checkT -= dt) <= 0) {
+      a.checkT = a.state === 'cross' ? 0.4 : 0.6 + Math.random() * 0.4;
+      a.hurry = this._vehicleThreat(a.position.x, a.position.z, a.state === 'cross' ? 7 : 1.5) ? 1 : 0;
     }
-    if (a.state === 'cross' && a.hurry) target = 3.2;
+    if (a.hurry && a.state === 'cross') target = 3.2;
 
     const spread = e.spread;
     this._avoid(a, ux, uz, spread, ctx, dt);
+    if (a.hurry && a.state !== 'cross' && e.kind !== CROSS) {
+      // Keep to the building side of the pavement (lateral sign of the edge's outer side).
+      const out = (e.side || 0) * (a.fwd ? 1 : -1);
+      a.latGoal = out * spread;
+      a.slow = Math.min(a.slow, 0.5);
+    }
     target *= a.slow;
     a.speed = approach(a.speed, target, (target > a.speed ? 1.6 : 4) * dt);
     const px = a.position.x;
@@ -341,7 +370,7 @@ export class Crowd {
     }
     a.slow = 1;
     if (best >= LOOK) {
-      a.latGoal = a.latPref * spread;
+      a.latGoal = this._laneGoal(a, this.walk.edges[a.edge]);
       a.blocked = 0;
       return;
     }
@@ -371,7 +400,6 @@ export class Crowd {
     a.s = Math.max(0, e.len - a.s);
     a.lat = -a.lat;
     a.latGoal = a.lat;
-    a.latPref = -a.latPref;
     a.blocked = 0;
     if (a.state === 'cross' || a.state === 'wait') a.state = 'walk';
   }
@@ -440,19 +468,26 @@ export class Crowd {
     a.fwd = fwd;
     a.s = Math.max(-0.5, rx * nux + rz * nuz);
     a.lat = Math.max(-n.spread, Math.min(n.spread, rx * nuz - rz * nux));
-    a.latGoal = a.latPref * n.spread;
+    a.latGoal = this._laneGoal(a, n);
     if (n.kind === CROSS && a.state !== 'flee') {
+      // Wait at the kerb, spread along it and behind whoever is already waiting.
       a.state = 'wait';
       a.waitT = 0;
       a.checkT = 0;
-      a.s = Math.min(a.s, 0.3);
+      this._place(a);
+      const near = this.near(a.position.x, a.position.z, 1.4, this._near);
+      let queued = 0;
+      for (let i = 0; i < near.length; i++) if (near[i] !== a && near[i].state === 'wait') queued++;
+      a.s = Math.max(-Math.max(0, n.kerb - 0.3), Math.min(a.s, n.kerb - 0.3, 0.3) - queued * 0.55);
+      a.latGoal = (Math.random() * 2 - 1) * n.spread;
     } else if (a.state === 'cross' || a.state === 'wait') a.state = 'walk';
   }
 
   _wait(a, dt, ctx) {
     const e = this.walk.edges[a.edge];
     a.speed = approach(a.speed, 0, 4 * dt);
-    a.s += a.speed * dt;
+    a.s = Math.min(Math.min(0.35, e.kerb - 0.3), a.s + a.speed * dt);
+    a.lat = approach(a.lat, Math.max(-e.spread, Math.min(e.spread, a.latGoal)), 0.8 * dt);
     this._place(a);
     a.vx = 0;
     a.vz = 0;
@@ -529,6 +564,8 @@ export class Crowd {
   // --- Reactions -------------------------------------------------------------------------------
 
   startReaction(a, type, dur, delay) {
+    // Someone halfway across the road finishes crossing first.
+    if (a.state === 'cross') return;
     if (a.state === 'react') {
       a.react.type = type;
       a.react.start = Math.min(a.react.start, this.game.time + delay);
@@ -545,9 +582,10 @@ export class Crowd {
       this.startReaction(a, 'cover', dur, 0.1);
       return;
     }
-    if (a.state === 'wait' || a.state === 'react') a.state = 'walk';
-    // Running toward Spider-Man? Turn around first.
-    if (this._ux(a) * (px - a.position.x) + this._uz(a) * (pz - a.position.z) > 0) this._turnAround(a);
+    // Running toward Spider-Man, or about to bolt into the road from the kerb? Turn around first.
+    const toward = this._ux(a) * (px - a.position.x) + this._uz(a) * (pz - a.position.z) > 0;
+    if (toward || a.state === 'wait') this._turnAround(a);
+    if (a.state === 'react') a.state = 'walk';
     a.state = 'flee';
     a.timer = dur;
     a.react = null;
@@ -604,12 +642,6 @@ export class Crowd {
     let lean = 0;
     let sit = 0;
     let flags = 0;
-    const setArm = (arm, pose, w = 1) => {
-      arm[0] = pose[0];
-      arm[1] = pose[1];
-      arm[2] = pose[2];
-      arm[3] = w;
-    };
 
     // Habits for people standing around: texting, a phone call, folded arms.
     if (a.state === 'idle' || a.state === 'wait' || a.state === 'chat' || a.state === 'vendor' || a.state === 'walk') {

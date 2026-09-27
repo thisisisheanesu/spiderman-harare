@@ -72,8 +72,8 @@ function propGeometries() {
   }
   g.blooms = mergeGeometries(blooms);
   // A-frame board: two leaning panels, the front one carries the painted sign.
-  const front = new THREE.PlaneGeometry(0.6, 0.8).rotateX(-0.2).translate(0, 0.42, -0.08);
-  const back = new THREE.PlaneGeometry(0.6, 0.8).rotateX(Math.PI + 0.2).translate(0, 0.42, 0.08);
+  const front = new THREE.PlaneGeometry(0.6, 0.8).rotateY(Math.PI).rotateX(0.2).translate(0, 0.42, -0.08);
+  const back = new THREE.PlaneGeometry(0.6, 0.8).rotateX(-0.2).translate(0, 0.42, 0.08);
   g.board = mergeGeometries([front, back]);
   for (const k of PROP_KINDS) if (k !== 'umbrella' && k !== 'board') g[k].deleteAttribute('uv');
   return g;

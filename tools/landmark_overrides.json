@@ -1155,10 +1155,10 @@
   {
    "key": "the_kopje",
    "name": "The Kopje",
-   "lat": -17.841,
+   "lat": -17.8398,
    "lon": 31.0386,
    "type": "hill",
-   "notes": "Granite hill where Salisbury/Harare was founded (1890), SW edge of the CBD; national monument (~15 ha). Rises roughly 45-55 m above Robert Mugabe Rd (toposcope quoted at 1,539.8 m ASL; PeakVisor lists 1,496 m). Summit reached by Skipper Hoste Drive, a one-way loop from Robert Mugabe Rd/Kaguvi St. Eternal Flame of Independence (carried here from Rufaro Stadium, 18 Apr 1980) and a (vandalised) toposcope at the top. Wooded (msasa), boulders. Summit location approximate; lies just south of the current map bbox (S=-17.840).",
+   "notes": "Granite hill where Salisbury/Harare was founded (1890), SW edge of the CBD; national monument (~15 ha). Rises roughly 45-55 m above Robert Mugabe Rd (toposcope quoted at 1,539.8 m ASL; PeakVisor lists 1,496 m). Summit reached by Skipper Hoste Drive, a one-way loop from Robert Mugabe Rd/Kaguvi St. Eternal Flame of Independence (carried here from Rufaro Stadium, 18 Apr 1980) and a (vandalised) toposcope at the top. Wooded (msasa), boulders. Summit location approximate (researched ~-17.841, just south of the map bbox S=-17.840); marker clamped to -17.8398 so it sits on the map edge.",
    "confidence": "low"
   },
   {

@@ -1,7 +1,7 @@
 import { headingDeg } from '../core/geo.js';
 import { MAP_COLORS } from './mapPainter.js';
 import { drawPlaceIcon, drawRankIcon, drawWaypointPin } from './mapIcons.js';
-import { angleDiff, el, fitCanvas, fmtDistance, setText, toggleClass } from './dom.js';
+import { angleDiff, el, fitCanvas, fmtDistance, RedrawGate, setText, toggleClass } from './dom.js';
 
 const SPAN = 150; // degrees visible across the strip
 const LABELS = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
@@ -22,49 +22,68 @@ export class Compass {
     this.ctx = this.canvas.getContext('2d');
     this.w = 0;
     this.h = 0;
-    this._sig = '';
+    this.gate = new RedrawGate(5);
     this.ahead = null;
   }
 
   resize() {
     this.w = this.canvas.clientWidth;
     this.h = this.canvas.clientHeight;
-    this.dpr = fitCanvas(this.canvas, this.w, this.h);
-    this._sig = '';
+    this.dpr = fitCanvas(this.canvas, this.w, this.h, 2);
+    this.gate.dirty = true;
+    if (this.w) this._buildStrip();
   }
 
-  draw(heading, pos, waypoint) {
-    if (!this.w) return;
-    const sig = `${heading.toFixed(1)},${Math.round(pos.x)},${Math.round(pos.z)},${waypoint ? waypoint.x : ''}`;
-    if (sig === this._sig) return;
-    this._sig = sig;
-
-    const { ctx, w, h } = this;
-    const ppd = w / SPAN;
-    const cx = w / 2;
-    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-
-    // Ticks every 5 degrees, taller every 15, letters every 45.
-    const bandH = Math.round(h * 0.52);
+  // Ticks every 5 degrees (taller every 15) and letters every 45, pre-rendered once per size for
+  // headings -SPAN/2 .. 360 + SPAN/2, so every visible window is one contiguous slice of it.
+  _buildStrip() {
+    const { dpr } = this;
+    const ppd = this.w / SPAN;
+    const bandH = Math.round(this.h * 0.52);
+    const strip = document.createElement('canvas');
+    strip.width = Math.ceil((360 + SPAN) * ppd * dpr);
+    strip.height = Math.ceil(bandH * dpr);
+    const ctx = strip.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    const first = Math.ceil((heading - SPAN / 2) / 5) * 5;
-    for (let d = first; d <= heading + SPAN / 2; d += 5) {
-      const x = cx + (d - heading) * ppd;
+    const y = bandH * 0.52;
+    for (let d = -SPAN / 2; d <= 360 + SPAN / 2; d += 5) {
+      const x = (d + SPAN / 2) * ppd;
       const deg = ((d % 360) + 360) % 360;
       const label = LABELS[deg];
       if (label) {
         ctx.font = `${deg === 0 ? 800 : 700} ${deg % 90 === 0 ? 13 : 11}px system-ui, sans-serif`;
         ctx.fillStyle = deg === 0 ? '#ff5a6e' : 'rgba(255, 255, 255, 0.92)';
-        ctx.fillText(label, x, bandH * 0.52);
+        ctx.fillText(label, x, y);
         continue;
       }
       const major = deg % 15 === 0;
-      ctx.fillStyle = major ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.28)';
       const th = major ? 7 : 4;
-      ctx.fillRect(Math.round(x) - 0.5, bandH * 0.52 - th / 2, 1, th);
+      ctx.fillStyle = major ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 255, 255, 0.28)';
+      ctx.fillRect(Math.round(x) - 0.5, y - th / 2, 1, th);
     }
+    this.strip = strip;
+    this.bandH = bandH;
+  }
+
+  draw(heading, pos, waypoint) {
+    if (!this.w) return;
+    const gate = this.gate;
+    gate.check(0, heading, 0.05);
+    gate.check(1, pos.x, 1);
+    gate.check(2, pos.z, 1);
+    gate.check(3, waypoint ? waypoint.x : 1e9, 0);
+    gate.check(4, waypoint ? waypoint.z : 1e9, 0);
+    if (!gate.take()) return;
+
+    const { ctx, w, h, dpr, bandH } = this;
+    const ppd = w / SPAN;
+    const cx = w / 2;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const sx = (((heading % 360) + 360) % 360) * ppd * dpr;
+    ctx.drawImage(this.strip, sx, 0, w * dpr, bandH * dpr, 0, 0, w, bandH);
 
     // Centre caret.
     ctx.fillStyle = MAP_COLORS.accent;
@@ -112,6 +131,8 @@ export class Compass {
       if (Math.abs(off) > lim) {
         ctx.fillStyle = MAP_COLORS.waypoint;
         ctx.font = '800 12px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText(off < 0 ? '‹' : '›', x + (off < 0 ? 12 : -12), my);
       }
       if (Math.abs(off) < 12) ahead = { label: 'Waypoint', dist, waypoint: true };

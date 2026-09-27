@@ -106,7 +106,7 @@ export class Traffic {
   update(dt, game) {
     this.focus.copy(game.player?.position ?? game.camera.position);
     game.camera.updateMatrixWorld();
-    this.renderer.begin(game.camera);
+    this.renderer.begin(game.camera, this.night);
     const teleported = this._lastFocus.distanceToSquared(this.focus) > TELEPORT * TELEPORT;
     this._lastFocus.copy(this.focus);
     this._updateNight(dt);
@@ -172,7 +172,8 @@ export class Traffic {
 
   _trySpawn(initial) {
     const f = this.focus;
-    const r = SPAWN_RADIUS * Math.sqrt(this.rng());
+    // Uniform in radius rather than area: denser near the player, where the streets are actually seen.
+    const r = SPAWN_RADIUS * this.rng();
     const ang = this.rng() * Math.PI * 2;
     const cell = this.graph.slotsInCell(Math.floor((f.x + Math.cos(ang) * r) / GRID), Math.floor((f.z + Math.sin(ang) * r) / GRID));
     if (!cell) return;
@@ -182,6 +183,7 @@ export class Traffic {
     if (d > SPAWN_RADIUS || d < 15) return;
     if (!initial && d < HIDDEN_SPAWN && this.renderer.inView(slot.x, 1, slot.z, 7)) return;
     const lane = slot.lane;
+    for (const u of lane.vehicles) if (Math.abs(u.s - slot.s) < 16) return;
     const def = this.mix.pickType(this.rng, this.kombis.nearRank(slot.x, slot.z) ? 2.5 : 1);
     const v = new Vehicle();
     this.mix.dress(v, def, this.rng, this.models);
@@ -287,10 +289,6 @@ export class Traffic {
       if (v.leaveT > 0) v.leaveT -= dt;
       if (v.blinkT > 0) v.blinkT -= dt;
       if (v.honkCd > 0) v.honkCd -= dt;
-      if (v.lateral) {
-        const step = Math.min(Math.abs(v.lateral), (0.6 + v.speed * 0.12) * dt);
-        v.lateral -= Math.sign(v.lateral) * step;
-      }
       const pulling = v.dwell > 0 || (v.stopLane === v.path && v.stopS - v.s < 30);
       const want = pulling ? Math.max(0, Math.min(1.5, v.path.kerbSpace - v.width / 2 - 0.25)) : 0;
       v.kerbShift += Math.max(-0.9 * dt, Math.min(0.9 * dt, want - v.kerbShift));

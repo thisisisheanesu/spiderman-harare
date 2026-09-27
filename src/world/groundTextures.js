@@ -54,8 +54,8 @@ function paving(p) {
 
 function bricks(p) {
   // Herringbone clay pavers (First Street Mall).
-  p.rect(0, 0, 1, 1, '#7d5a48');
-  const tones = ['#a8634a', '#b56f52', '#9a5a44', '#c07a5a', '#8f5540'];
+  p.rect(0, 0, 1, 1, '#6f5f55');
+  const tones = ['#9b6d5a', '#a87a66', '#8f6555', '#b0856f', '#8a6858', '#a09080'];
   const u = 1 / 16;
   for (let i = -2; i < 18; i++) {
     for (let j = -2; j < 18; j++) {
@@ -69,9 +69,9 @@ function bricks(p) {
 }
 
 function grass(p) {
-  p.rect(0, 0, 1, 1, '#6f8a45');
+  p.rect(0, 0, 1, 1, '#7b8a4c');
   p.grime(0.5, 1);
-  p.speckle(p.S * 120, ['rgba(40,70,20,0.35)', 'rgba(160,170,80,0.3)', 'rgba(120,140,60,0.35)', 'rgba(170,150,90,0.25)'], p.S / 300);
+  p.speckle(p.S * 120, ['rgba(50,70,25,0.35)', 'rgba(170,170,95,0.35)', 'rgba(125,135,65,0.35)', 'rgba(180,160,105,0.3)'], p.S / 300);
 }
 
 function dryGrass(p) {
@@ -148,14 +148,8 @@ function paint(p) {
 function flowers(p) {
   p.rect(0, 0, 1, 1, '#6b4a33');
   p.grime(0.3, 1);
-  const cols = ['#d8344a', '#f2c230', '#f4f0e8', '#e0609a', '#f08a30', '#4a8a3a', '#3f7a33', '#5b9a40'];
-  for (let i = 0; i < p.S * 6; i++) {
-    p.c.fillStyle = cols[Math.floor(p.rng() * cols.length)];
-    const r = (1 + p.rng() * 2.5) * (p.S / 256);
-    p.c.beginPath();
-    p.c.arc(p.rng() * p.S, p.rng() * p.S, r, 0, Math.PI * 2);
-    p.c.fill();
-  }
+  p.speckle(p.S * 5, ['rgba(60,110,50,0.9)', 'rgba(80,130,60,0.9)'], p.S / 90);
+  p.speckle(p.S * 6, ['rgba(216,52,74,1)', 'rgba(242,194,48,1)', 'rgba(244,240,232,1)', 'rgba(224,96,154,1)', 'rgba(240,138,48,1)'], p.S / 120);
 }
 
 export const GROUND_LAYERS = {
@@ -243,5 +237,11 @@ export function buildUrbanMask(buildings, bounds, res = 256) {
   texture.minFilter = THREE.LinearFilter;
   texture.needsUpdate = true;
   // DataTexture row 0 is v = 0, which is z0 here, so uv = (x - x0) / w, (z - z0) / h.
-  return { texture, rect: new THREE.Vector4(x0, z0, w, h) };
+  const at = (x, z) => {
+    const ix = Math.floor(((x - x0) / w) * res);
+    const iz = Math.floor(((z - z0) / h) * res);
+    if (ix < 0 || iz < 0 || ix >= res || iz >= res) return 0;
+    return data[(iz * res + ix) * 4] / 255;
+  };
+  return { texture, rect: new THREE.Vector4(x0, z0, w, h), at };
 }

@@ -11,12 +11,14 @@ import { Notices } from './notices.js';
 import { PauseMenu, HelpOverlay } from './menus.js';
 import { MenuNav } from './menuNav.js';
 import { TouchControls } from './touch.js';
+import { enableDragLook } from './dragLook.js';
 import { controlsHint } from './controls.js';
 import { el, isCoarsePointer, setText, toggleClass } from './dom.js';
 
 const TEXT_INTERVAL = 0.2; // s between DOM text refreshes (~5 Hz)
 const HINT_SECONDS = 20;
 const WAYPOINT_REACHED = 25; // m
+const LOCK_HINT_MS = 5000;
 
 // HUD system (game.hud): minimap, compass, location readout, subtitles / toasts / objective,
 // big map, pause menu, help and touch controls. Owns every overlay and pauses the game while one
@@ -35,9 +37,9 @@ export class Hud {
     this.started = false;
     this.heading = 0;
     this._dir = new THREE.Vector3();
-    this._textT = 0;
+    this._textT = TEXT_INTERVAL; // refresh the text on the first frame
     this._hintT = 0;
-    this._unlockedT = 0;
+    this._lockHintUntil = 0;
 
     this.root = document.getElementById('hud');
     this.root.classList.add('hud');
@@ -51,6 +53,7 @@ export class Hud {
     this.overlays = { map: this.bigMap, pause: this.pauseMenu, help: this.help };
     this.nav = new MenuNav();
     this.touch = new TouchControls(this);
+    enableDragLook(game, this.settings);
 
     for (const k of Object.keys(this.settings.values)) this._apply(k, this.settings.get(k));
     this._wireEvents();
@@ -68,7 +71,7 @@ export class Hud {
       el('div', 'location panel', null, [this.street, this.near, el('div', 'loc-stats', null, [this.alt, this.speed])]),
     ]);
     this.hint = el('div', 'controls-hint panel');
-    this.lockHint = el('div', 'lock-hint', { text: 'Click to look around' });
+    this.lockHint = el('div', 'lock-hint', { text: 'Click to capture the mouse · or drag to look' });
     this.root.append(top, left, this.hint, this.lockHint);
     this.compass = new Compass(top, this.places);
     this.minimap = new Minimap(this.root, painter, this.places, this.game.quality.level);
@@ -92,6 +95,10 @@ export class Hud {
       } else if (this.started && this._hadLock && !game.paused && !this.overlay) {
         this.openOverlay('pause');
       }
+    });
+    // Mouse capture refused (no user gesture yet, Esc used to resume, sandboxed iframe...).
+    document.addEventListener('pointerlockerror', () => {
+      this._lockHintUntil = performance.now() + LOCK_HINT_MS;
     });
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden) return;
@@ -209,7 +216,7 @@ export class Hud {
     }
     this._textT += dt;
     if (this._textT >= TEXT_INTERVAL) {
-      this._refreshText(this._textT, p, speed);
+      this._refreshText(p, speed);
       this._textT = 0;
     }
   }
@@ -257,7 +264,7 @@ export class Hud {
     return { street: title, detail };
   }
 
-  _refreshText(elapsed, p, speed) {
+  _refreshText(p, speed) {
     const { street, detail } = this._location();
     setText(this.street, street);
     setText(this.near, detail);
@@ -267,12 +274,10 @@ export class Hud {
 
     const mode = this.inputMode;
     if (this._hintOn && this._hintMode !== mode) this._fillHint(mode);
-    this.root.dataset.input = mode;
 
-    // Desktop without pointer lock (lock refused or released): say how to get the mouse back.
+    // Desktop without pointer lock: briefly say how to get the mouse back.
     const unlocked = this.started && !this.game.paused && !this.touch.enabled && mode === 'keyboard' && !this.game.input.pointerLocked;
-    this._unlockedT = unlocked ? this._unlockedT + elapsed : 0;
-    toggleClass(this.lockHint, 'shown', this._unlockedT > 0.6);
+    toggleClass(this.lockHint, 'shown', unlocked && performance.now() < this._lockHintUntil);
 
     const wp = this.waypoint;
     if (wp && Math.hypot(wp.x - p.x, wp.z - p.z) < WAYPOINT_REACHED) {

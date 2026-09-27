@@ -222,6 +222,7 @@ export class Walkways {
       jn: -1, // crossings at junctions: road-graph node and the far node of the crossed road
       from: -1,
       kerb: 0, // crossings: length at each end that is still pavement
+      keepOut: 0, // pedestrian streets: half-width of the central strip (benches) walkers avoid
       ...extra,
     };
     const id = this.edges.length;
@@ -269,8 +270,8 @@ export class Walkways {
         let tb = 0;
         if (k === 1) {
           // Dead end: each side just ends at the node.
-          A.cornerNode[1] = this._cornerAt(pax, paz, 0, nx, nz);
-          A.cornerNode[0] = this._cornerAt(pbx, pbz, 0, nx, nz);
+          A.cornerNode[1] = this._cornerAt(pax, paz, 0, node);
+          A.cornerNode[0] = this._cornerAt(pbx, pbz, 0, node);
           continue;
         }
         if (wedge < Math.PI - 0.12) {
@@ -308,17 +309,18 @@ export class Walkways {
         }
         A.trim[1] = ta;
         B.trim[0] = tb;
-        const c = this._cornerAt(cx, cz, wedge, nx, nz);
+        const c = this._cornerAt(cx, cz, wedge, node);
         A.cornerNode[1] = c;
         B.cornerNode[0] = c;
       }
     }
   }
 
-  _cornerAt(x, z, wedge, jx, jz) {
+  // Corner node of a junction wedge; remembers the junction (road-graph node and its position).
+  _cornerAt(x, z, wedge, jn) {
     if (!this.free(x, z)) return -1;
     const id = this._node(x, z, KERB_HEIGHT);
-    Object.assign(this.nodes[id], { corner: wedge, jx, jz });
+    Object.assign(this.nodes[id], { corner: wedge, jn, jx: this.data.nodes[jn][0], jz: this.data.nodes[jn][1] });
     this.corners.push(id);
     return id;
   }
@@ -446,14 +448,16 @@ export class Walkways {
     const na = this.nodes[a];
     const nb = this.nodes[b];
     if (Math.hypot(na.x - nb.x, na.z - nb.z) < 0.3) {
-      this._merge(a, b);
+      if (nb.corner !== undefined) this._merge(b, a);
+      else this._merge(a, b);
       return -1;
     }
     if (this._segmentHitsBuilding(na.x, na.z, nb.x, nb.z)) return -1;
-    return this._addEdge(a, b, LINK, 0.15, { density: 0.3 });
+    // Corner links are as wide as the pavement allows; _validate narrows them where it must.
+    return this._addEdge(a, b, LINK, 0.6, { density: 0.3 });
   }
 
-  // Fold node `drop` into node `keep` (they sit at the same spot).
+  // Fold node `drop` into node `keep` (they sit at the same spot; `keep` is the corner if either is).
   _merge(keep, drop) {
     const k = this.nodes[keep];
     for (const ei of this.nodes[drop].edges) {
@@ -464,14 +468,10 @@ export class Walkways {
       else k.edges.push(ei);
     }
     this.nodes[drop].edges = [];
-    // Anything that referenced the dropped node (crossing endpoints) follows it.
-    for (const list of this.ends.values()) {
-      for (const end of list) {
-        if (end.crossNode?.[0] === drop) end.crossNode[0] = keep;
-        if (end.crossNode?.[1] === drop) end.crossNode[1] = keep;
-        if (end.cornerNode[0] === drop) end.cornerNode[0] = keep;
-        if (end.cornerNode[1] === drop) end.cornerNode[1] = keep;
-      }
+    // A crossing endpoint at this junction may have been the dropped node.
+    for (const end of this.ends.get(k.jn) || []) {
+      if (end.crossNode?.[0] === drop) end.crossNode[0] = keep;
+      if (end.crossNode?.[1] === drop) end.crossNode[1] = keep;
     }
   }
 
@@ -517,7 +517,8 @@ export class Walkways {
       // Walkable runs become PATH chains; a carriageway stretch between two runs becomes a crossing.
       const walk = samples.map((q) => (q && q.road === undefined ? q : null));
       const runEnds = [];
-      this._emitRuns(walk, PATH, 0, (x, z) => weight * this.activity(x, z), { path: pi }, (first, last, j, k) => {
+      const props = { path: pi, keepOut: p.cls === 'pedestrian' && hMax > 2 ? 1.3 : 0 };
+      this._emitRuns(walk, PATH, 0, (x, z) => weight * this.activity(x, z), props, (first, last, j, k) => {
         runEnds.push({ first, last, j, k });
         joins.push(first, last);
       });
@@ -609,7 +610,7 @@ export class Walkways {
     const t = this.nodes[target];
     if (this._segmentHitsBuilding(n.x, n.z, t.x, t.z)) return;
     const road = this._roadAlong(n.x, n.z, t.x, t.z);
-    this._addEdge(id, target, road >= 0 ? CROSS : LINK, road >= 0 ? 0.5 : 0.15, { road, density: 0.3 });
+    this._addEdge(id, target, road >= 0 ? CROSS : LINK, 0.5, { road, density: 0.3 });
   }
 
   _split(ei, t) {
@@ -661,7 +662,7 @@ export class Walkways {
         else if ((1 - c.t) * e.len < 0.8) target = e.b;
         else target = this._split(c.i, c.t);
         const road = this._roadAlong(node.x, node.z, x, z);
-        this._addEdge(id, target, road >= 0 ? CROSS : LINK, road >= 0 ? 0.5 : 0.15, { road, density: 0.3 });
+        this._addEdge(id, target, road >= 0 ? CROSS : LINK, 0.5, { road, density: 0.3 });
         break;
       }
     }

@@ -34,7 +34,7 @@ const BIT = Object.fromEntries(Object.entries(FLAG).map(([k, v]) => [k, Math.log
 
 const B = { PELVIS: 0, TORSO: 1, HEAD: 2, ARM_R: 3, FORE_R: 4, ARM_L: 5, FORE_L: 6, THIGH_R: 7, SHIN_R: 8, THIGH_L: 9, SHIN_L: 10, SKIRT: 11 };
 // Colour slots 0-7 are the instance colours; 8+ are resolved from flags in the shader.
-const S = { SKIN: 0, TOP: 1, BOTTOM: 2, SHOES: 3, HAIR: 4, ACCENT: 5, ITEM: 6, EXTRA: 7, THIGH: 8, SHIN: 9, FOREARM: 10, DARK: 11 };
+const S = { SKIN: 0, TOP: 1, BOTTOM: 2, SHOES: 3, HAIR: 4, ACCENT: 5, ITEM: 6, EXTRA: 7, THIGH: 8, SHIN: 9, FOREARM: 10, DARK: 11, EYE: 12, LIP: 13 };
 
 // Skeleton (metres, 1.72 m adult facing -z).
 const J = { hipX: 0.095, hipY: 0.93, kneeY: 0.5, waistY: 1.02, shX: 0.2, shY: 1.39, elbowY: 1.11, neckY: 1.47 };
@@ -70,7 +70,6 @@ class Builder {
   // Add a primitive: placed by position/rotation/scale, tagged with bone, colour slot and flag rule
   // (flag > 0: only drawn when that flag bit is set; flag < 0: hidden when it is set).
   add(geo, { bone, slot, flag = 0, at = [0, 0, 0], rot = [0, 0, 0], scale = [1, 1, 1] }) {
-    geo = geo.index ? geo : geo;
     _q.setFromEuler(_e.set(rot[0], rot[1], rot[2]));
     _m.compose(_v.set(at[0], at[1], at[2]), _q, _s.set(scale[0], scale[1], scale[2]));
     geo.applyMatrix4(_m);
@@ -142,7 +141,14 @@ export function createBodyGeometry(lod) {
   b.sphere(0.1, near ? 9 : 6, near ? 7 : 4, { bone: B.HEAD, slot: S.SKIN, at: [0, 1.585, 0], scale: [0.92, 1.12, 1] });
   b.sphere(0.104, near ? 9 : 6, near ? 5 : 3, { bone: B.HEAD, slot: S.HAIR, flag: hiddenBy('BALD'), at: [0, 1.6, 0.012], rot: [0.45, 0, 0], scale: [0.95, 1.08, 1.02] }, 1.75);
   if (near) {
+    // Face: nose, eyes (hidden behind sunglasses), lips, ears - enough to read where someone looks.
     b.box(0.028, 0.045, 0.035, { bone: B.HEAD, slot: S.SKIN, at: [0, 1.572, -0.1] });
+    for (const side of [1, -1]) {
+      b.box(0.028, 0.015, 0.01, { bone: B.HEAD, slot: S.EYE, flag: hiddenBy('GLASSES'), at: [side * 0.034, 1.603, -0.093] });
+      b.box(0.012, 0.012, 0.008, { bone: B.HEAD, slot: S.DARK, flag: hiddenBy('GLASSES'), at: [side * 0.034, 1.603, -0.098] });
+      b.sphere(0.024, 5, 4, { bone: B.HEAD, slot: S.SKIN, at: [side * 0.088, 1.585, 0.004], scale: [0.45, 1, 0.8] });
+    }
+    b.box(0.045, 0.013, 0.012, { bone: B.HEAD, slot: S.LIP, at: [0, 1.536, -0.091] });
     b.box(0.165, 0.032, 0.02, { bone: B.HEAD, slot: S.DARK, flag: needs('GLASSES'), at: [0, 1.602, -0.094] });
     b.sphere(0.056, 6, 4, { bone: B.HEAD, slot: S.HAIR, flag: needs('BUN'), at: [0, 1.69, 0.065] });
   }
@@ -291,7 +297,7 @@ void npcPose(inout vec3 p, inout vec3 n) {
   vec4 cols = slot < 3.5 ? iColA : iColB;
   float k = mod(slot, 4.0);
   float packed = k < 0.5 ? cols.x : k < 1.5 ? cols.y : k < 2.5 ? cols.z : cols.w;
-  vNpcColor = slot > 10.5 ? vec3(0.012) : npcUnpack(packed);
+  vNpcColor = slot > 12.5 ? npcUnpack(iColA.x) * vec3(0.78, 0.52, 0.5) : slot > 11.5 ? vec3(0.8, 0.77, 0.72) : slot > 10.5 ? vec3(0.012) : npcUnpack(packed);
   vNpcAlt = npcUnpack(iColB.w);
   float pat = mod(floor(flags / 65536.0), 4.0);
   bool patTop = slot == 1.0 && npcFlag(flags, 18.0);
@@ -312,9 +318,11 @@ vec3 npcFragColor() {
   if (vNpcPattern < 1.5) m = step(0.5, fract(q.y * 16.0));
   else if (vNpcPattern < 2.5) m = 0.5 * (step(0.5, fract(q.y * 18.0)) + step(0.5, fract((q.x + q.z) * 18.0)));
   else {
-    vec2 g = fract(vec2(q.x * 0.7 + q.z * 0.7, q.y) * 11.0) - 0.5;
-    m = 1.0 - smoothstep(0.18, 0.26, length(g));
-    m = max(m, step(0.45, abs(fract(q.y * 5.5) - 0.5)) );
+    // Wax-print motif: rings around dots on a staggered grid.
+    vec2 uv = vec2(q.x * 0.7 + q.z * 0.7, q.y) * 9.0;
+    uv.x += 0.5 * step(0.5, fract(uv.y * 0.5));
+    float r = length(fract(uv) - 0.5);
+    m = max(1.0 - smoothstep(0.1, 0.14, r), 1.0 - smoothstep(0.03, 0.06, abs(r - 0.3)));
   }
   return mix(vNpcColor, vNpcAlt, m);
 }
@@ -335,7 +343,7 @@ function patchVertex(shader, withNormal) {
 }
 
 export function createBodyMaterial() {
-  const mat = new THREE.MeshStandardMaterial({ roughness: 0.82, metalness: 0 });
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.72, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
     patchVertex(shader, true);
     shader.fragmentShader = shader.fragmentShader
@@ -351,6 +359,13 @@ export function createBodyDepthMaterial() {
   mat.onBeforeCompile = (shader) => patchVertex(shader, false);
   mat.customProgramCacheKey = () => 'npc-body-depth';
   return mat;
+}
+
+function write4(arr, o, x, y, z, w) {
+  arr[o] = x;
+  arr[o + 1] = y;
+  arr[o + 2] = z;
+  arr[o + 3] = w;
 }
 
 const INSTANCE_ATTRS = ['iColA', 'iColB', 'iAnim', 'iArmR', 'iArmL', 'iStyle'];
@@ -427,14 +442,15 @@ export class CrowdRenderer {
     this._m.compose(this._p.set(a.position.x, a.position.y, a.position.z), this._q, this._s);
     mesh.setMatrixAt(i, this._m);
     const g = mesh.geometry.attributes;
+    const o = i * 4;
     const c = L.col;
-    g.iColA.array.set([c[0], c[1], c[2], c[3]], i * 4);
-    g.iColB.array.set([c[4], c[5], c[6], c[7]], i * 4);
     const p = a.pose;
-    g.iAnim.array.set([a.phase, p.gait, p.headYaw, p.headPitch], i * 4);
-    g.iArmR.array.set(p.armR, i * 4);
-    g.iArmL.array.set(p.armL, i * 4);
-    g.iStyle.array.set([L.flags | p.flags, L.build, p.lean, p.sit], i * 4);
+    write4(g.iColA.array, o, c[0], c[1], c[2], c[3]);
+    write4(g.iColB.array, o, c[4], c[5], c[6], c[7]);
+    write4(g.iAnim.array, o, a.phase, p.gait, p.headYaw, p.headPitch);
+    g.iArmR.array.set(p.armR, o);
+    g.iArmL.array.set(p.armL, o);
+    write4(g.iStyle.array, o, L.flags | p.flags, L.build, p.lean, p.sit);
     if (blob) {
       const k = this.blobCount++;
       this._s.set(0.75 * L.scale, 1, 0.75 * L.scale);

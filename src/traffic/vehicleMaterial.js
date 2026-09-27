@@ -14,7 +14,7 @@ const BANNER_COLORS = ['#d6201f', '#1d4fb8', '#111111', '#e3b21b'];
 // Canvas atlas with one sticker per row: kombi slogans, ZUPCO, TAXI and bus destination displays.
 export function buildStickerAtlas() {
   const rows = [];
-  rows.push({ key: 'ZUPCO', text: 'ZUPCO', bg: '#ffffff', fg: '#1c3f94' });
+  rows.push({ key: 'ZUPCO', text: 'ZUPCO', bg: '#ffffff', fg: '#1c3f94', fill: 0.62 });
   rows.push({ key: 'TAXI', text: 'TAXI', bg: '#f2d21b', fg: '#141414' });
   const slogans = KOMBI_SLOGANS?.length ? KOMBI_SLOGANS : [{ text: 'MWARI VANOKWANISA' }, { text: 'ZVICHANAKA' }];
   slogans.forEach((s, i) => {
@@ -39,10 +39,10 @@ export function buildStickerAtlas() {
     ctx.fillStyle = r.bg;
     ctx.fillRect(0, y, W, H);
     ctx.fillStyle = r.fg;
-    const font = r.led ? 'bold 30px monospace' : 'bold 34px Impact, "Arial Black", sans-serif';
+    const font = r.led ? 'bold 30px monospace' : `bold ${r.fill ? 42 : 34}px Impact, "Arial Black", sans-serif`;
     ctx.font = font;
     const tw = ctx.measureText(r.text).width;
-    const sx = Math.min(1, (W - 24) / tw);
+    const sx = r.fill ? (W * r.fill) / tw : Math.min(1, (W - 24) / tw);
     ctx.save();
     ctx.translate(W / 2, y + H / 2 + 1);
     ctx.scale(sx, 1);
@@ -124,7 +124,12 @@ if ( abs( vTag - 2.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.93, 0.78 ) 
 else if ( abs( vTag - 3.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.05, 0.02 ) * ( 0.04 + 0.9 * vState.x + 2.6 * vState.y );
 else if ( abs( vTag - 5.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.z;
 else if ( abs( vTag - 7.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.w;
-else if ( abs( vTag - 10.0 ) < 0.5 ) totalEmissiveRadiance += diffuseColor.rgb * ( 0.5 + 1.5 * vState.x );`,
+else if ( abs( vTag - 10.0 ) < 0.5 ) totalEmissiveRadiance += diffuseColor.rgb * ( 0.5 + 1.5 * vState.x );
+else if ( abs( vTag - 4.0 ) < 0.5 ) {
+  // Cheap sky reflection on glass (stronger at grazing angles), dimmed at night.
+  float fr = 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );
+  totalEmissiveRadiance += mix( vec3( 0.2, 0.25, 0.3 ), vec3( 0.015, 0.02, 0.03 ), vState.x ) * ( 0.25 + 0.9 * fr * fr );
+}`,
       );
   };
   // All vehicle bodies share one program; the cache key keeps it distinct from stock materials.

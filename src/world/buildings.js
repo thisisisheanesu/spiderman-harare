@@ -2,7 +2,7 @@ import { GeoBuffer } from './geoBuffer.js';
 import { cleanRing, signedArea, edgeNormals, offsetRing, orientedBox, isConvex } from './polygon.js';
 import { hashString, makeRng } from '../core/rng.js';
 import { PALETTE, tint } from './palette.js';
-import { glassPresetFor } from './facades.js';
+import { glassPresetFor, MISC_CELLS, miscUV } from './facades.js';
 import { addRooftopClutter, rbox } from './rooftops.js';
 import { sidewalkWidth } from './streetMetrics.js';
 
@@ -188,8 +188,9 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   const { L, tileW, world, quality } = ctx;
   const seed = b.seed;
   const rng = spec.rng;
-  const fp = cleanRing(b.fp);
+  const fp = cleanRing(spec.fp || b.fp);
   if (fp.length < 6) return [];
+  const i0 = gb.iCount;
   const holes = (b.holes || []).map((h) => cleanRing(h)).filter((h) => h.length >= 6);
   const frontages = [];
   const { fh, wallTop } = spec;
@@ -262,8 +263,9 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   });
 
   if (flat) {
-    gb.brush(spec.roofTint, L.roofFlat, seed, 2);
-    gb.polygon(fp, holes, b.h, tileW.roofFlat);
+    const layer = spec.roofLayer || 'roofFlat';
+    gb.brush(spec.roofTint, L[layer], seed, spec.roofKind ?? 2, spec.cls, spec.glass);
+    gb.polygon(fp, holes, b.h, tileW[layer]);
   } else {
     emitHipRoof(fp, spec, gb, L, tileW, seed);
   }
@@ -278,6 +280,9 @@ export function emitBuilding(b, spec, gb, col, ctx) {
     }
   }
 
+  if (spec.fullCollider) copyTriangles(gb, i0, col);
+  if (b.lm && ctx.landmarks) ctx.landmarks.decorate(b, spec, gb, col, L, world);
+
   // Rooftop clutter on flat roofs.
   if (flat && spec.obb && spec.area > 45 && b.h > 5 && spec.clutter > 0) {
     const normals = edgeNormals(fp, true);
@@ -291,6 +296,20 @@ export function emitBuilding(b, spec, gb, col, ctx) {
     });
   }
   return frontages;
+}
+
+// Copies triangles [i0, end) of `gb` into `col` (for pieces that are not in the physics data).
+function copyTriangles(gb, i0, col) {
+  const P = gb.pos;
+  for (let t = i0; t < gb.iCount; t += 3) {
+    const a = gb.idx[t] * 3;
+    const b = gb.idx[t + 1] * 3;
+    const c = gb.idx[t + 2] * 3;
+    const va = col.vertex(P[a], P[a + 1], P[a + 2], 0, 1, 0, 0, 0);
+    const vb = col.vertex(P[b], P[b + 1], P[b + 2], 0, 1, 0, 0, 0);
+    const vc = col.vertex(P[c], P[c + 1], P[c + 2], 0, 1, 0, 0, 0);
+    col.tri(va, vb, vc);
+  }
 }
 
 // Hip roof from the oriented box: every footprint vertex (pushed out for the eaves overhang)
@@ -386,12 +405,13 @@ function emitCanopy(f, spec, gb, col, L, rng, depth) {
   gb.brush(color, L.concrete, f.seed, 2);
   gb.box(0, y, depth / 2, w, t, depth, 4, true);
   gb.box(0, y + t, depth - 0.1, w, 0.45, 0.2, 4);
-  // Downlights under the slab.
-  gb.brush([255, 240, 210], L.misc, f.seed, 3);
+  // Downlights under the slab (most shops leave them on at night).
+  gb.brush([255, 240, 210], L.misc, f.seed, rng() < 0.7 ? 3 : 2);
+  const [u0, v0, u1, v1] = miscUV(MISC_CELLS.lamp);
   const n = Math.max(1, Math.floor(w / 3));
   for (let k = 0; k < n; k++) {
     const x = -w / 2 + (k + 0.5) * (w / n);
-    gb.quad(x - 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 + 0.2, x - 0.2, y - 0.01, depth * 0.55 + 0.2, 0, -1, 0, 0.5, 0.0, 0.52, 0.02);
+    gb.quad(x - 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 - 0.2, x + 0.2, y - 0.01, depth * 0.55 + 0.2, x - 0.2, y - 0.01, depth * 0.55 + 0.2, 0, -1, 0, u0, v0, u1, v1);
   }
   gb.clearTransform();
   col.setTransform(mx, 0, mz, rot);

@@ -4,7 +4,7 @@
 
 const KEY = 'spiderman-harare.settings.v1';
 
-export const DEFAULTS = {
+const DEFAULTS = {
   master: 0.8,
   voices: 1,
   sfx: 0.8,
@@ -37,9 +37,10 @@ export class Settings {
     this.values = { ...DEFAULTS };
     const stored = readStored();
     for (const k of Object.keys(DEFAULTS)) {
-      if (k in stored && (typeof stored[k] === typeof DEFAULTS[k] || DEFAULTS[k] === null)) this.values[k] = stored[k];
+      const v = stored[k];
+      if (typeof v === typeof DEFAULTS[k] && (typeof v !== 'number' || Number.isFinite(v))) this.values[k] = v;
     }
-    this.listeners = new Set();
+    this.values.quality = storedQuality();
   }
 
   get(k) {
@@ -54,11 +55,5 @@ export class Settings {
     } catch {
       /* storage unavailable: the setting still applies for this session */
     }
-    for (const fn of this.listeners) fn(k, v);
-  }
-
-  onChange(fn) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
   }
 }

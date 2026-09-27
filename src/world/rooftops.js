@@ -100,7 +100,7 @@ function solarGeyser(gb, L, x, y, z, seed) {
   const h1 = 0.3 + Math.sin(tilt) * len;
   const zs = z + Math.cos(tilt) * len * 0.5;
   const zn = z - Math.cos(tilt) * len * 0.5;
-  gb.brush([255, 255, 255], L.solar, seed, 0, 3, 1);
+  gb.brush([255, 255, 255], L.solar, seed, 0, 4, 1);
   // Panel: low edge north (zn, y+0.3), high edge south (zs, y+h1); normal points north-up.
   const ny = Math.cos(tilt);
   const nz = -Math.sin(tilt);

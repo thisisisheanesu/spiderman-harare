@@ -114,7 +114,7 @@ export class Npcs {
       if (d < 30) sum += 1 - d / 30;
     }
     const height = Math.max(0, ctx.py - this.walkways.groundY(ctx.px, ctx.pz));
-    const target = Math.min(1, sum / 9) * Math.max(0.15, 1 - height / 70);
+    const target = Math.min(1, sum / 14) * Math.max(0.15, 1 - height / 70);
     this.ambience += (target - this.ambience) * 0.35;
     this.game.audio?.setAmbience?.('crowd', Math.round(this.ambience * 100) / 100);
   }

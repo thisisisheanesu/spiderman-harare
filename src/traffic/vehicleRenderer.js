@@ -46,7 +46,30 @@ function shadowTexture() {
   g.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 64, 128);
+  return new THREE.CanvasTexture(c);
+}
+
+// Two soft lobes of headlight spill on the tarmac, brightest just ahead of the bumper.
+function beamTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.globalCompositeOperation = 'lighter';
+  for (const x of [21, 43]) {
+    ctx.save();
+    ctx.translate(x, 126);
+    ctx.scale(1, 5.2);
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 20);
+    g.addColorStop(0, 'rgba(255,255,255,0.75)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.3)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(-21, -24, 42, 24);
+    ctx.restore();
+  }
   const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
@@ -107,19 +130,35 @@ export class VehicleRenderer {
     this.shadows = makeInstanced(shadowGeo, shadowMat, total, 'vehicle-shadows');
     this.shadows.renderOrder = 1;
     this.group.add(this.shadows);
+
+    const beamGeo = new THREE.PlaneGeometry(1, 1);
+    beamGeo.rotateX(-Math.PI / 2);
+    this.beamMat = new THREE.MeshBasicMaterial({
+      map: beamTexture(),
+      color: '#ffe2b0',
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -3,
+      polygonOffsetUnits: -3,
+    });
+    this.beams = makeInstanced(beamGeo, this.beamMat, total, 'vehicle-headlight-pools');
+    this.beams.renderOrder = 2;
+    this.group.add(this.beams);
     this.frustum = new THREE.Frustum();
     this._pv = new THREE.Matrix4();
-    this._shared = [this.wheels, this.hwindi, this.shadows];
+    this._shared = [this.wheels, this.hwindi, this.shadows, this.beams];
   }
 
-  begin(camera) {
+  begin(camera, night) {
     this._pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     this.frustum.setFromProjectionMatrix(this._pv);
     this.camPos = camera.position;
+    this.beamMat.opacity = 0.5 * night;
     for (const k in this.models) this.models[k].mesh.count = 0;
-    this.wheels.count = 0;
-    this.hwindi.count = 0;
-    this.shadows.count = 0;
+    for (const m of this._shared) m.count = 0;
   }
 
   inView(x, y, z, r) {
@@ -162,6 +201,12 @@ export class VehicleRenderer {
     const dx = p.x - this.camPos.x;
     const dz = p.z - this.camPos.z;
     if (dx * dx + dz * dz > DETAIL_DIST * DETAIL_DIST) return true;
+
+    if (head > 0.25 && this.beams.count < this.beams.instanceMatrix.count) {
+      _local.makeScale(v.width * 2, 1, 11).setPosition(0, 0.03, -(v.length / 2 + 5.2));
+      _out.multiplyMatrices(_chassis, _local);
+      this.beams.setMatrixAt(this.beams.count++, _out);
+    }
 
     for (const w of spec.wheels) {
       const spin = -v.odo / w.r;

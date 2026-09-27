@@ -58,4 +58,25 @@ export function angleDiff(a, b) {
   return d;
 }
 
+// Skips canvas redraws on frames where nothing moved enough to show. check() each input, then take().
+export class RedrawGate {
+  constructor(size) {
+    this.values = new Float64Array(size).fill(Infinity);
+    this.dirty = true;
+  }
+
+  check(i, value, eps) {
+    if (Math.abs(value - this.values[i]) > eps) {
+      this.values[i] = value;
+      this.dirty = true;
+    }
+  }
+
+  take() {
+    const d = this.dirty;
+    this.dirty = false;
+    return d;
+  }
+}
+
 export const isCoarsePointer = () => window.matchMedia?.('(pointer: coarse)').matches ?? false;

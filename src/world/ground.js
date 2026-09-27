@@ -10,7 +10,7 @@ import { tint } from './palette.js';
 
 // [ground layer, tint, priority group] — "landuse" areas sit under parks/lots that overlap them.
 const AREA_STYLE = {
-  park: ['grass', '#e9e6b4', 'area'],
+  park: ['grass', '#e6dfb4', 'area'],
   grass: ['grass', '#efe2ae', 'area'],
   pitch: ['grass', '#e2e3a6', 'area'],
   golf: ['grass', '#d6e0a4', 'landuse'],

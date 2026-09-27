@@ -10,14 +10,27 @@ export function resolveAudioUrl(src) {
   return new URL(src, base).toString();
 }
 
-export async function fetchAudioBuffer(ctx, url) {
+// Decoded audio is raw float PCM, so ~9 minutes of voice sprites would take ~200 MB at 48 kHz.
+// Decoding through an OfflineAudioContext at the recordings' own rate (or lower on phones) keeps
+// it at a fraction of that; the buffers still play in the main context.
+export async function fetchAudioBuffer(ctx, url, sampleRate) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
-  return ctx.decodeAudioData(await res.arrayBuffer());
+  let decoder = ctx;
+  if (sampleRate && sampleRate < ctx.sampleRate) {
+    try {
+      decoder = new OfflineAudioContext(1, 1, sampleRate);
+    } catch {
+      /* rate not supported here: decode at the context rate */
+    }
+  }
+  return decoder.decodeAudioData(await res.arrayBuffer());
 }
 
 export class VoiceBank {
-  constructor(manifest) {
+  // decodeRate: sample rate to decode the sprites at (they are 24 kHz speech).
+  constructor(manifest, decodeRate) {
+    this.decodeRate = decodeRate;
     this.manifest = manifest;
     this.clips = Array.isArray(manifest?.clips) ? manifest.clips : [];
     this.byId = new Map(this.clips.map((c) => [c.id, c]));
@@ -31,7 +44,7 @@ export class VoiceBank {
       const sprites = this.manifest?.sprites || {};
       this._loading = Promise.all(
         Object.entries(sprites).map(([key, src]) =>
-          fetchAudioBuffer(ctx, resolveAudioUrl(src))
+          fetchAudioBuffer(ctx, resolveAudioUrl(src), this.decodeRate)
             .then((buf) => {
               this.buffers[key] = buf;
             })

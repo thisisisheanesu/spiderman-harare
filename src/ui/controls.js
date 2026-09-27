@@ -72,7 +72,7 @@ const CONTROLS = {
   },
 };
 
-export const CONTROL_MODES = Object.keys(CONTROLS);
+const CONTROL_MODES = Object.keys(CONTROLS);
 
 function keyList(keys) {
   const out = [];
@@ -83,13 +83,14 @@ function keyList(keys) {
   return out;
 }
 
-// One table per input method; `active` is highlighted (the device the player is using now).
+// One table per input method; `active` (the device the player is using now) comes first, highlighted.
 export function controlsColumns(active) {
+  const modes = [active, ...CONTROL_MODES.filter((m) => m !== active)];
   return el(
     'div',
     'controls-cols',
     null,
-    CONTROL_MODES.map((mode) =>
+    modes.map((mode) =>
       el('section', `controls-col${mode === active ? ' is-active' : ''}`, { 'data-mode': mode }, [
         el('h3', null, { text: CONTROLS[mode].title }),
         el(

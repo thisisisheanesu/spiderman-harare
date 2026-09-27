@@ -1,5 +1,5 @@
 import { GeoBuffer } from './geoBuffer.js';
-import { polylineNormals, arcLengths, sampleAt, slice, SegmentGrid } from './lines.js';
+import { polylineNormals, arcLengths, sampleAt, slice, SegmentGrid, resample } from './lines.js';
 import { sidewalkWidth, kerbOffset, totalLanes, laneWidth, isMajor, KERB_HEIGHT } from './streetMetrics.js';
 import { tint } from './palette.js';
 
@@ -14,7 +14,7 @@ const YELLOW = tint('#e9b83a');
 const SIDE_STEP = 3;
 
 export function buildStreets(ctx) {
-  const { data, G, heightAt, crossingPoints } = ctx;
+  const { data, G, heightAt, crossingPoints, densify } = ctx;
   const roads = data.roads;
   const asphalt = new GeoBuffer(1 << 16);
   const walks = new GeoBuffer(1 << 16);
@@ -67,7 +67,7 @@ export function buildStreets(ctx) {
 
   const tmp = { x: 0, z: 0, dx: 0, dz: 0, i: 0 };
   roads.forEach((r, ri) => {
-    const pts = r.pts;
+    const pts = densify(r.pts) ? resample(r.pts, 4) : r.pts;
     const n = pts.length / 2;
     if (n < 2) return;
     const nrm = polylineNormals(pts);
@@ -273,7 +273,7 @@ function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW
     const k = nrm[i * 3 + 2];
     const nx = nrm[i * 3] * k;
     const nz = nrm[i * 3 + 1] * k;
-    samples.push({ x, z, nx, nz, s: lens[i], w: widthAt(x, z, nrm[i * 3], nrm[i * 3 + 1]) });
+    samples.push({ x, z, nx, nz, s: lens[i], w: widthAt(x, z, nrm[i * 3], nrm[i * 3 + 1]), vertex: true });
     if (i === n - 1) break;
     const segLen = lens[i + 1] - lens[i];
     const steps = Math.floor(segLen / SIDE_STEP);
@@ -286,17 +286,44 @@ function sidewalkRuns(r, ri, pts, nrm, lens, side, hw, sw, grid, roads, maxHalfW
       samples.push({ x: sx, z: szz, nx: dz, nz: -dx, s: lens[i] + t, w: widthAt(sx, szz, dz, -dx) });
     }
   }
+  // Runs of usable samples; their ends are refined by bisection so pavements stop right at the
+  // kerb line of the crossing street (corners then overlap instead of leaving gaps).
+  const tmp = { x: 0, z: 0, dx: 0, dz: 0, i: 0 };
+  const probe = (s) => {
+    sampleAt(pts, lens, s, tmp);
+    return { x: tmp.x, z: tmp.z, nx: tmp.dz, nz: -tmp.dx, s, w: widthAt(tmp.x, tmp.z, tmp.dz, -tmp.dx) };
+  };
+  const refine = (good, bad) => {
+    let a = good.s;
+    let b = bad.s;
+    for (let k = 0; k < 5; k++) {
+      const m = (a + b) / 2;
+      if (probe(m).w > 0) a = m;
+      else b = m;
+    }
+    const p = probe(a);
+    p.w = Math.min(good.w, p.w || good.w);
+    return p;
+  };
   const runs = [];
   let cur = null;
-  for (const s of samples) {
-    if (s.w > 0) {
-      if (!cur) runs.push((cur = []));
-      cur.push(s);
-    } else {
+  for (let k = 0; k < samples.length; k++) {
+    const smp = samples[k];
+    if (smp.w > 0) {
+      if (!cur) {
+        runs.push((cur = []));
+        if (k > 0) cur.push(refine(smp, samples[k - 1]));
+      }
+      cur.push(smp);
+    } else if (cur) {
+      cur.push(refine(samples[k - 1], smp));
       cur = null;
     }
   }
-  return runs.filter((run) => run.length >= 2 && run[run.length - 1].s - run[0].s > 1.5);
+  // Drop in-between samples on straight stretches where the width does not change.
+  return runs
+    .filter((run) => run.length >= 2 && run[run.length - 1].s - run[0].s > 1.5)
+    .map((run) => run.filter((p, k) => k === 0 || k === run.length - 1 || p.vertex || p.w !== run[k - 1].w || p.w !== run[k + 1].w));
 }
 
 function emitSidewalk(gb, G, run, hw, side, heightAt) {

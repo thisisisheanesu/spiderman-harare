@@ -11,7 +11,7 @@ import { FLAG } from './bodies.js';
 // rank crowds with their touts, and stall vendors in a radius around the player, scaled by the
 // quality preset, the time of day and how busy each street is. Spawns happen out of sight.
 
-const PER_METRE = 0.075; // walkers per metre of pavement at density 1
+const PER_METRE = 0.2; // people per metre of pavement at density 1
 const HOURLY = STREETLIFE.TRAFFIC?.densityByHour || { 0: 0.05, 6: 0.5, 7: 0.9, 12: 0.7, 17: 1, 19: 0.5, 21: 0.2 };
 const HOURS = Object.keys(HOURLY).map(Number).sort((a, b) => a - b);
 const SELLING = STREETLIFE.VENDOR_RAID?.sellingHours || [6, 18];
@@ -53,7 +53,7 @@ export class Population {
     const q = game.quality;
     this.max = Math.max(60, Math.round(300 * (q.crowd ?? 1)));
     this.radius = q.level === 'low' ? 115 : q.level === 'medium' ? 140 : 165;
-    this.pool = Array.from({ length: this.max }, (_, i) => new Agent(i));
+    this.pool = Array.from({ length: this.max }, () => new Agent());
     this.free = this.pool.slice().reverse();
     this.list = [];
     this.nextId = 1;
@@ -135,7 +135,7 @@ export class Population {
     }
     this._updateVendors(ctx, hour, jumped);
     this._updateRanks(ctx, tf, jumped);
-    this._updateGroups(t);
+    this._updateGroups(t, ctx.focus);
 
     // Walkers: despawn far ones, top up toward the target out of sight.
     let walkers = 0;
@@ -249,16 +249,15 @@ export class Population {
       if (ei < 0) return null;
       const e = W.edges[ei];
       const s = rng() * e.len;
-      const lat = (rng() * 2 - 1) * e.spread * 0.9;
-      const p = W.pointOn(e, s, lat, this._p);
+      const p = W.pointOn(e, s, 0, this._p);
       if (!anywhere && this._inView(p.x, p.z)) continue;
-      if (this.crowd.near(p.x, p.z, 0.9, this._tmp).length) continue;
+      if (this.crowd.near(p.x, p.z, 1.2, this._tmp).length) continue;
       const nearRank = this.ranks.some((r) => Math.abs(r.x - p.x) < 90 && Math.abs(r.z - p.z) < 90);
       const look = makeLook(rng, pickArchetype(rng, { hour: this.hour, nearRank, walking: true }));
       const a = this._alloc(look, 'walker');
       if (!a) return null;
       const fwd = rng() < 0.5;
-      this.crowd.putOnEdge(a, ei, fwd, fwd ? s : e.len - s, fwd ? lat : -lat);
+      this.crowd.putOnEdge(a, ei, fwd, fwd ? s : e.len - s);
       return a;
     }
     return null;
@@ -343,9 +342,13 @@ export class Population {
     return group.members.length;
   }
 
-  _updateGroups(t) {
+  _updateGroups(t, focus) {
+    const far2 = (this.radius * 1.1) ** 2;
     for (let i = this.groups.length - 1; i >= 0; i--) {
       const g = this.groups[i];
+      if (g.edge >= 0 && (g.x - focus.x) ** 2 + (g.z - focus.z) ** 2 > far2) {
+        for (const a of g.members.slice()) this.release(a);
+      }
       if (!g.members.length) {
         this.groups.splice(i, 1);
         continue;
@@ -378,17 +381,39 @@ export class Population {
         .filter((a) => a.kind === 'rank')
         .map((a) => ({ a, c: polyCentroid(a.pts) }))
         .filter(({ a, c }) => pointInPoly(rk.x, rk.z, a.pts) || Math.hypot(c.x - rk.x, c.z - rk.z) < 60)[0]?.a;
+      // People gather in knots and in queues for the kombis, thickest at the heart of the rank.
       const spots = [];
-      for (let i = 0; i < 500 && spots.length < 70; i++) {
-        const x = rk.x + rng.range(-38, 38);
-        const z = rk.z + rng.range(-38, 38);
-        if (poly && !pointInPoly(x, z, poly.pts) && rng() < 0.7) continue;
-        if (!W.free(x, z) || !W.free(x + 0.4, z) || !W.free(x - 0.4, z) || !W.free(x, z + 0.4) || !W.free(x, z - 0.4)) continue;
-        if (spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 1.1 * 1.1)) continue;
-        spots.push({ x, y: W.groundY(x, z), z, heading: rng.range(-Math.PI, Math.PI), used: null });
+      const ok = (x, z) => W.free(x, z) && W.free(x + 0.35, z) && W.free(x - 0.35, z) && W.free(x, z + 0.35) && W.free(x, z - 0.35) && !spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 0.75 * 0.75);
+      for (let c = 0, tries = 0; c < 12 && tries < 200; tries++) {
+        const r = 4 + rng() * (rk.kind === 'bus_stop' ? 10 : 26);
+        const ang = rng() * Math.PI * 2;
+        const cx = rk.x + Math.cos(ang) * r;
+        const cz = rk.z + Math.sin(ang) * r;
+        if (poly && !pointInPoly(cx, cz, poly.pts) && rng() < 0.6) continue;
+        if (!ok(cx, cz)) continue;
+        c++;
+        if (rng() < 0.4) {
+          // A queue: a line of people facing the same way.
+          const dir = rng() * Math.PI * 2;
+          const dx = Math.sin(dir);
+          const dz = Math.cos(dir);
+          for (let k = 0; k < 7; k++) {
+            const x = cx + dx * k * 0.85 + rng.range(-0.12, 0.12);
+            const z = cz + dz * k * 0.85 + rng.range(-0.12, 0.12);
+            if (!ok(x, z)) break;
+            spots.push({ x, y: W.groundY(x, z), z, heading: headingOf(-dx, -dz), knot: null });
+          }
+        } else {
+          const knot = { x: cx, z: cz };
+          for (let k = 0; k < 14 && spots.length < 90; k++) {
+            const a2 = rng() * Math.PI * 2;
+            const r2 = 0.6 + rng() * 2.4;
+            const x = cx + Math.cos(a2) * r2;
+            const z = cz + Math.sin(a2) * r2;
+            if (ok(x, z)) spots.push({ x, y: W.groundY(x, z), z, heading: rng.range(-Math.PI, Math.PI), knot });
+          }
+        }
       }
-      // Spots nearest the rank point first: the crowd thickens at the heart of the rank.
-      spots.sort((p, q) => Math.hypot(p.x - rk.x, p.z - rk.z) - Math.hypot(q.x - rk.x, q.z - rk.z));
       const key = rk.name.toLowerCase();
       const info = RANK_INFO.find((r) => [r.name, ...(r.altNames || [])].some((n) => key.includes(n.toLowerCase().split(' ')[0])));
       out.push({ name: rk.name, x: rk.x, z: rk.z, kind: rk.kind, spots, agents: [], info });
@@ -406,7 +431,7 @@ export class Population {
         for (const s of rk.spots) s.used = null;
         continue;
       }
-      const want = Math.min(rk.spots.length, Math.round((rk.kind === 'bus_stop' ? 8 : 30) * (this.game.quality.crowd ?? 1) * Math.max(0.35, tf)));
+      const want = Math.min(rk.spots.length, Math.round((rk.kind === 'bus_stop' ? 10 : 55) * (this.game.quality.crowd ?? 1) * Math.max(0.35, tf)));
       let budget = jumped ? want : 2;
       for (const s of rk.spots) {
         if (rk.agents.length >= want || budget <= 0 || !this.free.length) break;
@@ -418,10 +443,19 @@ export class Population {
         const a = this._alloc(look, hwindi ? 'hwindi' : 'rank');
         if (!a) break;
         a.position.set(s.x, s.y, s.z);
-        const face = rng() < 0.6 ? headingOf(rk.x - s.x, rk.z - s.z) : s.heading;
+        // In a knot people turn toward each other; in a queue they face the front.
+        const face = s.knot && rng() < 0.7 ? headingOf(s.knot.x - s.x, s.knot.z - s.z) : s.heading;
         a.heading = face;
         a.home = { x: s.x, z: s.z, heading: face };
         a.rank = rk;
+        if (s.knot && !hwindi && rng() < 0.7) {
+          // Knots of people at the rank chat among themselves.
+          const g = s.knot.group || (s.knot.group = { x: s.knot.x, z: s.knot.z, members: [], speaker: 0, switchAt: 0, until: Infinity, edge: -1 });
+          if (!g.members.length && !this.groups.includes(g)) this.groups.push(g);
+          g.members.push(a);
+          a.group = g;
+          a.state = 'chat';
+        }
         if (hwindi) a.role = `${look.name}, hwindi`;
         s.used = a;
         s.usedId = a.id;

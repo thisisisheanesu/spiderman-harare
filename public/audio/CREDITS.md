@@ -4,11 +4,11 @@ The NPC voices and the crowd ambience in this game are real recordings of Shona 
 recorded for Google's **FLEURS** speech dataset (locale `sn_zw`). Nothing was synthesised: the clips are
 trimmed, lightly cleaned (90 Hz high-pass, mild FFT denoise), loudness-matched and packed into audio sprites
 by `tools/build_voices.py`. The crowd bed layers many of the same recordings at low level (with a small
-speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single sentence is intelligible.
+speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single sentence stands out.
 
 | File | Contents |
 |------|----------|
-| `voices_f.mp3`, `voices_m.mp3` | 215 clips (60 female lines, 60 male lines, 45 female barks, 50 male barks); offsets, Shona text and English translations in `voices.json` |
+| `voices_f.mp3`, `voices_m.mp3` | 213 clips (60 female lines, 60 male lines, 43 female barks, 50 male barks); offsets, Shona text and English translations in `voices.json` |
 | `crowd_loop.mp3` | 45 s seamless loop of layered Shona chatter (28 utterances) |
 
 ## Speech: FLEURS
@@ -34,7 +34,8 @@ speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single se
 
 ## Sentences: FLoRes
 
-The speakers read sentences from the FLoRes-101 benchmark (translations of English Wikipedia sentences).
+The speakers read sentences from the FLoRes-101 benchmark (English sentences from Wikinews, Wikijunior and
+Wikivoyage, professionally translated into Shona and 100 other languages).
 The Shona text (`sn`) is the FLEURS transcription; the English text (`en`) is the matching FLoRes English
 sentence, licensed **CC BY-SA 4.0** <https://creativecommons.org/licenses/by-sa/4.0/>.
 Goyal et al., *The FLORES-101 Evaluation Benchmark for Low-Resource and Multilingual Machine Translation*, 2021.
@@ -46,7 +47,7 @@ Selection of a subset of utterances (content curated to everyday/neutral topics)
 cutting of short fragments at natural pauses ("barks"), splitting of some two-sentence utterances at the
 sentence pause, high-pass filtering, FFT denoising, loudness normalisation with peak limiting, 15 ms fades,
 resampling to 24 kHz, MP3 encoding and concatenation into sprites; for the crowd loop additionally mixing,
-panning, speed change (+/-6 %), low-pass filtering and echo. Bark subtitles (`approx: true`) are estimated
+panning, speed change (about +/-5 %), slow level riding, low-pass filtering and echo. Bark subtitles (`approx: true`) are estimated
 from timing and may be off by a word.
 
 This is a non-commercial fan project and is not endorsed by Google, Meta, or the speakers.

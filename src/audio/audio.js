@@ -5,8 +5,9 @@ import { Ambience } from './ambience.js';
 
 // Audio system (game.audio).
 //
-// Graph: sources -> {voices, sfx, ambience} buses -> master -> limiter -> THREE.AudioListener
-// (on the camera, so PannerNodes hear the world from the camera position).
+// Graph: sources -> {voices, sfx, ambience, ui} buses -> master -> limiter -> THREE.AudioListener
+// (on the camera, so PannerNodes hear the world from the camera position). Voices and effects dip
+// while the game is paused; 'ui' (menu clicks) follows the effects volume without the dip.
 //
 // Public API:
 //   unlock()                                   resume the context from a user gesture (retried on later gestures)
@@ -28,7 +29,7 @@ export class AudioManager {
     this.listener = new THREE.AudioListener();
     game.camera.add(this.listener);
     const ctx = (this.ctx = this.listener.context);
-    this.hrtf = game.quality.level !== 'low';
+    this.low = game.quality.level === 'low'; // phones: cheaper panning, lighter decoded audio
 
     this.limiter = ctx.createDynamicsCompressor();
     this.limiter.threshold.value = -8;
@@ -40,17 +41,19 @@ export class AudioManager {
     this.master = ctx.createGain();
     this.master.connect(this.limiter);
     this.buses = {};
-    for (const name of ['voices', 'sfx', 'ambience']) {
+    // 'ui' carries menu clicks: it follows the effects volume but is not ducked while paused.
+    for (const name of ['voices', 'sfx', 'ambience', 'ui']) {
       this.buses[name] = ctx.createGain();
       this.buses[name].connect(this.master);
     }
     this.volumes = { master: 0.8, voices: 1, sfx: 0.8, ambience: 0.7 };
     this._muted = false;
+    this._duck = 1; // voices + effects dip while a menu / the map is open
     this._applyVolumes(true);
 
     this.sfx = synthesizeSfx(ctx);
     this.active = {};
-    this.voiceBank = new VoiceBank(game.voices);
+    this.voiceBank = new VoiceBank(game.voices, this.low ? 16000 : 24000);
     this.ambience = new Ambience(this);
     this._camPos = new THREE.Vector3();
     this._started = false;
@@ -64,7 +67,11 @@ export class AudioManager {
     });
     ev.on('player:jump', () => this.playSfx('whoosh', null, { volume: 0.3, pitch: 1.15 }));
     ev.on('player:swingEnd', () => this.playSfx('whoosh', null, { volume: 0.45 }));
-    ev.on('game:pause', (e) => this.ambience.setPaused(!!e?.paused));
+    ev.on('game:pause', (e) => {
+      this.ambience.setPaused(!!e?.paused);
+      this._duck = e?.paused ? 0.35 : 1;
+      this._applyVolumes();
+    });
 
     // Browsers only start audio from a gesture; keep retrying on any later one (iOS can re-suspend).
     const retry = () => {
@@ -111,7 +118,7 @@ export class AudioManager {
     const m = this.game.voices;
     if (m) {
       this.voiceBank.load(this.ctx);
-      if (m.ambient?.crowd) this.ambience.loadCrowd(m.ambient.crowd, m.ambientLoop?.crowd);
+      if (m.ambient?.crowd) this.ambience.loadCrowd(m.ambient.crowd, m.ambientLoop?.crowd, this.low ? 22050 : 0);
     }
   }
 
@@ -125,12 +132,13 @@ export class AudioManager {
   }
 
   setMasterVolume(v) {
+    if (!Number.isFinite(v)) return;
     this.volumes.master = v;
     this._applyVolumes();
   }
 
   setBusVolume(bus, v) {
-    if (!(bus in this.buses)) return;
+    if (!(bus in this.volumes) || bus === 'master' || !Number.isFinite(v)) return;
     this.volumes[bus] = v;
     this._applyVolumes();
   }
@@ -139,7 +147,11 @@ export class AudioManager {
     const now = this.ctx.currentTime;
     const set = (param, v) => (immediate ? (param.value = v) : param.setTargetAtTime(v, now, 0.05));
     set(this.master.gain, this._muted ? 0 : this.volumes.master);
-    for (const [name, node] of Object.entries(this.buses)) set(node.gain, this.volumes[name]);
+    const { voices, sfx, ambience } = this.volumes;
+    set(this.buses.voices.gain, voices * this._duck);
+    set(this.buses.sfx.gain, sfx * this._duck);
+    set(this.buses.ambience.gain, ambience);
+    set(this.buses.ui.gain, sfx);
   }
 
   setAmbience(key, level) {
@@ -165,6 +177,7 @@ export class AudioManager {
     const far = name === 'horn' || name === 'kombiHoot';
     const handle = this.playBuffer(buffer, position, {
       volume,
+      bus: name === 'ui' ? 'ui' : 'sfx',
       rate: pitch * (0.97 + Math.random() * 0.06),
       ref: far ? 8 : 4,
       rolloff: far ? 0.8 : 1.2,
@@ -179,6 +192,7 @@ export class AudioManager {
     const ctx = this.ctx;
     if (ctx.state !== 'running') return null;
     if (position) {
+      if (!Number.isFinite(position.x + position.y + position.z)) return null;
       this.game.camera.getWorldPosition(this._camPos);
       if (this._camPos.distanceTo(position) > MAX_HEAR_DIST) return null;
     }
@@ -191,7 +205,7 @@ export class AudioManager {
     let panner = null;
     if (position) {
       panner = ctx.createPanner();
-      panner.panningModel = this.hrtf ? 'HRTF' : 'equalpower';
+      panner.panningModel = this.low ? 'equalpower' : 'HRTF';
       panner.distanceModel = 'inverse';
       panner.refDistance = ref;
       panner.rolloffFactor = rolloff;
@@ -220,7 +234,7 @@ export class AudioManager {
         }
       },
       setPosition(v) {
-        if (panner) setPannerPosition(panner, v);
+        if (panner && Number.isFinite(v.x + v.y + v.z)) setPannerPosition(panner, v);
       },
     };
   }

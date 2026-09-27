@@ -88,77 +88,67 @@ export class Signals {
   }
 
   _find(data, rng) {
-    const { roads, nodes, features } = data;
-    const ends = new Map();
-    roads.forEach((r) => {
-      const cls = ROAD_CLASSES[r.cls];
-      if (!cls) return;
-      for (const [node, atA] of [[r.a, true], [r.b, false]]) {
-        const p = r.pts;
-        const n = p.length;
-        const dx = atA ? p[2] - p[0] : p[n - 4] - p[n - 2];
-        const dz = atA ? p[3] - p[1] : p[n - 3] - p[n - 1];
-        const l = Math.hypot(dx, dz) || 1;
-        if (!ends.has(node)) ends.set(node, []);
-        ends.get(node).push({ road: r, rank: cls.rank, dx: dx / l, dz: dz / l });
-      }
-    });
-    const mapped = (features || []).filter((f) => f.kind === 'traffic_signals');
+    const mapped = (data.features || []).filter((f) => f.kind === 'traffic_signals');
     const core = coreBounds(data.buildings);
     const signalised = [];
-    for (const [node, list] of ends) {
+    for (const j of this.graph.junctionList) {
+      const list = j.ends;
       if (list.length < 3) continue;
-      const [x, z] = nodes[node];
       // Inside the CBD grid, a major street crossing any wide named street gets a robot as well.
-      const inCore = core && x > core.minX && x < core.maxX && z > core.minZ && z < core.maxZ;
-      let yes = mapped.some((f) => Math.hypot(f.x - x, f.z - z) < 18);
+      const inCore = core && j.x > core.minX && j.x < core.maxX && j.z > core.minZ && j.z < core.maxZ;
+      let yes = mapped.some((f) => Math.hypot(f.x - j.x, f.z - j.z) < 18);
       for (let i = 0; i < list.length && !yes; i++) {
         for (let k = i + 1; k < list.length; k++) {
           const a = list[i];
           const b = list[k];
-          const hi = Math.max(a.rank, b.rank);
-          const lo = Math.min(a.rank, b.rank);
+          const ra = ROAD_CLASSES[a.road.cls].rank;
+          const rb = ROAD_CLASSES[b.road.cls].rank;
           const minor = inCore ? a.road.name && b.road.name && Math.min(a.road.w, b.road.w) >= 8 : false;
-          if (hi < MAJOR_RANK || (lo < MAJOR_RANK && !minor)) continue;
-          const cross = Math.abs(a.dx * b.dz - a.dz * b.dx);
+          if (Math.max(ra, rb) < MAJOR_RANK || (Math.min(ra, rb) < MAJOR_RANK && !minor)) continue;
+          const cross = Math.abs(a.dir.x * b.dir.z - a.dir.z * b.dir.x);
           if (cross > 0.6 && (a.road.name || a.road) !== (b.road.name || b.road)) {
             yes = true;
             break;
           }
         }
       }
-      if (yes) signalised.push(node);
+      if (yes) signalised.push(j);
     }
 
-    // Cluster nearby signalised nodes (union-find).
-    const parent = new Map(signalised.map((n) => [n, n]));
-    const find = (n) => {
-      while (parent.get(n) !== n) n = parent.get(n);
-      return n;
+    // Cluster nearby signalised junctions (union-find) so e.g. both halves of a dual carriageway
+    // crossing run one phase plan.
+    const parent = signalised.map((_, i) => i);
+    const find = (i) => {
+      while (parent[i] !== i) i = parent[i];
+      return i;
     };
     for (let i = 0; i < signalised.length; i++) {
-      const [ax, az] = nodes[signalised[i]];
+      const a = signalised[i];
       for (let k = i + 1; k < signalised.length; k++) {
-        const [bx, bz] = nodes[signalised[k]];
-        if (Math.abs(ax - bx) < CLUSTER_DIST && Math.abs(az - bz) < CLUSTER_DIST && Math.hypot(ax - bx, az - bz) < CLUSTER_DIST) {
-          parent.set(find(signalised[i]), find(signalised[k]));
-        }
+        const b = signalised[k];
+        if (Math.hypot(a.x - b.x, a.z - b.z) < CLUSTER_DIST) parent[find(i)] = find(k);
       }
     }
     const clusters = new Map();
-    for (const n of signalised) {
-      const root = find(n);
+    signalised.forEach((j, i) => {
+      const root = find(i);
       if (!clusters.has(root)) clusters.set(root, []);
-      clusters.get(root).push(n);
-    }
+      clusters.get(root).push(j);
+    });
     for (const members of clusters.values()) {
       let best = null;
-      for (const n of members) {
-        for (const e of ends.get(n)) if (!best || e.rank > best.rank || (e.rank === best.rank && e.road.w > best.road.w)) best = e;
+      for (const j of members) {
+        for (const e of j.ends) {
+          const rank = ROAD_CLASSES[e.road.cls].rank;
+          if (!best || rank > best.rank || (rank === best.rank && e.road.w > best.road.w)) best = { rank, road: e.road, dir: e.dir };
+        }
       }
-      const c = new Controller(this.controllers.length, members, { x: best.dx, z: best.dz }, rng);
+      const nodes = members.flatMap((j) => j.nodes);
+      const c = new Controller(this.controllers.length, nodes, { x: best.dir.x, z: best.dir.z }, rng);
+      c.x = members[0].x;
+      c.z = members[0].z;
       this.controllers.push(c);
-      for (const n of members) this.byNode.set(n, c);
+      for (const n of nodes) this.byNode.set(n, c);
     }
 
     for (const lane of this.graph.lanes) {
@@ -172,6 +162,8 @@ export class Signals {
       const dz = p[n - 1] - p[n - 3];
       const l = Math.hypot(dx, dz) || 1;
       lane.signalGroup = Math.abs((dx * c.axis.x + dz * c.axis.z) / l) >= Math.SQRT1_2 ? 0 : 1;
+      // Even a movement that crosses nobody (e.g. a free left turn) waits for its green.
+      if (!lane.internal) for (const conn of lane.out) conn.conflictFree = false;
     }
   }
 

@@ -425,7 +425,7 @@ These are `places[]` in the JSON. The coordinates are lat/lon, and the notes exp
   - Features: lawns, flower beds, a pond on the north side, a **1930s bandstand** (Sunday jazz), a restaurant and a playground. The National Gallery is at the SE corner.
   - There is no Overture polygon, so the corner points in the JSON notes are *approx.*
   - Sources: [MyGuide Zimbabwe](https://www.myguidezimbabwe.com/things-to-do/harare-gardens), [ExcursionMania](https://excursionmania.com/ttd/5459/harare-gardens-blg-5459).
-- **The Kopje** (`the_kopje`, about -17.8410, 31.0386, hill).
+- **The Kopje** (`the_kopje`, about -17.8410, 31.0386, hill; the JSON marker is clamped to -17.8398 to stay inside the map bbox).
   - The granite hill at the SW edge of the CBD where the city was founded; a national monument of about 15 ha.
   - The summit road is **Skipper Hoste Drive**, a one-way loop that climbs south from Robert Mugabe Rd / Kaguvi St. It is in the Overture segments.
   - The **Eternal Flame of Independence** is on the summit. It was lit by Robert Mugabe at Rufaro Stadium on 18 April 1980 and carried here.

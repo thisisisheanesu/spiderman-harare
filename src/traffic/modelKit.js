@@ -101,6 +101,7 @@ export class ModelBuilder {
       bevelEnabled: bevel > 0,
       bevelThickness: bevel,
       bevelSize: bevel,
+      bevelOffset: -bevel,
       bevelSegments: 1,
       curveSegments: 4,
     });

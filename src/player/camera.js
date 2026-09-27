@@ -104,19 +104,18 @@ export class CameraRig {
     // Follow point: tight horizontally, softer vertically so bounces and landings don't jolt.
     _v.copy(p.position);
     _v.y += preset.height;
-    if (p.state === 'wall') _v.addScaledVector(p.controller.wallN, 0.7);
+    if (p.state === 'wall') _v.addScaledVector(p.controller.wall.normal, 0.7);
     const catchUp = 14 + speed * 0.3;
     this.follow.x = damp(this.follow.x, _v.x, catchUp, dt);
     this.follow.z = damp(this.follow.z, _v.z, catchUp, dt);
-    this.follow.y = damp(this.follow.y, _v.y, p.state === 'swing' || p.state === 'dive' ? 9 : 12, dt);
+    this.follow.y = damp(this.follow.y, _v.y, p.state === 'swing' ? 9 : catchUp, dt);
     // Never let the follow point lag more than a few metres (teleports, 50 m/s dives).
     _v.sub(this.follow);
     const lag = _v.length();
     if (lag > 4) this.follow.addScaledVector(_v, (lag - 4) / lag);
 
-    let want = preset.dist + speedK * 3.4;
-    if (p.state === 'dive') want += 1.6;
-    else if (p.state === 'perch') want += 1.0;
+    let want = preset.dist + speedK * (p.state === 'dive' ? 1.2 : 3.4);
+    if (p.state === 'perch') want += 1.0;
     this.distance = damp(this.distance, want, 3, dt);
 
     this._kick = damp(this._kick, 0, 2.5, dt);
@@ -167,7 +166,7 @@ export class CameraRig {
     // Roll into the swing (towards the anchor side) and into hard yaw turns.
     let roll = 0;
     if (p.state === 'swing') {
-      _v.subVectors(p.controller.anchor, p.position).normalize();
+      _v.subVectors(p.controller.swing.anchor, p.position).normalize();
       roll = -_v.dot(_right) * 0.16;
     }
     const yawRate = (this.yaw - this._lastYaw) / Math.max(dt, 1e-3);
@@ -191,13 +190,13 @@ export class CameraRig {
     }
     if (hs < 3 || !(st === 'swing' || st === 'dive' || st === 'zip' || st === 'air')) return;
     const k = clamp(hs / 20, 0.3, 1);
-    const yawRate = st === 'air' ? 1.0 : 1.7;
+    const yawRate = st === 'air' ? 1.0 : st === 'dive' ? 2.6 : 1.7;
     this.yaw = dampAngle(this.yaw, Math.atan2(-v.x, -v.z), yawRate * k, dt);
     let pitch = -0.2;
     if (st === 'swing') pitch = -0.2 - 0.12 * clamp(v.length() / 45, 0, 1);
-    else if (st === 'dive') pitch = clamp(Math.atan2(v.y, hs) * 0.75, -1.2, -0.3);
+    else if (st === 'dive') pitch = clamp(Math.atan2(v.y, hs) * 0.8, -1.25, -0.35);
     else if (st === 'air') pitch = clamp(Math.atan2(v.y, hs) * 0.4, -0.7, -0.1);
-    this.pitch = damp(this.pitch, pitch, st === 'dive' ? 2 : 1.2, dt);
+    this.pitch = damp(this.pitch, pitch, st === 'dive' ? 3 : 1.2, dt);
   }
 }
 

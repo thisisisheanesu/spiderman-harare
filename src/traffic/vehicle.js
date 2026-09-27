@@ -62,6 +62,7 @@ export class Vehicle {
     this.lineWait = 0;
     this.stuck = 0;
     this.lcCooldown = 0;
+    this.lcLeader = null;
     this.blink = 0;
     this.blinkT = 0;
     this.leader = null;

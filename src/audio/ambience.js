@@ -64,7 +64,7 @@ export class Ambience {
     lfo.start();
     this.trafficGain = gainNode(ctx, 0);
     loop(ctx, brown).connect(rumble).connect(swell);
-    loop(ctx, pink).connect(hiss).connect(gainNode(ctx, 0.35)).connect(swell);
+    loop(ctx, pink).connect(hiss).connect(gainNode(ctx, 0.55)).connect(swell);
     swell.connect(this.trafficGain).connect(ambience);
 
     // City bed.
@@ -79,10 +79,10 @@ export class Ambience {
     this.wildlife = synthesizeWildlife(ctx);
   }
 
-  // region: optional {start, end} (s) of the loopable part of the file.
-  async loadCrowd(src, region) {
+  // region: optional {start, end} (s) of the loopable part; decodeRate: 0 = context rate.
+  async loadCrowd(src, region, decodeRate) {
     try {
-      const buffer = await fetchAudioBuffer(this.ctx, resolveAudioUrl(src));
+      const buffer = await fetchAudioBuffer(this.ctx, resolveAudioUrl(src), decodeRate);
       this.crowd = new CrossfadeLoop(this.ctx, buffer, this.crowdGain, region);
     } catch (err) {
       console.warn('[audio] crowd bed unavailable:', err.message);
@@ -102,14 +102,14 @@ export class Ambience {
     this._paramT = 0;
 
     const now = this.ctx.currentTime;
-    const set = (param, v, tc = 0.25) => param.setTargetAtTime(v, now, tc);
+    const set = (param, v, tc = 0.25) => Number.isFinite(v) && param.setTargetAtTime(v, now, tc);
     const alt = player?.position.y ?? 0;
     const high = clamp01((alt - 8) / 90); // 0 at street level, 1 high above the rooftops
     const ground = this.paused ? 0.3 : 1 - 0.85 * high;
 
     set(this.crowdGain.gain, this.targets.crowd * 0.9 * ground, 0.6);
     set(this.trafficGain.gain, this.targets.traffic * 0.55 * (this.paused ? 0.3 : 1 - 0.65 * high), 0.6);
-    set(this.bedGain.gain, (0.05 + 0.04 * this.targets.traffic) * (this.paused ? 0.4 : 1 - 0.5 * high), 0.8);
+    set(this.bedGain.gain, (0.08 + 0.06 * this.targets.traffic) * (this.paused ? 0.4 : 1 - 0.5 * high), 0.8);
 
     const speed = this.paused ? 0 : (player?.speed ?? player?.velocity?.length() ?? 0);
     const v = Math.min(1.4, speed / 40);
@@ -156,8 +156,9 @@ export class Ambience {
   }
 }
 
-// Plays a buffer (or its {start, end} region) in a seamless loop by overlapping copies with
-// equal-power cross-fades, which also hides the silent padding mp3 encoders add at both ends.
+// Plays a buffer (or its {start, end} region) in a seamless loop by overlapping copies with short
+// cross-fades, which also hides the silent padding mp3 encoders add at both ends. Segments are
+// scheduled about a second ahead; after a stall (slow frame, suspended tab) it simply restarts.
 class CrossfadeLoop {
   constructor(ctx, buffer, dest, region) {
     this.ctx = ctx;
@@ -171,27 +172,24 @@ class CrossfadeLoop {
     }
     const len = this.end - this.start;
     this.fade = Math.min(1.5, len / 4);
-    const n = 64;
-    this.fadeIn = new Float32Array(n);
-    this.fadeOut = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      this.fadeIn[i] = Math.sin(((i / (n - 1)) * Math.PI) / 2);
-      this.fadeOut[i] = Math.cos(((i / (n - 1)) * Math.PI) / 2);
-    }
-    this.next = ctx.currentTime + 0.05;
+    this.next = null;
     this.offset = this.start + Math.random() * (len - this.fade * 2); // begin somewhere mid-loop
   }
 
   tick() {
     const ctx = this.ctx;
-    while (this.next < ctx.currentTime + 1) {
+    const now = ctx.currentTime;
+    if (this.next === null || this.next < now) this.next = now + 0.05;
+    while (this.next < now + 1) {
+      const t = this.next;
+      const len = this.end - this.offset;
       const src = ctx.createBufferSource();
       src.buffer = this.buffer;
       const g = ctx.createGain();
-      const t = this.next;
-      const len = this.end - this.offset;
-      g.gain.setValueCurveAtTime(this.fadeIn, t, this.fade);
-      g.gain.setValueCurveAtTime(this.fadeOut, t + len - this.fade, this.fade);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(1, t + this.fade);
+      g.gain.setValueAtTime(1, t + len - this.fade);
+      g.gain.linearRampToValueAtTime(0, t + len);
       src.connect(g).connect(this.dest);
       src.start(t, this.offset, len);
       src.onended = () => {

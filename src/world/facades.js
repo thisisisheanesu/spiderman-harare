@@ -422,6 +422,17 @@ export const SURFACE_STYLES = {
       p.grime(0.15, 1);
     },
   },
+  water: {
+    tileW: 4,
+    draw(p) {
+      p.glass(0, 0, 1, 1, '#5d8f95', '#2f5a60');
+      for (let i = 0; i < 26; i++) {
+        const y = p.rng();
+        const x = p.rng();
+        p.rect(x, y, x + 0.1 + p.rng() * 0.25, y + 0.006, 'rgba(255,255,255,0.18)');
+      }
+    },
+  },
   solar: {
     tileW: 1,
     draw(p) {

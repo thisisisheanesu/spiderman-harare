@@ -1,6 +1,6 @@
 import { MAP_COLORS, halfImage } from './mapPainter.js';
 import { drawPlaceIcon, drawPlayerArrow, drawRankIcon, drawWaypointPin, haloText } from './mapIcons.js';
-import { clamp, el, fitCanvas, fmtDistance } from './dom.js';
+import { clamp, el, fitCanvas, fmtDistance, RedrawGate } from './dom.js';
 
 const DEG = Math.PI / 180;
 const MARGIN = 12; // CSS px
@@ -21,14 +21,19 @@ export class Minimap {
     this.radius = 160;
     this.size = 0;
     this.dpr = 1;
-    this._sig = '';
+    this.gate = new RedrawGate(7);
   }
 
   // The canvas overhangs the circle by MARGIN px on every side so the N badge can sit on the rim.
   resize() {
     this.size = this.root.clientWidth;
     this.dpr = fitCanvas(this.canvas, this.size + MARGIN * 2, this.size + MARGIN * 2);
-    this._sig = '';
+    this.gate.dirty = true;
+    // Soft inner vignette so the rim reads against bright streets.
+    const r = this.size / 2;
+    this.vignette = this.ctx.createRadialGradient(r, r, r * 0.62, r, r, r);
+    this.vignette.addColorStop(0, 'rgba(8, 26, 56, 0)');
+    this.vignette.addColorStop(1, 'rgba(8, 26, 56, 0.55)');
   }
 
   // heading: camera compass heading (deg, clockwise from north); facing: player facing (deg).
@@ -38,9 +43,15 @@ export class Minimap {
     const t = clamp(Math.max(speed / 45, (alt - 12) / 140), 0, 1);
     this.radius += (150 + 280 * t - this.radius) * (1 - Math.exp(-dt * 1.5));
 
-    const sig = `${pos.x.toFixed(1)},${pos.z.toFixed(1)},${heading.toFixed(1)},${facing.toFixed(0)},${this.radius.toFixed(1)},${waypoint ? waypoint.x : ''}`;
-    if (sig === this._sig) return;
-    this._sig = sig;
+    const gate = this.gate;
+    gate.check(0, pos.x, 0.05);
+    gate.check(1, pos.z, 0.05);
+    gate.check(2, heading, 0.05);
+    gate.check(3, facing, 0.5);
+    gate.check(4, this.radius, 0.05);
+    gate.check(5, waypoint ? waypoint.x : 1e9, 0);
+    gate.check(6, waypoint ? waypoint.z : 1e9, 0);
+    if (!gate.take()) return;
 
     const ctx = this.ctx;
     const s = this.size;
@@ -65,11 +76,7 @@ export class Minimap {
     this._blit(ctx, pos.x, pos.z, R + 4, k * this.dpr);
     ctx.restore();
 
-    // Soft inner vignette so the rim reads against bright streets.
-    const g = ctx.createRadialGradient(r, r, r * 0.62, r, r, r);
-    g.addColorStop(0, 'rgba(8, 26, 56, 0)');
-    g.addColorStop(1, 'rgba(8, 26, 56, 0.55)');
-    ctx.fillStyle = g;
+    ctx.fillStyle = this.vignette;
     ctx.beginPath();
     ctx.arc(r, r, r - 1, 0, Math.PI * 2);
     ctx.fill();

@@ -25,9 +25,12 @@ import requests
 
 # south, west, north, east (Overpass order). Same box as tools/fetch_overture.py.
 BBOX = (-17.840, 31.030, -17.815, 31.062)
+# Tried in order; the main instance is often "too busy" (504), so fall back to mirrors.
 ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.openstreetmap.fr/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
 ]
 USER_AGENT = "SpiderManHarareFanGame/0.1 (https://github.com/thisisisheanesu/spiderman-harare)"
 
@@ -55,9 +58,11 @@ out body geom qt;
 """
 
 
-def fetch(q, attempts=4):
+def fetch(q, attempts=3):
     last = None
     for attempt in range(attempts):
+        if attempt:
+            time.sleep(30 * attempt)
         for url in ENDPOINTS:
             try:
                 print(f"POST {url} (attempt {attempt + 1})", file=sys.stderr)
@@ -66,11 +71,12 @@ def fetch(q, attempts=4):
                     data = r.json()
                     if data.get("remark") and "error" in data["remark"].lower():
                         raise RuntimeError(data["remark"])
+                    print(f"ok from {url}, base {data.get('osm3s', {}).get('timestamp_osm_base')}", file=sys.stderr)
                     return data
                 last = f"HTTP {r.status_code}: {r.text[:200]}"
                 print(last, file=sys.stderr)
-                if r.status_code in (429, 504):
-                    time.sleep(15 * (attempt + 1))
+                if r.status_code == 429:
+                    time.sleep(20 * (attempt + 1))
             except (requests.RequestException, ValueError, RuntimeError) as e:
                 last = repr(e)
                 print(last, file=sys.stderr)

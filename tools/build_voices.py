@@ -3,12 +3,13 @@
 
 Usage:
     python3 tools/build_voices.py [--fleurs DIR] [--fleurs-en DIR] [--out public/audio]
-                                  [--work DIR] [--ffmpeg PATH] [--seed N] [--verify-only]
+                                  [--work DIR] [--ffmpeg PATH] [--seed N] [--fresh] [--verify-only]
 
 Inputs (FLEURS layout, tab-separated, no header, no quoting):
     <fleurs>/{dev,test}.tsv + <fleurs>/audio/{dev,test}/*.wav   (16 kHz mono float)
         cols: 0 sentence id, 1 wav, 2 raw text, 3 normalised text, 4 chars, 5 samples, 6 gender
     <fleurs-en>/{dev,test,train}.tsv   English FLEURS rows; col 0 is the shared FLoRes id, col 2 the text.
+    Defaults point at this project's download location; per-file analysis is cached in --work.
 
 Outputs (in --out, paths in the manifest are relative to the site root):
     voices_f.mp3, voices_m.mp3   audio sprites (mono 24 kHz, 48 kbps CBR), 0.30 s silence between clips
@@ -20,15 +21,15 @@ Pipeline:
     1. analyse every dev/test recording (noise floor, speech RMS, peak/clipping, energy VAD, pauses, F0)
     2. curate content by FLoRes sentence id (hand-reviewed allow-list below, plus a keyword safety net
        on the English translation)
-    3. "line" clips = whole utterances 3.0-9.5 s after trimming (60 ms pad kept); when a gender runs
-       short, two-sentence utterances are split at the sentence-final pause (text split on the '.')
-    4. "bark" clips = utterance starts up to the first >=180 ms pause (0.7-2.6 s); the cut always lies
-       inside a detected pause; Shona text only when two independent timing estimates agree
+    3. "line" clips = whole utterances 3.0-9.5 s after trimming (60 ms pad kept); after those, two-sentence
+       utterances too long for one line are split at the sentence pause (text split on the '.')
+    4. "bark" clips = utterance starts up to the first >=180 ms pause (0.7-2.6 s long, so a pause after a
+       lone short first word is passed over); the cut lies inside the pause; Shona text only when two
+       independent timing estimates agree on the word boundary (else null)
     5. highpass 90 Hz + afftdn (nr 10), active-speech RMS normalisation with a peak limiter, 15 ms fades
     6. sprites, crowd loop, manifest, credits, then verification of the encoded files
 """
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -62,6 +63,7 @@ FRAME = 400                # 25 ms analysis frame
 HOP = 160                  # 10 ms hop
 HOP_S = HOP / SR
 PAUSE_MIN_S = 0.18         # a "pause" is >= 180 ms of sub-threshold energy
+ANALYSIS_VERSION = 4       # bump when analyse_one changes (invalidates the cache)
 
 LINE_MIN_S, LINE_MAX_S = 3.0, 9.5
 BARK_MIN_S, BARK_MAX_S = 0.7, 2.6
@@ -70,7 +72,7 @@ TARGET_BARKS = {'female': 50, 'male': 50}
 MAX_PER_SENTENCE = 3
 
 TARGET_RMS_DB = -20.0      # active-speech RMS after normalisation (dBFS)
-PEAK_CEIL_DB = -2.0        # sample-peak ceiling (dBFS)
+PEAK_CEIL_DB = -3.0        # sample-peak ceiling (dBFS); leaves ~1 dB for MP3 decode overshoot
 
 CROWD_LEN_S = 45.0
 CROWD_VOICES = 28
@@ -96,9 +98,9 @@ ALLOWED_IDS = {
     # 1660-1999
     1660, 1662, 1663, 1664, 1666, 1667, 1668, 1672, 1674, 1675, 1676, 1677, 1680, 1681, 1682, 1684,
     1685, 1686, 1689, 1691, 1693, 1695, 1698, 1700, 1701, 1704, 1707, 1711, 1712, 1714, 1715, 1717,
-    1718, 1720, 1724, 1725, 1726, 1728, 1729, 1730, 1731, 1732, 1734, 1735, 1737, 1738, 1740, 1741,
+    1718, 1720, 1724, 1725, 1726, 1728, 1729, 1730, 1731, 1732, 1734, 1735, 1737, 1740, 1741,
     1742, 1743, 1744, 1745, 1746, 1750, 1753, 1754, 1758, 1760, 1763, 1765, 1766, 1767, 1768, 1770,
-    1771, 1772, 1773, 1774, 1775, 1776, 1777, 1781, 1782, 1785, 1787, 1789, 1790, 1791, 1792, 1793,
+    1771, 1772, 1773, 1774, 1775, 1776, 1777, 1781, 1782, 1785, 1787, 1789, 1790, 1792, 1793,
     1794, 1796, 1797, 1798, 1800, 1801, 1802, 1803, 1805, 1806, 1807, 1809, 1811, 1813, 1814, 1817,
     1818, 1819, 1820, 1822, 1823, 1825, 1827, 1831, 1832, 1833, 1836, 1838, 1839, 1841, 1842, 1844,
     1846, 1849, 1850, 1851, 1852, 1855, 1856, 1862, 1865, 1866, 1867, 1868, 1869, 1870, 1871, 1874,
@@ -124,9 +126,10 @@ BLOCK_RE = re.compile(
     r'parliament\w*|senator|minister|congress\w*|jesus|christ\w*|islam\w*|church\w*|holocaust|nazi\w*)\b',
     re.IGNORECASE)
 # Allowed sentences that trip the keyword net but were re-read and are fine: 1525 "old mosques and churches"
-# in a city description, 1592 "people were probably patient" (travel), 1738 a mosasaur "attacked anything
-# that entered the water", 1743 "cultural or political influence" on technology (academic).
-KEYWORD_REVIEWED_OK = {1525, 1592, 1738, 1743}
+# in a city description, 1592 "people were probably patient" (travel), 1743 "cultural or political influence"
+# on technology (academic). Removed on review: 1738 (a mosasaur "attacked anything that entered the water":
+# violence) and 1791 ("do not deface the site ... graffiti": vandalism/crime).
+KEYWORD_REVIEWED_OK = {1525, 1592, 1743}
 
 # --------------------------------------------------------------------------------------------------
 
@@ -310,11 +313,11 @@ def analyse_one(args):
     # i.e. contains real silence. The cut goes to the quietest frame of the gap.
     r2, _ = vad(fdb, noise_db, speech_db, voiced, thr=max(thr, speech_db - 22.0))
     bark_pauses = []
+    ctr = np.arange(len(fdb)) * HOP_S + FRAME / (2 * SR)             # frame centres (s)
     for (s0, e0), (s1, e1) in zip(r2[:-1], r2[1:]):
         g0, g1 = (e0 - 1) * HOP / SR + FRAME / SR, s1 * HOP / SR
         if g1 - g0 >= PAUSE_MIN_S and fdb[e0:s1].min() <= thr:
             # quietest frame (by its centre) between 60 and 140 ms into the gap, and >= 60 ms before its end
-            ctr = np.arange(len(fdb)) * HOP_S + FRAME / (2 * SR)
             win = np.where((ctr >= g0 + PAD_S) & (ctr <= min(g0 + 0.14, g1 - PAD_S)))[0]
             cut = float(ctr[win[np.argmin(fdb[win])]]) if len(win) else g0 + PAD_S
             bark_pauses.append((round(g0, 3), round(g1, 3), round(cut, 3)))
@@ -357,15 +360,18 @@ def load_corpus(fleurs, fleurs_en):
     return items
 
 
-def analyse_all(items, fleurs, ffmpeg, work):
+def analyse_all(items, fleurs, ffmpeg, work, fresh=False):
     cache = Path(work) / 'analysis.json'
     env_cache = Path(work) / 'envelopes.npz'
-    if cache.exists() and env_cache.exists():
-        data = json.loads(cache.read_text())
-        if len(data) == len(items):
-            envs = dict(np.load(env_cache))
-            log(f'analysis: {len(data)} files (cached)')
-            return data, envs
+    if cache.exists() and env_cache.exists() and not fresh:
+        cached = json.loads(cache.read_text())
+        if isinstance(cached, dict) and cached.get('version') == ANALYSIS_VERSION:
+            by_wav = {r['wav']: r for r in cached['records']}
+            if all(it['wav'] in by_wav for it in items):
+                data = [dict(by_wav[it['wav']], **it) for it in items]   # fresh text/metadata, cached acoustics
+                envs = dict(np.load(env_cache))
+                log(f'analysis: {len(data)} files (cached)')
+                return data, envs
     jobs = [(ffmpeg, Path(fleurs) / 'audio' / it['split'] / it['wav'], it) for it in items]
     data, envs = [], {}
     with ProcessPoolExecutor(max_workers=os.cpu_count() or 2) as ex:
@@ -376,12 +382,10 @@ def analyse_all(items, fleurs, ffmpeg, work):
             if (i + 1) % 200 == 0:
                 log(f'  analysed {i + 1}/{len(jobs)}')
     Path(work).mkdir(parents=True, exist_ok=True)
-    cache.write_text(json.dumps(data))
+    cache.write_text(json.dumps({'version': ANALYSIS_VERSION, 'records': data}))
     np.savez_compressed(env_cache, **envs)
     log(f'analysis: {len(data)} files')
     return data, envs
-
-
 
 
 # --------------------------------------------------------------------------------------------------
@@ -602,7 +606,7 @@ def split_line_candidates(data, min_snr=18.0):
 
 
 def bark_candidates(data, exclude_wavs, min_snr=18.0):
-    out, skipped_first = [], 0
+    out = []
     for r in data:
         if not base_ok(r, min_snr) or r['wav'] in exclude_wavs or not clean_start(r):
             continue
@@ -620,14 +624,13 @@ def bark_candidates(data, exclude_wavs, min_snr=18.0):
         t1, g0, g1, k = cut
         if active_before(r, g0) - active_before(r, r['on']) < 0.35:
             continue
-        skipped_first += k > 0
         text = fragment_text(r, g0)
         out.append(dict(rec=r, t0=t0, t1=t1, sn=text, en=None, part=None, pause=(g0, g1), pause_index=k,
                         score=r['score'] + (4 if text else 0)))
-    return out, skipped_first
+    return out
 
 
-def choose(cands, n, sid_count, used_wavs, quota=None, pair_seen=None):
+def choose(cands, n, sid_count, used_wavs, quota=None):
     """Round-robin over sentence ids (best recording of every sentence first), honouring MAX_PER_SENTENCE,
     one clip per recording (split halves excepted) and optional per-session share quotas."""
     by = defaultdict(list)
@@ -635,7 +638,7 @@ def choose(cands, n, sid_count, used_wavs, quota=None, pair_seen=None):
         by[c['rec']['sid']].append(c)
     order = sorted(by, key=lambda s: -by[s][0]['score'])
     chosen, sess = [], Counter()
-    seen_pairs = set(pair_seen) if pair_seen is not None else set()
+    seen_pairs = set()
     for relax in (False, True):
         for rnd in range(6):
             for sid in order:
@@ -764,8 +767,14 @@ def encode_mp3(ffmpeg, pcm, in_sr, out_path, out_sr, kbps, channels=1, af=None):
     if af:
         cmd += ['-af', af]
     cmd += ['-ar', str(out_sr), '-ac', str(channels), '-c:a', 'libmp3lame', '-b:a', f'{kbps}k', '-abr', '0',
-            '-map_metadata', '-1', '-id3v2_version', '0', '-write_xing', '1', str(out_path)]
+            '-map_metadata', '-1', '-id3v2_version', '0', '-write_xing', '1', '-f', 'mp3', f'{out_path}.tmp']
     subprocess.run(cmd, input=np.ascontiguousarray(pcm, dtype='<f4').tobytes(), check=True)
+    os.replace(f'{out_path}.tmp', out_path)       # atomic: readers never see a half-written file
+
+
+def write_text_atomic(path, text):
+    Path(f'{path}.tmp').write_text(text, encoding='utf-8')
+    os.replace(f'{path}.tmp', path)
 
 
 def build_sprites(ffmpeg, clips, out_dir):
@@ -815,7 +824,8 @@ def build_crowd(ffmpeg, data, exclude_wavs, out_path, rng):
     fem = [r for r in pool if r['session'] == 'f']
     mc = [r for r in pool if r['session'] == 'm-clean']
     mn = [r for r in pool if r['session'] == 'm-noisy' and r['snr_db'] >= 20]
-    rng.shuffle(fem), rng.shuffle(mc), rng.shuffle(mn)
+    for group in (fem, mc, mn):
+        rng.shuffle(group)
     n_f = CROWD_VOICES // 2
     n_mn = min(len(mn), CROWD_VOICES // 5)
     picks, seen = [], set()
@@ -857,11 +867,11 @@ def build_crowd(ffmpeg, data, exclude_wavs, out_path, rng):
     for _ in range(300):
         E = energy_map(gains)
         share = E / np.maximum(E.sum(axis=0, keepdims=True), 1e-12)
-        share[gains <= -20.0] = 0.0
+        share[gains <= -18.0] = 0.0
         i, w = np.unravel_index(np.argmax(share), share.shape)
         if share[i, w] <= 0.45:
             break
-        gains[i] -= 1.0
+        gains[i] = max(-18.0, gains[i] - 1.0)
     E = energy_map(gains)
     share = E / np.maximum(E.sum(axis=0, keepdims=True), 1e-12)
     tot_db = db(E.sum(axis=0) / win)
@@ -916,7 +926,7 @@ The NPC voices and the crowd ambience in this game are real recordings of Shona 
 recorded for Google's **FLEURS** speech dataset (locale `sn_zw`). Nothing was synthesised: the clips are
 trimmed, lightly cleaned (90 Hz high-pass, mild FFT denoise), loudness-matched and packed into audio sprites
 by `tools/build_voices.py`. The crowd bed layers many of the same recordings at low level (with a small
-speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single sentence is intelligible.
+speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single sentence stands out.
 
 | File | Contents |
 |------|----------|
@@ -946,7 +956,8 @@ speed/pitch spread, a 4 kHz low-pass and a short room echo) so that no single se
 
 ## Sentences: FLoRes
 
-The speakers read sentences from the FLoRes-101 benchmark (translations of English Wikipedia sentences).
+The speakers read sentences from the FLoRes-101 benchmark (English sentences from Wikinews, Wikijunior and
+Wikivoyage, professionally translated into Shona and 100 other languages).
 The Shona text (`sn`) is the FLEURS transcription; the English text (`en`) is the matching FLoRes English
 sentence, licensed **CC BY-SA 4.0** <https://creativecommons.org/licenses/by-sa/4.0/>.
 Goyal et al., *The FLORES-101 Evaluation Benchmark for Low-Resource and Multilingual Machine Translation*, 2021.
@@ -958,7 +969,7 @@ Selection of a subset of utterances (content curated to everyday/neutral topics)
 cutting of short fragments at natural pauses ("barks"), splitting of some two-sentence utterances at the
 sentence pause, high-pass filtering, FFT denoising, loudness normalisation with peak limiting, 15 ms fades,
 resampling to 24 kHz, MP3 encoding and concatenation into sprites; for the crowd loop additionally mixing,
-panning, speed change (+/-6 %), low-pass filtering and echo. Bark subtitles (`approx: true`) are estimated
+panning, speed change (about +/-5 %), slow level riding, low-pass filtering and echo. Bark subtitles (`approx: true`) are estimated
 from timing and may be off by a word.
 
 This is a non-commercial fan project and is not endorsed by Google, Meta, or the speakers.
@@ -973,7 +984,8 @@ def main():
     ap.add_argument('--work', default=str(DEFAULT_WORK))
     ap.add_argument('--ffmpeg', default=os.environ.get('FFMPEG', DEFAULT_FFMPEG))
     ap.add_argument('--seed', type=int, default=20260927)
-    ap.add_argument('--verify-only', action='store_true')
+    ap.add_argument('--fresh', action='store_true', help='ignore the analysis cache')
+    ap.add_argument('--verify-only', action='store_true', help='only re-check the files in --out')
     ap.add_argument('--stop-after', choices=['analyse', 'select'], default=None)
     args = ap.parse_args()
     out_dir = Path(args.out)
@@ -982,7 +994,7 @@ def main():
 
     items = load_corpus(args.fleurs, args.fleurs_en)
     log(f'corpus: {len(items)} recordings, {len({i["sid"] for i in items})} sentences')
-    data, envs = analyse_all(items, args.fleurs, args.ffmpeg, args.work)
+    data, envs = analyse_all(items, args.fleurs, args.ffmpeg, args.work, fresh=args.fresh)
     if args.stop_after == 'analyse':
         return
     for r in data:
@@ -1003,7 +1015,7 @@ def main():
     for g in ('female', 'male'):
         # Line priority tiers: whole utterances, then sentence-split halves; and when natural short
         # utterance starts are scarce for this gender, recordings that could give a bark go last.
-        bark_all, _ = bark_candidates([r for r in data if r['ok'] and r['gender'] == g], set())
+        bark_all = bark_candidates([r for r in data if r['ok'] and r['gender'] == g], set())
         bark_wavs = {c['rec']['wav'] for c in bark_all}
         scarce = len(bark_wavs) < 1.25 * TARGET_BARKS[g]
         full = [c for c in line_candidates(data) if c['rec']['gender'] == g]
@@ -1021,7 +1033,7 @@ def main():
         lines[g] = chosen
     barks = {}
     for g in ('female', 'male'):
-        cands, skipped = bark_candidates([r for r in data if r['ok'] and r['gender'] == g], {k[0] for k in used})
+        cands = bark_candidates([r for r in data if r['ok'] and r['gender'] == g], {k[0] for k in used})
         barks[g] = choose(cands, TARGET_BARKS[g], sid_count, used, quota if g == 'male' else None)
         log(f'  {g}: {len(barks[g])} barks (of {len(cands)} candidates; {sum(c["pause_index"] > 0 for c in barks[g])} '
             f'extend past a pause < {BARK_MIN_S} s in; {sum(bool(c["sn"]) for c in barks[g])} with estimated text); '
@@ -1047,9 +1059,10 @@ def main():
         f'{np.median(lim):.1f} dB, max {max(lim):.1f} dB, {sum(x > 0 for x in lim)} clips limited')
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    for old in out_dir.glob('voices_*.mp3'):
-        old.unlink()
     sprites = build_sprites(args.ffmpeg, sel, out_dir)
+    for old in out_dir.glob('voices_*.mp3'):          # sprites left over from a bigger earlier build
+        if f'audio/{old.name}' not in {v['path'] for v in sprites.values()}:
+            old.unlink()
 
     rng = np.random.default_rng(args.seed)
     crowd = build_crowd(args.ffmpeg, data, {k[0] for k in used}, out_dir / 'crowd_loop.mp3', rng)
@@ -1064,7 +1077,6 @@ def main():
         'attribution': ATTRIBUTION,
         'sprites': {k: v['path'] for k, v in sprites.items()},
         'ambient': {'crowd': 'audio/crowd_loop.mp3'},
-        'ambientLoop': {'crowd': {'start': 0.0, 'end': CROWD_LEN_S}},
         'clips': [],
     }
     for c in sel:
@@ -1075,11 +1087,14 @@ def main():
         if c['kind'] == 'bark' and c['sn']:
             clip['approx'] = True
         manifest['clips'].append(clip)
-    (out_dir / 'voices.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
+    head = json.dumps({k: v for k, v in manifest.items() if k != 'clips'}, ensure_ascii=False, indent=1)[:-2]
+    body = ',\n'.join('  ' + json.dumps(c, ensure_ascii=False) for c in manifest['clips'])
+    write_text_atomic(out_dir / 'voices.json', f'{head},\n "clips": [\n{body}\n ]\n}}\n')
+    assert json.loads((out_dir / 'voices.json').read_text(encoding='utf-8')) == manifest
     kinds = Counter((c['kind'], c['gender']) for c in sel)
     summary = ', '.join(f'{kinds[(k, g)]} {g} {k}s' for k in ('line', 'bark') for g in ('female', 'male'))
-    (out_dir / 'CREDITS.md').write_text(CREDITS.format(n_clips=len(sel), summary=summary, crowd_s=CROWD_LEN_S,
-                                                       crowd_voices=crowd['voices']), encoding='utf-8')
+    write_text_atomic(out_dir / 'CREDITS.md', CREDITS.format(n_clips=len(sel), summary=summary, crowd_s=CROWD_LEN_S,
+                                                             crowd_voices=crowd['voices']))
     (Path(args.work) / 'build_report.json').write_text(json.dumps(dict(
         crowd=crowd, sprites=sprites,
         clips=[dict(id=c['id'], wav=c['rec']['wav'], sid=c['rec']['sid'], session=c['rec']['session'],

@@ -180,6 +180,7 @@
 
 .minimap {
   position: absolute;
+  z-index: 1; /* above the touch look zone, so a tap opens the map */
   right: var(--right);
   bottom: var(--bottom);
   width: var(--mini);
@@ -1354,5 +1355,13 @@
 
   .bigmap-zoom {
     flex-direction: row;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud,
+  .hud * {
+    transition-duration: 0s !important;
+    animation: none !important;
   }
 }

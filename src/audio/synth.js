@@ -201,7 +201,7 @@ function horn(ctx) {
       const shape = Math.min(1, t / 0.015) * Math.min(1, (dur - t) / 0.06);
       d[i] = Math.tanh(lp.run(s) * 1.4) * shape;
     }
-  }, 0.8);
+  }, 0.55); // dense and loud-sounding: lower peak keeps it level with the other effects
 }
 
 // Kombi hoot: brassy double toot (saw pair through a formant band).
@@ -227,7 +227,7 @@ function kombiHoot(ctx) {
       }
       d[i] = Math.tanh((formant.run(saw) * 1.6 + body.run(saw) * 0.6) * 1.3) * shape;
     }
-  }, 0.8);
+  }, 0.6);
 }
 
 // UI click: tiny pitched tick.
@@ -341,7 +341,7 @@ export function noiseBuffer(ctx, color, seconds, seed) {
       b0 = 0.99765 * b0 + w * 0.099046;
       b1 = 0.963 * b1 + w * 0.2965164;
       b2 = 0.57 * b2 + w * 1.0526913;
-      raw[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2;
+      raw[i] = (b0 + b1 + b2 + w * 0.1848) * 0.12;
     } else if (color === 'brown') {
       last = (last + 0.02 * w) / 1.02;
       raw[i] = last * 3.5;
