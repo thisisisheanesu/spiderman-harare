@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0e1116" />
+    <meta name="description" content="Fan-made web-swinging game set in a real-data recreation of Harare's CBD, Zimbabwe. Built with Three.js." />
+    <title>Spider-Man: Harare</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="hud"></div>
+    <div id="loading">
+      <div class="load-card">
+        <h1>Spider-Man<br /><span>Harare</span></h1>
+        <p class="sub">Swing through the real streets of Harare CBD, Zimbabwe</p>
+        <div class="load-track"><div id="load-bar"></div></div>
+        <div id="load-text">Loading…</div>
+        <button id="start" disabled>Loading…</button>
+        <div class="keys">
+          <kbd>WASD</kbd> move · <kbd>Mouse</kbd> look · <kbd>Space</kbd> jump / wall-run<br />
+          Hold <kbd>Left click</kbd> or <kbd>Shift</kbd> swing · <kbd>E</kbd> / <kbd>Right click</kbd> web-zip ·
+          <kbd>Ctrl</kbd> dive · <kbd>F</kbd> suit · <kbd>M</kbd> map · <kbd>H</kbd> help
+        </div>
+        <div class="fine">Fan project, not affiliated with Marvel or Sony. Map data © Overture Maps / OpenStreetMap contributors.
+          Voices: Shona speakers from Google FLEURS (CC BY 4.0).</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
