@@ -263,7 +263,8 @@ function classifySurface(world, hit, origin, out) {
 }
 
 // Top of an obstacle in front of the feet (facing into the wall with normal n), if it is within
-// maxRise above the feet: returns the top point (written into out) or null.
+// maxRise above the feet and there is room to land on it: returns the top point (written into out)
+// or null.
 export function probeLedge(world, feet, n, radius, maxRise, out) {
   _o.copy(feet).addScaledVector(n, -(radius + 0.35));
   _o.y += maxRise + 0.1;
@@ -271,7 +272,12 @@ export function probeLedge(world, feet, n, radius, maxRise, out) {
   if (!hit || hit.normal.y < 0.7) return null;
   const rise = hit.point.y - feet.y;
   if (rise < 0.25 || rise > maxRise) return null;
-  return out.copy(hit.point);
+  out.copy(hit.point);
+  // The probe may start inside a closed collider (a water tank on a lift room) and find the floor
+  // under it: the vault would then end inside, trapped. Require a clear run in over the lip.
+  _o.set(feet.x, out.y + 0.5, feet.z);
+  if (world.raycast(_o, _d.copy(n).negate(), 2 * radius + 0.9)) return null;
+  return out;
 }
 
 // A drop-off within reach of the feet (roof edge, parapet, antenna top): returns

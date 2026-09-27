@@ -43,7 +43,7 @@ export class City {
     game.scene.add(this.group);
     const quality = (this.quality = QUALITY[game.quality.level] || QUALITY.high);
 
-    const kopje = new Kopje(data);
+    const kopje = new Kopje(data, quality);
     this.heightAt = kopje.heightAt;
     const roadHeightAt = (x, z) => kopje.roadHeightAt(x, z);
     const skipArea = (a) => a === kopje.area;

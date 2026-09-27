@@ -18,8 +18,9 @@ export class LayerAtlas {
     const S = this.size;
     const color = makeCanvas(S);
     const mask = makeCanvas(S);
-    const c = color.getContext('2d');
-    const m = mask.getContext('2d');
+    // Painted once, then read back (speckle, build): CPU-backed canvases avoid GPU readbacks.
+    const c = color.getContext('2d', { willReadFrequently: true });
+    const m = mask.getContext('2d', { willReadFrequently: true });
     m.fillStyle = '#000';
     m.fillRect(0, 0, S, S);
     draw(c, m, S);

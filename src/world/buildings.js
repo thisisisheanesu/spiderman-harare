@@ -203,6 +203,8 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
   const roofY = spec.roofY ?? b.h;
   const parapetTop = flat && spec.parapet ? roofY + PARAPET : Math.min(wallTop, roofY);
   const bandTint = tint('#ffffff', 0.93).map((v, i) => Math.round((v * spec.tint[i]) / 255));
+  // Raised parts (minH: bridges, overhangs) float above the street like their physics extrusion.
+  const base = b.minH || 0;
 
   const rings = [fp, ...holes];
   rings.forEach((ring, ri) => {
@@ -220,8 +222,8 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
       if (len < 0.12) continue;
       const nx = normals[i * 2];
       const nz = normals[i * 2 + 1];
-      let y0 = 0;
-      const street = outer && spec.ground && b.core && len > 2.5 ? streetFacing(ctx.streets, ax, az, bx, bz, nx, nz, len) : null;
+      let y0 = base;
+      const street = !base && outer && spec.ground && b.core && len > 2.5 ? streetFacing(ctx.streets, ax, az, bx, bz, nx, nz, len) : null;
       if (street && (spec.windowTop > fh * 1.6 || spec.fl === 1)) {
         const gl = spec.ground;
         const nb = Math.max(1, Math.round(len / tileW[gl]));
@@ -274,6 +276,10 @@ export function emitBuilding(b, spec, gb, detail, col, ctx) {
     gb.polygon(fp, holes, roofY, tileW[layer]);
   } else {
     emitHipRoof(fp, spec, gb, L, tileW, seed);
+  }
+  if (base > 0) {
+    gb.brush(bandTint, L.concrete, seed, 2);
+    gb.polygon(fp, holes, base, tileW.concrete, false);
   }
 
   // Canopies / verandahs over the pavement on street frontages.

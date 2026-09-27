@@ -34,7 +34,7 @@ function noise(x, z) {
 }
 
 export class Kopje {
-  constructor(data) {
+  constructor(data, quality) {
     const f = data.features.find((p) => p.key === 'the_kopje' || p.kind === 'hill');
     this.center = f ? { x: f.x, z: f.z } : FALLBACK;
     const c = this.center;
@@ -73,10 +73,37 @@ export class Kopje {
     // Buildings on the hill's skirt: the ground levels out around them (physics extrudes every
     // building from y = 0).
     this.pads = data.buildings.filter((b) => b.maxX > minX && b.minX < maxX && b.maxZ > minZ && b.minZ < maxZ);
+    // The hill is rendered and collided as one triangulated heightfield grid, sampled here.
+    this.step = quality.props >= 1 ? 5 : 8;
+    this.nx = Math.ceil((maxX - minX) / this.step);
+    this.nz = Math.ceil((maxZ - minZ) / this.step);
+    this.hs = new Float32Array((this.nx + 1) * (this.nz + 1));
+    for (let j = 0; j <= this.nz; j++) {
+      for (let i = 0; i <= this.nx; i++) this.hs[j * (this.nx + 1) + i] = this._shape(minX + i * this.step, minZ + j * this.step);
+    }
     this.heightAt = this.heightAt.bind(this);
   }
 
+  // Height of the built surface: the grid triangles (split along the (i, j)-(i+1, j+1) diagonal,
+  // as in build()), so whatever stands on it matches what is drawn and what the physics uses.
   heightAt(x, z) {
+    const fx = (x - this.box.minX) / this.step;
+    const fz = (z - this.box.minZ) / this.step;
+    if (!(fx > 0 && fz > 0 && fx < this.nx && fz < this.nz)) return 0;
+    const i = Math.floor(fx);
+    const j = Math.floor(fz);
+    const u = fx - i;
+    const v = fz - j;
+    const w = this.nx + 1;
+    const ha = this.hs[j * w + i];
+    const hb = this.hs[j * w + i + 1];
+    const hc = this.hs[(j + 1) * w + i + 1];
+    const hd = this.hs[(j + 1) * w + i];
+    return v >= u ? ha + (hc - hd) * u + (hd - ha) * v : ha + (hb - ha) * u + (hc - hb) * v;
+  }
+
+  // Smooth hill shape: a noisy dome inside the wooded outline, levelled around buildings.
+  _shape(x, z) {
     const b = this.box;
     if (x <= b.minX || x >= b.maxX || z <= b.minZ || z >= b.maxZ) return 0;
     const c = this.center;
@@ -116,11 +143,7 @@ export class Kopje {
   build(ground, G, groundScale, chunkGb, L, quality) {
     const col = new GeoBuffer(1 << 15);
     const b = this.box;
-    const step = quality.props >= 1 ? 5 : 8;
-    const nx = Math.ceil((b.maxX - b.minX) / step);
-    const nz = Math.ceil((b.maxZ - b.minZ) / step);
-    const hs = new Float32Array((nx + 1) * (nz + 1));
-    for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) hs[j * (nx + 1) + i] = this.heightAt(b.minX + i * step, b.minZ + j * step);
+    const { step, nx, nz, hs } = this;
     const H = (i, j) => hs[Math.min(nz, Math.max(0, j)) * (nx + 1) + Math.min(nx, Math.max(0, i))];
     const idx = new Int32Array((nx + 1) * (nz + 1)).fill(-1);
     const s = 1 / groundScale.dryGrass;

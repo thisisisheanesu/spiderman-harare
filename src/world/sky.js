@@ -114,7 +114,14 @@ export class Sky {
     this.setTimeOfDay(this.timeOfDay);
   }
 
+  // Jumps to a time of day (settings slider, ?time=): cancels any running T-key transition.
   setTimeOfDay(hours) {
+    if (!Number.isFinite(hours)) return;
+    this._tween = null;
+    this._apply(hours);
+  }
+
+  _apply(hours) {
     const h = ((hours % 24) + 24) % 24;
     this.timeOfDay = h;
     const el = THREE.MathUtils.radToDeg(celestial(h, SUN_DECL, SOLAR_NOON, this.sunDirection));
@@ -183,7 +190,7 @@ export class Sky {
     if (tw) {
       tw.t = Math.min(1, tw.t + dt / tw.dur);
       const k = tw.t * tw.t * (3 - 2 * tw.t);
-      this.setTimeOfDay(tw.from + (tw.to - tw.from) * k);
+      this._apply(tw.from + (tw.to - tw.from) * k);
       if (tw.t >= 1) this._tween = null;
     }
 
