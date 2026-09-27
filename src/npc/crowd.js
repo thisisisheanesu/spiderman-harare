@@ -41,6 +41,8 @@ const FALLBACK = { flee_run: 'walk', call_out: 'wave', carry_on_head: 'walk', wa
 const SEATED = new Set(['sit_idle', 'sit_talk', 'sit_ground']);
 
 export class Agent {
+  static humans = null; // humans.js, set by npcs.js (head heights)
+
   constructor() {
     this.id = 0;
     this.position = new THREE.Vector3();
@@ -131,9 +133,18 @@ export class Agent {
     this.phone = false;
   }
 
-  // Height of the mouth above the ground (seated people are lower), for voices and bubbles.
+  // World height of the head joint (base of the skull) in the current animation frame: lower when sitting,
+  // bobbing when walking. Voices come from the mouth, bubbles float above the head.
+  get headY() {
+    const H = Agent.humans;
+    const L = this.look;
+    const an = this.anim;
+    if (H && an.clip && L.variant) return this.position.y + (H.jointY(0, an.clip, an.t, L.variant.index) + L.variant.ground) * L.scale;
+    return this.position.y + L.height * 0.9;
+  }
+
   get mouthY() {
-    return this.position.y + this.look.height * 0.93 - (this.pose.sit ? 0.42 * this.look.scale * (this.look.variant?.stride ?? 0.9) + (this.pose.sit > 1 ? 0.1 : 0) : 0);
+    return this.headY + 0.03 * this.look.scale;
   }
 }
 
@@ -312,10 +323,21 @@ export class Crowd {
     const e = W.edges[a.edge];
     const ux = a.fwd ? e.ux : -e.ux;
     const uz = a.fwd ? e.uz : -e.uz;
+    const L = a.look;
     let target = a.prefSpeed;
-    if (a.state === 'cross') target *= 1.25;
+    // Pupils walking together keep up with the one in front (and wait for the others).
+    const lead = a.follow && a.follow.id === a.followId && a.follow.edge >= 0 ? a.follow : null;
+    if (a.follow && !lead) a.follow = null;
+    if (lead && a.state !== 'flee') {
+      const ahead = (lead.position.x - a.position.x) * ux + (lead.position.z - a.position.z) * uz;
+      const gap = Math.hypot(lead.position.x - a.position.x, lead.position.z - a.position.z);
+      if (gap > 12) a.follow = null;
+      target = Math.min(L.walkMax, lead.prefSpeed * (ahead > 1.4 ? 1.25 : ahead < -0.6 ? 0.8 : 1));
+    }
+    // Speeds stay inside what the walk and run clips cover at a natural cadence (stride-matched).
+    if (a.state === 'cross') target = Math.min(target * 1.2, L.walkMax);
     if (a.state === 'flee') {
-      target = 3.6 + (a.look.child ? 0.4 : 0);
+      target = L.runSpeed || L.walkMax;
       a.timer -= dt;
       // Calm down, but whoever is out on a crossing by then still finishes crossing.
       if (a.timer <= 0) a.state = e.kind === CROSS ? 'cross' : 'walk';
@@ -326,7 +348,7 @@ export class Crowd {
       a.checkT = a.state === 'cross' ? 0.4 : 0.6 + Math.random() * 0.4;
       a.hurry = this._vehicleThreat(a.position.x, a.position.z, a.state === 'cross' ? 7 : 1.5) ? 1 : 0;
     }
-    if (a.hurry && a.state === 'cross') target = 3.2;
+    if (a.hurry && a.state === 'cross') target = L.runSpeed ? L.runSpeed * 0.85 : L.walkMax;
 
     const spread = e.spread;
     this._avoid(a, ux, uz, spread, ctx, dt);
@@ -354,7 +376,8 @@ export class Crowd {
     const px = a.position.x;
     const pz = a.position.z;
     a.s += a.speed * dt;
-    if (a.next < 0 && e.len - a.s < PLAN) this._plan(a, ctx);
+    // (A group member lets the one in front choose first.)
+    if (a.next < 0 && e.len - a.s < PLAN && !(lead && lead.edge === a.edge && lead.next < 0 && e.len - a.s > 1.5)) this._plan(a, ctx);
     const lo = a.next >= 0 ? a.nextLo : -spread;
     const hi = a.next >= 0 ? a.nextHi : spread;
     const goal = Math.max(lo, Math.min(hi, a.latGoal));
@@ -487,6 +510,12 @@ export class Crowd {
     const ux = a.fwd ? e.ux : -e.ux;
     const uz = a.fwd ? e.uz : -e.uz;
     const opts = node.edges;
+    // Walking in a group: take the way the one in front took (or is about to take).
+    const lead = a.follow && a.follow.id === a.followId ? a.follow : null;
+    if (lead && a.state !== 'flee') {
+      if (lead.edge !== a.edge && opts.includes(lead.edge)) return lead.edge;
+      if (lead.edge === a.edge && lead.next >= 0 && lead.fwd === a.fwd && opts.includes(lead.next)) return lead.next;
+    }
     let total = 0;
     let pick = -1;
     const weights = this._weights || (this._weights = []);
@@ -764,169 +793,176 @@ export class Crowd {
 
   // --- Animation -------------------------------------------------------------------------------
 
+  // Which clip this person plays now, how fast, and where they look. Walking clips are stride-matched:
+  // playback rate = ground speed / (clip speed x the variant's stride scale x the person's scale).
   _animate(a, dt, ctx) {
-    const p = a.pose;
+    const H = this.humans;
     const L = a.look;
+    const V = L.variant;
+    const an = a.anim;
+    const p = a.pose;
     const t = this.game.time;
+    if (!H || !V) return;
     const sp = a.state === 'react' || a.state === 'wait' ? a.speed : Math.hypot(a.vx, a.vz);
-    const gait = sp < 0.05 ? 0 : sp < 1.8 ? Math.min(1, sp / 1.1) : 1 + Math.min(1, (sp - 1.8) / 1.6);
-    p.gait += (gait - p.gait) * Math.min(1, dt * 6);
-    // Stride from the same hip swing the shader uses (four leg-lengths x sin(amplitude) per cycle,
-    // plus flight when running) so feet do not slide.
-    const walk = Math.min(1, p.gait);
-    const run = Math.max(0, Math.min(1, p.gait - 1));
-    const amp = (0.42 * walk + 0.36 * run) * (L.flags & FLAG.LONG ? 0.72 : 1);
-    const stride = L.scale * Math.max(0.35, 3.36 * Math.sin(amp) + 0.9 * run);
-    a.phase += sp > 0.05 ? (TAU * sp * dt) / stride : dt * 1.4;
-    if (a.phase > 1e4) a.phase -= TAU * 1000;
+    const mobile = a.state === 'walk' || a.state === 'cross' || a.state === 'flee' || a.state === 'react' || a.state === 'wait';
+    an.moving = mobile && (an.moving ? sp > 0.08 : sp > 0.22);
 
-    const R = this._armR;
-    const Lw = this._armL;
-    R[3] = 0;
-    Lw[3] = 0;
-    let headYaw = 0;
-    let headPitch = 0;
-    let lean = 0;
-    let sit = 0;
-    let flags = 0;
-
-    // Habits for people standing around: texting, a phone call, folded arms.
-    if (a.state === 'idle' || a.state === 'wait' || a.state === 'chat' || a.state === 'vendor' || a.state === 'walk') {
+    // Standing habits: a phone call, folded arms, looking about.
+    if (a.state === 'idle' || a.state === 'wait' || a.state === 'chat' || a.state === 'vendor') {
       if ((a.habitT -= dt) <= 0) {
         const r = Math.random();
-        const still = a.state !== 'walk';
-        a.habit = r < (still ? 0.28 : 0.12) ? 'text' : r < (still ? 0.38 : 0.16) ? 'call' : still && r < 0.55 && a.state !== 'chat' ? 'fold' : null;
-        if (a.lounge && a.habit !== 'text') a.habit = null;
-        a.habitT = 4 + Math.random() * 10;
+        const guard = L.archetype === 'security_guard' || L.archetype === 'police';
+        if (guard) a.habit = r < 0.45 ? 'fold' : r < 0.8 ? 'look' : null;
+        else if (a.state === 'chat') a.habit = null;
+        else a.habit = r < 0.2 ? 'call' : r < 0.36 ? 'fold' : r < 0.48 ? 'look' : null;
+        if (a.lounge || a.stall?.sit) a.habit = null;
+        a.habitT = 5 + Math.random() * 12;
       }
     } else a.habit = null;
 
-    if (a.stall?.sit && a.state !== 'react') {
+    let name = 'idle_relaxed';
+    let rate = a.tempo;
+    let phone = false;
+    let sit = 0;
+    const reacting = a.state === 'react' && t >= a.react.start;
+    if (an.moving) {
+      if (L.runSpeed && sp > Math.max(2.2, L.walkMax * 1.05)) {
+        name = 'flee_run';
+        rate = sp / (H.clips.flee_run.speed * V.stride * L.scale);
+      } else {
+        name = a.walkClip;
+        rate = Math.min(2.2, Math.max(0.3, sp / ((H.clips[name]?.speed || 1.05) * V.stride * L.scale)));
+      }
+    } else if (a.stall?.sit) {
       sit = 1;
-      setArm(R, ARMS.rest);
-      setArm(Lw, ARMS.rest);
+      name = a.talkUntil > t ? 'sit_talk' : 'sit_idle';
     } else if (a.lounge) {
       sit = 2;
-      lean = -0.12;
-      setArm(R, ARMS.prop);
-      setArm(Lw, ARMS.prop);
+      name = 'sit_ground';
+    } else if (reacting) {
+      switch (a.react.type) {
+        case 'point':
+          name = 'point';
+          break;
+        case 'photo':
+          name = 'phone_film';
+          phone = true;
+          break;
+        case 'wave':
+          name = 'wave';
+          break;
+        case 'cheer':
+          name = 'cheer';
+          break;
+        case 'cover':
+          // Flinch, then stand braced.
+          if (!an.once && an.clip?.name !== 'hit_head' && t - a.react.start < 0.2) this._once(a, 'hit_head');
+          name = 'idle_arms_folded';
+          break;
+        default:
+          name = 'idle_relaxed';
+      }
+    } else if (a.kind === 'hwindi' && a.timer > 0) {
+      name = 'call_out';
+    } else if (a.talkUntil > t) {
+      name = a.talkClip;
+    } else if (a.habit === 'call') {
+      name = 'phone_call';
+      phone = true;
+    } else if (a.habit === 'fold') {
+      name = 'idle_arms_folded';
+    } else if (a.habit === 'look') {
+      name = 'idle_look';
+    } else if (a.group && a.state === 'chat') {
+      // Listeners nod along now and then.
+      if (t > an.nodAt) {
+        if (an.nodAt) this._once(a, 'nod_yes');
+        an.nodAt = t + 5 + Math.random() * 12;
+      }
     }
-    if (L.flags & FLAG.LOAD && a.id % 3 !== 0) setArm(Lw, ARMS.steady);
-    if (L.flags & FLAG.BAGHAND) setArm(Lw, ARMS.bag, 0.6);
-
-    switch (a.habit) {
-      case 'text':
-        setArm(R, ARMS.text);
-        if (!(L.flags & FLAG.LOAD)) setArm(Lw, ARMS.textL);
-        headPitch = -0.42;
-        flags |= FLAG.PHONE;
-        break;
-      case 'call':
-        setArm(R, ARMS.call);
-        headYaw = 0.25;
-        flags |= FLAG.PHONE;
-        break;
-      case 'fold':
-        if (!sit) {
-          setArm(R, ARMS.fold);
-          setArm(Lw, ARMS.fold);
-        }
-        break;
-    }
-
     if (a.kind === 'hwindi' && a.state !== 'react') {
-      const k = Math.sin(t * 7 + a.id);
-      R[0] = ARMS.hwindi[0] + 0.25 * k;
-      R[1] = ARMS.hwindi[1] + 0.2 * k;
-      R[2] = ARMS.hwindi[2];
-      R[3] = a.timer > 0 ? 1 : 0;
       a.timer -= dt;
       if (a.timer < -4 - (a.id % 5)) a.timer = 2 + (a.id % 3);
     }
+    if (an.once && !an.moving && !sit && t < an.onceUntil) name = an.once;
+    else an.once = null;
+    this._play(a, name, rate);
+    a.phone = phone;
+    p.sit = sit;
+    if (an.prev) {
+      an.pt += dt * an.prate;
+      an.blend -= dt / an.fade;
+      if (an.blend <= 0) {
+        an.blend = 0;
+        an.prev = null;
+      }
+    }
+    an.t += dt * an.rate;
+    if (an.t > 1e4) an.t %= an.clip.dur;
 
-    // Chatting groups look at whoever holds the floor; the speaker gestures.
+    // Where they look: at Spider-Man when he is close on foot or they react to him, at whoever holds
+    // the floor in a chat, or a glance around now and then.
+    let headYaw = 0;
+    let headPitch = 0;
     if (a.group && a.state === 'chat') {
       const g = a.group;
       const sp2 = g.members[g.speaker];
-      if (sp2 === a) {
-        a.talkUntil = Math.max(a.talkUntil, t + 0.1);
-      } else if (sp2) {
-        headYaw = wrapAngle(headingOf(sp2.position.x - a.position.x, sp2.position.z - a.position.z) - a.heading);
-      }
+      if (sp2 === a) a.talkUntil = Math.max(a.talkUntil, t + 0.1);
+      else if (sp2) headYaw = wrapAngle(headingOf(sp2.position.x - a.position.x, sp2.position.z - a.position.z) - a.heading);
     }
-
-    // Glance around now and then; look at Spider-Man when he is close on foot.
     if ((a.glanceT -= dt) <= 0) {
-      a.glance = Math.random() < 0.35 ? (Math.random() - 0.5) * 1.6 : 0;
+      a.glance = Math.random() < 0.35 ? (Math.random() - 0.5) * 1.4 : 0;
       a.glanceT = 1.5 + Math.random() * 3;
     }
     const dxp = ctx.px - a.position.x;
     const dzp = ctx.pz - a.position.z;
     const d2 = dxp * dxp + dzp * dzp;
-    let watching = a.state === 'react' && t >= a.react.start;
-    if (!watching && ctx.playerOnFoot && d2 < 64) watching = true;
+    let watching = reacting;
+    if (!watching && ctx.playerOnFoot && d2 < 64 && a.state !== 'flee') watching = true;
     if (watching) {
       const d = Math.sqrt(d2);
-      headYaw = Math.max(-1.25, Math.min(1.25, wrapAngle(headingOf(dxp, dzp) - a.heading)));
-      headPitch = Math.max(-0.5, Math.min(1.0, Math.atan2(ctx.py + 1.2 - (a.position.y + 1.55 * L.scale), d)));
-    } else if (!a.habit && !a.group) headYaw = a.glance;
-
-    if (a.state === 'react' && t >= a.react.start) {
-      const k = Math.sin(t * 9 + a.id);
-      const up = headPitch;
-      switch (a.react.type) {
-        case 'cheer':
-          setArm(R, ARMS.cheer);
-          setArm(Lw, ARMS.cheer);
-          R[0] += 0.2 * k;
-          Lw[0] -= 0.2 * k;
-          break;
-        case 'point':
-          setArm(R, ARMS.point);
-          R[0] += up;
-          break;
-        case 'photo':
-          setArm(R, ARMS.photo);
-          setArm(Lw, ARMS.photo);
-          R[0] += up * 0.8;
-          Lw[0] += up * 0.8;
-          flags |= FLAG.PHONE;
-          break;
-        case 'wave':
-          setArm(R, ARMS.wave);
-          R[1] += 0.3 * k;
-          break;
-        case 'cover':
-          setArm(R, ARMS.cover);
-          setArm(Lw, ARMS.cover);
-          sit = Math.max(sit, 0.18);
-          lean = 0.25;
-          headPitch = -0.3;
-          break;
-      }
-    }
-
-    // Talking (a real voice clip or group chatter): nods and a hand that moves with the words.
-    if (a.talkUntil > t) {
-      headPitch += 0.07 * Math.sin(t * 8.3 + a.id) + 0.04 * Math.sin(t * 13.1);
-      if (R[3] < 0.5) {
-        R[0] = ARMS.talk[0] + 0.25 * Math.sin(t * 4.3 + a.id);
-        R[1] = ARMS.talk[1];
-        R[2] = ARMS.talk[2] + 0.35 * Math.sin(t * 3.1);
-        R[3] = 0.85;
-      }
-    }
-
-    if (a.state === 'flee') lean = 0.1;
-    const k = Math.min(1, dt * 7);
-    for (let i = 0; i < 4; i++) {
-      p.armR[i] += (R[i] - p.armR[i]) * k;
-      p.armL[i] += (Lw[i] - p.armL[i]) * k;
+      headYaw = Math.max(-1.1, Math.min(1.1, wrapAngle(headingOf(dxp, dzp) - a.heading)));
+      headPitch = Math.max(-0.45, Math.min(0.85, Math.atan2(ctx.py + 1.2 - a.mouthY, d)));
+      // Clips that already aim the head or hands forward (filming, pointing) only need the pitch.
+      if (name === 'phone_film' || name === 'point') headYaw *= 0.4;
+    } else if (!a.habit && !a.group && an.moving) headYaw = a.glance * 0.6;
+    else if (!a.habit && !a.group && !an.moving) headYaw = a.glance;
+    if (a.state === 'flee' || name === 'hit_head') {
+      headYaw = 0;
+      headPitch = 0;
     }
     p.headYaw += (headYaw - p.headYaw) * Math.min(1, dt * 5);
     p.headPitch += (headPitch - p.headPitch) * Math.min(1, dt * 5);
-    p.lean += (lean - p.lean) * k;
-    p.sit += (sit - p.sit) * Math.min(1, dt * 4);
-    p.flags = flags;
+  }
+
+  // Start a one-shot clip (nod, flinch) over whatever the person is doing while standing.
+  _once(a, name) {
+    const clip = this.humans?.clips[name];
+    if (!clip || !a.look.variant?.has(name)) return;
+    a.anim.once = name;
+    a.anim.onceUntil = this.game.time + clip.dur / a.tempo - 0.1;
+  }
+
+  // Switch to clip `name` (fading from the current one) or just update the playback rate.
+  _play(a, name, rate) {
+    const H = this.humans;
+    const V = a.look.variant;
+    while (!V.has(name)) name = FALLBACK[name] || (V.has('walk') ? 'walk' : 'walk_female');
+    const clip = H.clips[name];
+    const an = a.anim;
+    if (clip !== an.clip) {
+      if (an.clip) {
+        // A swap in the middle of a fade drops the older clip.
+        an.prev = an.clip;
+        an.pt = an.t;
+        an.prate = an.rate;
+        an.blend = 1;
+        an.fade = SEATED.has(name) || SEATED.has(an.clip.name) ? FADE_SIT : FADE;
+      }
+      an.clip = clip;
+      // Loops start somewhere in their cycle (so a crowd never moves in step); one-shots at the start.
+      an.t = clip.loop && !an.moving ? Math.random() * clip.dur : 0;
+    }
+    an.rate = rate;
   }
 }

@@ -65,7 +65,7 @@ export class Social {
     const id = a.id;
     return (v) => {
       if (a.id !== id) return false;
-      v.set(a.position.x, a.position.y + 1.6 * a.look.scale, a.position.z);
+      v.set(a.position.x, a.mouthY, a.position.z);
       return true;
     };
   }

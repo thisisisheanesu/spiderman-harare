@@ -103,7 +103,7 @@ export class VoiceDirector {
     const game = this.game;
     const t = game.time;
     this.played.set(clip.id, t);
-    const head = this._head.set(agent.position.x, agent.position.y + 1.6 * agent.look.scale, agent.position.z);
+    const head = this._head.set(agent.position.x, agent.mouthY, agent.position.z);
     const rate = agent.voiceRate || 1;
     const handle = game.audio?.playVoice?.(clip.id, head.clone(), { volume: clip.kind === 'line' ? 1 : 0.9, rate });
     // Wall-clock length at this rate.
@@ -135,7 +135,7 @@ export class VoiceDirector {
   }
 
   _onScreen(agent) {
-    const v = this._ndc.set(agent.position.x, agent.position.y + 1.6 * (agent.look?.scale ?? 1), agent.position.z).project(this.game.camera);
+    const v = this._ndc.set(agent.position.x, agent.mouthY, agent.position.z).project(this.game.camera);
     return v.z < 1 && Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.95;
   }
 
@@ -163,7 +163,7 @@ export class VoiceDirector {
         this.game.hud?.dropSubtitle?.({ sn: v.clip.sn, en: v.clip.en });
       }
       if (gone || !v.handle?.setPosition) continue;
-      v.handle.setPosition(this._head.set(a.position.x, a.position.y + 1.6 * a.look.scale, a.position.z));
+      v.handle.setPosition(this._head.set(a.position.x, a.mouthY, a.position.z));
     }
     if (t < this.nextLine || !ctx.nearGround || this.busy()) return;
     this.nextLine = t + 6 + Math.random() * 8;

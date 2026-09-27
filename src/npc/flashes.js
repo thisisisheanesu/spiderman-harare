@@ -38,10 +38,11 @@ export class Flashes {
   fire(a) {
     const i = this.next;
     this.next = (this.next + 1) % MAX;
+    // The phone is held up at arm's length in front of the face (phone_film).
     const s = a.look.scale;
-    this.pos[i * 3] = a.position.x - Math.sin(a.heading) * 0.5 * s;
-    this.pos[i * 3 + 1] = a.position.y + 1.62 * s;
-    this.pos[i * 3 + 2] = a.position.z - Math.cos(a.heading) * 0.5 * s;
+    this.pos[i * 3] = a.position.x - Math.sin(a.heading) * 0.38 * s;
+    this.pos[i * 3 + 1] = a.headY + 0.02 * s;
+    this.pos[i * 3 + 2] = a.position.z - Math.cos(a.heading) * 0.38 * s;
     this.age[i] = 0;
   }
 

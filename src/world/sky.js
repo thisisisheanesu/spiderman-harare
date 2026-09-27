@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { createSkyDome, createStars } from './skyDome.js';
+import { CityEnvironment } from './render/environment.js';
 
 // Sky + lighting for Harare (lat -17.83 S, lon 31.05 E) on a late-September day (27 Sep 2026:
 // solar declination -1.7 deg, solar noon 11:47 CAT, sunrise 05:41, sunset 17:53). The moon is
@@ -8,7 +9,8 @@ import { createSkyDome, createStars } from './skyDome.js';
 // Public: sun (DirectionalLight, follows the player: the sun by day, the moon at night), hemi,
 // setTimeOfDay(hours), timeOfDay, isNight, nightFactor (0..1), sunDirection / moonDirection (unit
 // vectors towards them, may point below the horizon), lightDirection (towards the current key
-// light), palette {zenith, horizon, ground} (linear Colors, for glass reflections).
+// light), palette {zenith, horizon, ground, version} (linear Colors, for glass reflections),
+// environment (the PMREM in scene.environment: image-based light for every PBR material).
 
 const LAT = (-17.83 * Math.PI) / 180;
 const SUN_DECL = (-1.7 * Math.PI) / 180;
@@ -77,7 +79,7 @@ export class Sky {
     this.sunDirection = new THREE.Vector3(0, 1, 0);
     this.moonDirection = new THREE.Vector3();
     this.lightDirection = new THREE.Vector3(0, 1, 0);
-    this.palette = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color() };
+    this.palette = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color(), version: 0 };
     this._raw = { zenith: new THREE.Color(), horizon: new THREE.Color(), fog: new THREE.Color(), glow: new THREE.Color(), hemiSky: new THREE.Color(), hemiGround: new THREE.Color(), sun: new THREE.Color() };
     this._tween = null;
     this._focus = new THREE.Vector3();
@@ -114,7 +116,21 @@ export class Sky {
     this.stars = createStars(game.camera.far * 0.85);
     scene.add(this.dome.mesh);
     scene.add(this.stars.mesh);
+    // Image-based lighting: the sky + HDRI street environment (render/environment.js).
+    this.env = new CityEnvironment(game.renderer, q);
+    await this.env.load(game.assets);
     this.setTimeOfDay(this.timeOfDay);
+  }
+
+  // Rebuilds the PMREM environment when the hour moved (throttled while the T-key tween runs).
+  _updateEnv(force = false) {
+    if (!this.env) return;
+    const tex = this.env.update(this, this._raw, this.nightFactor, force);
+    const scene = this.game.scene;
+    if (tex && scene.environment !== tex) scene.environment = tex;
+    // The environment replaces most of the hemisphere fill by day; at night the tuned blue-grey
+    // hemisphere keeps the city readable (the night sky itself is nearly black).
+    scene.environmentIntensity = this.envIntensity;
   }
 
   // Jumps to a time of day (settings slider, ?time=): cancels any running T-key transition.
@@ -154,7 +170,10 @@ export class Sky {
     light.normalize();
     this.hemi.color.setRGB(raw.hemiSky.r, raw.hemiSky.g, raw.hemiSky.b, THREE.SRGBColorSpace);
     this.hemi.groundColor.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace);
-    this.hemi.intensity = hemiI;
+    // Share of the hemisphere fill kept next to the image-based light.
+    const hemiKeep = THREE.MathUtils.lerp(0.35, 1.0, this.nightFactor);
+    this.hemi.intensity = hemiI * (this.env ? hemiKeep : 1);
+    this.envIntensity = THREE.MathUtils.lerp(1.0, 0.6, this.nightFactor);
 
     const scene = this.game.scene;
     scene.fog.color.setRGB(raw.fog.r, raw.fog.g, raw.fog.b, THREE.SRGBColorSpace);
@@ -171,6 +190,8 @@ export class Sky {
     pal.zenith.setRGB(raw.zenith.r, raw.zenith.g, raw.zenith.b, THREE.SRGBColorSpace).multiplyScalar(1.15);
     pal.horizon.setRGB(raw.horizon.r, raw.horizon.g, raw.horizon.b, THREE.SRGBColorSpace).multiplyScalar(1.1);
     pal.ground.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace).multiplyScalar(0.6);
+    pal.version++;
+    if (this.env && !this._tween) this._updateEnv();
     this.game.city?.setNight?.(this.nightFactor);
   }
 
@@ -196,6 +217,17 @@ export class Sky {
       this._apply(tw.from + (tw.to - tw.from) * k);
       if (tw.t >= 1) this._tween = null;
     }
+
+    // During a time-of-day transition, refresh the environment a few times a second.
+    this._envClock = (this._envClock || 0) + dt;
+    if (tw && this._envClock > 0.25) {
+      this._envClock = 0;
+      this._updateEnv();
+    } else if (!tw && this.env?.dirty) {
+      this._updateEnv(true);
+    }
+    if (!tw && this._wasTween) this._updateEnv(true);
+    this._wasTween = !!tw;
 
     const cam = game.camera;
     this.dome.mesh.position.copy(cam.position);

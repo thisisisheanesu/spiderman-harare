@@ -4,15 +4,16 @@ import * as THREE from 'three';
 // into a PMREM from a tiny scene: the procedural sky of skyDome.js above the horizon (same palette,
 // so reflections match the sky you see, sunsets included) and, below it, the street, trees and
 // low-rise blocks of the CC0 HDRI (public/textures/env, "Wide Street 01"), rotated so its sunlit side
-// faces the game sun and tinted / dimmed by the time of day. Rebuilt when the time of day moves
-// (about one frame of GPU work: 6 x 128^2 faces + the PMREM blur).
+// faces the game sun and tinted / dimmed by the time of day. The shader writes a 512 x 256
+// equirectangular half-float target, converted by PMREMGenerator.fromEquirectangular into a reused
+// cube-UV target. Rebuilt when the time of day moves (a fraction of a millisecond of GPU work).
 // Phones ('low'): the HDRI alone, converted once, faded by night.
 
 const VERT = /* glsl */ `
-varying vec3 vDir;
+varying vec2 vUv;
 void main() {
-  vDir = position;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  vUv = uv;
+  gl_Position = vec4(position.xy, 0.0, 1.0);
 }`;
 
 const FRAG = /* glsl */ `
@@ -29,12 +30,15 @@ uniform vec3 uSunDir;
 uniform float uSunVis;
 uniform float uNight;
 uniform float uScale;
-varying vec3 vDir;
+varying vec2 vUv;
 
 vec3 toLin(vec3 c) { return pow(max(c, vec3(0.0)), vec3(2.2)); }
 
 void main() {
-  vec3 d = normalize(vDir);
+  // Equirectangular direction (inverse of three's equirectUv).
+  float phi = (vUv.x - 0.5) * 6.2831853;
+  float th = (vUv.y - 0.5) * 3.1415927;
+  vec3 d = vec3(cos(th) * cos(phi), sin(th), cos(th) * sin(phi));
   float y = d.y;
   // Sky (display colours of the dome, decoded to linear radiance).
   float t = pow(clamp(y, 0.0, 1.0), 0.42);
@@ -54,7 +58,6 @@ void main() {
     ground = min(h, vec3(4.0)) * uHdrTint;
   }
   float horizonBand = smoothstep(-0.02, 0.1, y);
-  vec3 hazeLow = mix(ground, toLin(uFog), 0.35 * (1.0 - smoothstep(-0.25, 0.0, y)) + 0.0);
   col = mix(mix(ground, toLin(uFog), smoothstep(-0.12, 0.0, y) * 0.5), col, horizonBand);
   // City glow at night: sodium / LED light scattered in the haze low over the CBD.
   col += vec3(0.05, 0.032, 0.018) * uNight * (1.0 - smoothstep(-0.05, 0.35, abs(y)));
@@ -67,6 +70,11 @@ export class CityEnvironment {
     this.low = quality.level === 'low';
     this.pmrem = new THREE.PMREMGenerator(renderer);
     this.scene = new THREE.Scene();
+    this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    this.equirect = new THREE.WebGLRenderTarget(512, 256, {
+      type: THREE.HalfFloatType, format: THREE.RGBAFormat, colorSpace: THREE.LinearSRGBColorSpace,
+      minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false, depthBuffer: false,
+    });
     this.uniforms = {
       uHdr: { value: null },
       uHdrOn: { value: 0 },
@@ -82,8 +90,10 @@ export class CityEnvironment {
       uNight: { value: 0 },
       uScale: { value: 1 },
     };
-    const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms, side: THREE.BackSide, depthWrite: false, depthTest: false });
-    this.scene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), mat));
+    const mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: this.uniforms, depthWrite: false, depthTest: false });
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat);
+    quad.frustumCulled = false;
+    this.scene.add(quad);
     this.target = null;
     this.texture = null;
     this.hdrSun = new THREE.Vector3(0.488, 0.798, 0.355);
@@ -140,7 +150,15 @@ export class CityEnvironment {
     const g = raw.hemiGround;
     const day = 1 - night;
     u.uHdrTint.value.setRGB(0.55 + 0.45 * g.r, 0.55 + 0.45 * g.g, 0.55 + 0.45 * g.b).multiplyScalar(0.05 + 0.95 * day * day);
-    this.target = this.pmrem.fromScene(this.scene, 0, 0.1, 100, { size: 128, renderTarget: this.target });
+    const r = this.renderer;
+    const prev = r.getRenderTarget();
+    const toneMapping = r.toneMapping;
+    r.toneMapping = THREE.NoToneMapping;
+    r.setRenderTarget(this.equirect);
+    r.render(this.scene, this.camera);
+    r.setRenderTarget(prev);
+    r.toneMapping = toneMapping;
+    this.target = this.pmrem.fromEquirectangular(this.equirect.texture, this.target);
     this.texture = this.target.texture;
     this.builds++;
     return this.texture;

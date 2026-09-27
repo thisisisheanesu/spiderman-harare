@@ -513,6 +513,14 @@ export class Humans {
     return rt.texture;
   }
 
+  // Character-space height of prop bone k (0 head, 1 right hand) at time t of `clip` for variant index v.
+  jointY(k, clip, t, v) {
+    let f = t * clip.fps;
+    f = clip.loop ? ((f % clip.frames) + clip.frames) % clip.frames : Math.min(Math.max(f, 0), clip.frames);
+    const row = clip.cBase[v] + Math.round(f);
+    return this.propT[(row * this.PROP_BONES.length + k) * 3 + 1];
+  }
+
   // Pose of a prop bone (k: 0 head, 1 right hand) for an animation sample, in character space:
   // writes position into outP (Vector3) and world rotation into outQ (Quaternion).
   propPose(k, qFrame, cRow, outP, outQ) {

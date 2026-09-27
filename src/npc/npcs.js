@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { Walkways } from './walkways.js';
 import { Vendors } from './vendors.js';
-import { Crowd } from './crowd.js';
+import { Crowd, Agent } from './crowd.js';
 import { Population } from './population.js';
 import { CrowdRenderer } from './bodies.js';
+import { Humans } from './humans.js';
+import { useHumans } from './appearance.js';
 import { VoiceDirector } from './voices.js';
 import { Bubbles } from './bubbles.js';
 import { Social } from './social.js';
@@ -23,10 +25,12 @@ import { streetVoices } from './streetVoices.js';
 // Emits 'npc:speak' {npc, clip, text}; drives audio.playVoice / playExtra (real recorded greetings and
 // calls, streetVoices.js) / setAmbience('crowd') and hud.showSubtitle.
 
+// Draw distances (m): LOD0 (full mesh, real shadows) out to lod0 for at most cap0 people, LOD1 out to lod1,
+// nobody beyond (humans README: desktop 22 / 90 m, phones 12 / 55 m). atlas = LOD0 texture array size.
 const LOD = {
-  low: { near: 26, far: 115, blob: 40 },
-  medium: { near: 36, far: 150, blob: 55 },
-  high: { near: 46, far: 185, blob: 70 },
+  low: { lod0: 12, lod1: 58, cap0: 10, atlas: 512 },
+  medium: { lod0: 18, lod1: 75, cap0: 16, atlas: 512 },
+  high: { lod0: 22, lod1: 90, cap0: 24, atlas: 1024 },
 };
 
 export class Npcs {
@@ -37,12 +41,20 @@ export class Npcs {
 
   async init(game) {
     this.game = game;
+    this.lod = LOD[game.quality.level] || LOD.high;
+    // The people themselves load while the pedestrian network is built.
+    this.humans = new Humans(game);
+    const humansReady = this.humans.load({ lod0Size: this.lod.atlas, lod1Size: 256 });
     // Ground height from the city (the Kopje hill), looked up live in case the city swaps it.
     this.walkways = new Walkways(game.world, game.data, (x, z) => game.city?.heightAt?.(x, z) ?? 0);
     await this.walkways.build(() => new Promise((r) => setTimeout(r, 0)));
+    await humansReady;
+    useHumans(this.humans);
+    Agent.humans = this.humans;
     this.vendors = new Vendors(game, this.walkways);
     this.vendors.build();
     this.crowd = new Crowd(game, this.walkways, this.vendors.obstacles);
+    this.crowd.humans = this.humans;
     this.crossers = this.crowd.crossers;
     this._cityObstacles = 0;
     this._takeCityObstacles();
@@ -52,9 +64,10 @@ export class Npcs {
     this.population = new Population(game, this.walkways, this.vendors, this.crowd, this.voices);
     this.list = this.population.list;
     this.social = new Social(game, this.crowd, this.population, this.voices, this.bubbles);
-    this.lod = LOD[game.quality.level] || LOD.high;
-    this.renderer = new CrowdRenderer(game.scene, this.population.max, { shadows: !!game.quality.shadows });
+    this.renderer = new CrowdRenderer(game, this.humans, this.population.max, { shadows: !!game.quality.shadows });
     this.flashes = new Flashes(game.scene);
+    this.objects = [...this.renderer.objects, this.flashes.points, this.vendors.group].filter(Boolean);
+    this._lod0 = [];
     this.ctx = {
       focus: new THREE.Vector3(),
       px: 0,
@@ -143,21 +156,29 @@ export class Npcs {
     const t = this.game.time;
     const cam = this.game.camera.position;
     const frustum = this.population.frustum;
-    const { near, far, blob } = this.lod;
+    const { lod0, lod1, cap0 } = this.lod;
     const sphere = this._sphere;
+    const near = this._lod0;
+    near.length = 0;
     r.begin();
     for (const a of this.list) {
       const dx = a.position.x - cam.x;
       const dy = a.position.y - cam.y;
       const dz = a.position.z - cam.z;
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 > far * far) continue;
+      if (d2 > lod1 * lod1 || !a.anim.clip) continue;
       sphere.center.set(a.position.x, a.position.y + 0.9, a.position.z);
       if (!frustum.intersectsSphere(sphere)) continue;
-      r.push(a, d2 < near * near ? 0 : 1, d2 < blob * blob);
+      if (d2 < lod0 * lod0) {
+        a._d2 = d2;
+        near.push(a);
+      } else r.push(a, 1, true);
       // People filming Spider-Man: the odd phone flash.
       if (a.state === 'react' && a.react.type === 'photo' && t > a.react.start && Math.random() < dt * 0.7) this.flashes.fire(a);
     }
+    // The nearest few get the full mesh; a crowd pressing round Spider-Man spills over into LOD1.
+    if (near.length > cap0) near.sort((p, q) => p._d2 - q._d2);
+    for (let i = 0; i < near.length; i++) r.push(near[i], i < cap0 ? 0 : 1, true);
     r.end();
     this.flashes.update(dt);
     r.setShadowStrength(this.game.sky?.isNight ? 0.55 : 1);

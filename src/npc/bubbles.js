@@ -33,7 +33,7 @@ import * as THREE from 'three';
 
 const POOL = 8;
 const OCCLUSION_CHECK = 0.25; // s between raycasts per bubble
-const HEAD = 2.05; // m above the feet (x look.scale) where the tail points
+const HEAD = 0.4; // m above the speaker's head joint (x look.scale) where the tail points
 const EDGE = 6; // px kept clear of the screen edges
 const PAD = 4; // px between a bubble and what it avoids
 const DROP_HIDDEN = 0.8; // s: compact screens drop a bubble that could not be shown this long
@@ -201,7 +201,7 @@ export class Bubbles {
     const id = agent.id;
     const anchor = (out) => {
       if (agent.id !== id) return false;
-      out.set(agent.position.x, agent.position.y + HEAD * (agent.look?.scale ?? 1), agent.position.z);
+      out.set(agent.position.x, (agent.headY ?? agent.position.y + 1.65) + HEAD * (agent.look?.scale ?? 1), agent.position.z);
       return true;
     };
     return this.showAt(agent, id, anchor, sn, en, ms, kind, delay);

@@ -4,8 +4,7 @@ import { makeRng, hashString } from '../core/rng.js';
 import { pointInPoly, polyCentroid, polyArea } from '../core/geo.js';
 import { CROSS, WALK, PATH } from './walkways.js';
 import { Agent, headingOf } from './crowd.js';
-import { makeLook, pickArchetype, vendorLook } from './appearance.js';
-import { FLAG } from './bodies.js';
+import { makeLook, pickArchetype, vendorLook, archetypeById } from './appearance.js';
 import { rankSites } from './ranks.js';
 
 // Who is out, and where: keeps a population of walkers, chatting groups, people standing about,
@@ -194,7 +193,7 @@ export class Population {
       let n = 0;
       if (r < 0.08 && groupsN < target * 0.14) n = this._spawnGroup(ctx, anywhere);
       else if (r < 0.13 && idlers < target * 0.06) n = this._spawnIdler(ctx, anywhere) ? 1 : 0;
-      else n = this._spawnWalker(ctx, anywhere) ? 1 : 0;
+      else n = this._spawnWalker(ctx, anywhere);
       if (r < 0.08) groupsN += n;
       else if (r < 0.13) idlers += n;
       else walkers += n;
@@ -281,14 +280,48 @@ export class Population {
       if (!anywhere && this._inView(p.x, p.z)) continue;
       if (this.crowd.near(p.x, p.z, 1.2, this._tmp).length) continue;
       const nearRank = this.ranks.some((r) => Math.abs(r.x - p.x) < 90 && Math.abs(r.z - p.z) < 90);
-      const look = makeLook(rng, pickArchetype(rng, { hour: this.hour, nearRank, walking: true }));
-      const a = this._alloc(look, 'walker');
-      if (!a) return null;
+      const arch = pickArchetype(rng, { hour: this.hour, nearRank, walking: true });
       const fwd = rng() < 0.5;
+      if (arch.id === 'school_kid' && rng() < 0.75 && this.free.length > 4) return this._spawnPupils(arch, ei, fwd, fwd ? s : e.len - s);
+      const look = makeLook(rng, arch);
+      const a = this._alloc(look, 'walker');
+      if (!a) return 0;
       this.crowd.putOnEdge(a, ei, fwd, fwd ? s : e.len - s);
-      return a;
+      return 1;
     }
-    return null;
+    return 0;
+  }
+
+  // Pupils walk to and from school in twos, threes and fours from the same school, keeping together.
+  _spawnPupils(arch, ei, fwd, s) {
+    const rng = this.rng;
+    const e = this.walk.edges[ei];
+    const school = rng() < 0.55 ? 'primary' : 'high';
+    const n = rng.int(2, 4);
+    const kids = [];
+    for (let k = 0; k < n; k++) {
+      const a = this._alloc(makeLook(rng, arch, { school }), 'walker');
+      if (!a) break;
+      kids.push(a);
+    }
+    if (!kids.length) return 0;
+    const pace = Math.min(...kids.map((a) => a.prefSpeed));
+    const lead = kids[0];
+    kids.forEach((a, k) => {
+      a.prefSpeed = pace * (k ? 1 : 0.97);
+      // Two abreast, rows 0.9 m apart, the lead in front.
+      const row = Math.floor((k + 1) / 2);
+      const side = k === 0 ? 0 : k % 2 ? 1 : -1;
+      this.crowd.putOnEdge(a, ei, fwd, Math.max(0, s - row * 0.9));
+      a.lat = Math.max(-e.spread, Math.min(e.spread, lead.lat + side * 0.55));
+      a.latGoal = a.lat;
+      this.crowd._place(a);
+      if (k) {
+        a.follow = lead;
+        a.followId = lead.id;
+      }
+    });
+    return kids.length;
   }
 
   // Someone standing at the building line: a guard, someone on the phone, waiting for a friend.
@@ -390,7 +423,8 @@ export class Population {
         continue;
       }
       if (t > g.switchAt) {
-        g.speaker = Math.floor(this.rng() * g.members.length);
+        const preacher = g.preacher && g.preacher.id === g.preacherId ? g.members.indexOf(g.preacher) : -1;
+        g.speaker = preacher >= 0 && this.rng() < 0.85 ? preacher : Math.floor(this.rng() * g.members.length);
         g.switchAt = t + this.rng.range(2.5, 6);
       }
     }
@@ -561,6 +595,8 @@ export class Population {
   _spawnLoungers(cx, cz) {
     const W = this.walk;
     const rng = this.rng;
+    // Vapostori gather in the parks in their white robes: a circle on the grass round a standing preacher.
+    if (this.hour > 8 && this.hour < 17 && rng() < 0.3) return this._spawnCongregation(cx, cz);
     const n = rng.int(2, 4);
     const group = { x: cx, z: cz, members: [], speaker: 0, switchAt: 0, until: Infinity, edge: -1 };
     const base = rng() * Math.PI * 2;
@@ -569,9 +605,7 @@ export class Population {
       const x = cx + Math.cos(ang) * 0.85;
       const z = cz + Math.sin(ang) * 0.85;
       if (!W.free(x, z)) continue;
-      const look = makeLook(rng, pickArchetype(rng, { hour: this.hour }));
-      look.flags &= ~FLAG.LOAD;
-      if (look.flags & FLAG.LONG) look.flags = (look.flags & ~FLAG.LONG) | FLAG.SKIRT;
+      const look = makeLook(rng, pickArchetype(rng, { hour: this.hour }), { load: false });
       const a = this._alloc(look, 'group');
       if (!a) break;
       a.position.set(x, W.groundY(x, z), z);
@@ -579,6 +613,39 @@ export class Population {
       a.home = { x, z, heading: a.heading };
       a.group = group;
       a.lounge = true;
+      group.members.push(a);
+    }
+    if (group.members.length) this.groups.push(group);
+    return group;
+  }
+
+  _spawnCongregation(cx, cz) {
+    const W = this.walk;
+    const rng = this.rng;
+    const arch = archetypeById('apostolic');
+    const n = rng.int(5, 8);
+    const group = { x: cx, z: cz, members: [], speaker: 0, switchAt: 0, until: Infinity, edge: -1, preacher: null, preacherId: -1 };
+    const base = rng() * Math.PI * 2;
+    for (let k = 0; k <= n; k++) {
+      // k = 0: the preacher stands at the edge of the circle, facing in.
+      const ang = base + (k / (n + 1)) * Math.PI * 2 + rng.range(-0.12, 0.12);
+      const r = k === 0 ? 1.7 : rng.range(1.25, 1.45);
+      const x = cx + Math.cos(ang) * r;
+      const z = cz + Math.sin(ang) * r;
+      if (!W.free(x, z)) continue;
+      const look = makeLook(rng, arch, { gender: k === 0 ? 'male' : rng() < 0.7 ? 'female' : 'male' });
+      const a = this._alloc(look, 'group');
+      if (!a) break;
+      a.position.set(x, W.groundY(x, z), z);
+      a.heading = headingOf(cx - x, cz - z);
+      a.home = { x, z, heading: a.heading };
+      a.group = group;
+      a.lounge = k > 0;
+      if (k === 0) {
+        group.preacher = a;
+        group.preacherId = a.id;
+        a.role = `${look.name}, mupostori (preaching)`;
+      }
       group.members.push(a);
     }
     if (group.members.length) this.groups.push(group);
@@ -604,11 +671,12 @@ export class Population {
       if ((st.agent && st.agent.id === st.agentId) || budget <= 0 || !this.free.length) continue;
       const rng = makeRng(st.seed);
       const look = vendorLook(rng, st.def);
-      if (st.sit && look.flags & FLAG.LONG) look.flags = (look.flags & ~FLAG.LONG) | FLAG.SKIRT;
       const a = this._alloc(look, 'vendor');
       if (!a) break;
       const v = st.vendorSpot;
-      a.position.set(v.x, v.y, v.z);
+      // Seated vendors sit on their crate: the chair clip's seat is 0.45 m (x stride) above the feet.
+      const seat = st.sit ? (st.seatH ?? 0.4) - 0.45 * (look.variant?.stride ?? 0.9) * look.scale : 0;
+      a.position.set(v.x, v.y + seat, v.z);
       a.heading = v.heading;
       a.home = { x: v.x, z: v.z, heading: v.heading };
       a.stall = st;

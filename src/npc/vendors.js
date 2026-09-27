@@ -25,6 +25,8 @@ const HEADLINES = TYPES.find((t) => t.type === 'newspaper')?.headlines || ['MYST
 const BUILDERS = new Set(['fruit_veg', 'airtime_phone', 'sweets_snacks', 'newspaper', 'shoe_mender', 'flowers', 'secondhand_clothes', 'roast_maize', 'megaphone_herbalist', 'money_changer', 'umbrella_accessories']);
 
 const _p = { x: 0, z: 0 };
+// Height of the upturned crate seated vendors sit on (the chair clip's seat is lowered onto it, population.js).
+const SEAT = 0.4;
 
 // Heading that faces back across edge e from its `out` side (+1 = left of a→b).
 function facingIn(e, out) {
@@ -260,7 +262,7 @@ export class Vendors {
           vendorZ = 0.55;
         }
         if (rng() < 0.6) umbrella();
-        add('box', 0, 0, vendorZ + 0.05, 0.42, 0.32, 0.34, rng.pick(['#d23a2a', '#2b56a1', '#e0b23a', '#2e8b57']));
+        add('box', 0, 0, vendorZ + 0.05, 0.42, SEAT, 0.34, rng.pick(['#d23a2a', '#2b56a1', '#e0b23a', '#2e8b57']));
         break;
       case 'airtime_phone':
       case 'umbrella_accessories':
@@ -275,7 +277,7 @@ export class Vendors {
         add('box', 0.35, 0, 0, 0.42, 0.32, 0.34, '#e0b23a');
         add('box', 0.35, 0.32, 0, 0.5, 0.04, 0.42, '#c9a26b');
         add('board', 0.9, 0, -0.2, 1, 1, 1, '#ffffff', -0.3, 2);
-        add('box', 0, 0, vendorZ + 0.05, 0.42, 0.32, 0.34, '#2e8b57');
+        add('box', 0, 0, vendorZ + 0.05, 0.42, SEAT, 0.34, '#2e8b57');
         break;
       case 'newspaper':
         add('box', 0, 0, -0.1, 0.45, 0.22, 0.32, '#e8e4d8');
@@ -286,7 +288,7 @@ export class Vendors {
       case 'shoe_mender':
         for (let i = 0; i < 6; i++) add('box', -0.6 + i * 0.22, 0, -0.35, 0.1, 0.09, 0.26, rng.pick(['#1a1a1a', '#3b2a1e', '#6b4a2e']));
         add('board', 0.9, 0, -0.1, 1, 1, 1, '#ffffff', -0.25, 3);
-        add('box', 0, 0, vendorZ + 0.05, 0.36, 0.34, 0.36, '#6b4a2e');
+        add('box', 0, 0, vendorZ + 0.05, 0.36, SEAT, 0.36, '#6b4a2e');
         umbrella();
         break;
       case 'flowers':
@@ -310,7 +312,7 @@ export class Vendors {
         add('heap', -0.3, 0.1, -0.2, 0.8, 0.6, 0.8, '#e9c25a');
         add('basin', 0.4, 0, -0.2, 0.9, 0.9, 0.9, '#c9ced3');
         add('heap', 0.4, 0.06, -0.2, 0.7, 0.8, 0.7, '#f0d23c');
-        add('box', 0, 0, vendorZ + 0.05, 0.42, 0.32, 0.34, '#d23a2a');
+        add('box', 0, 0, vendorZ + 0.05, 0.42, SEAT, 0.34, '#d23a2a');
         break;
       case 'megaphone_herbalist':
         add('box', 0, 0, -0.1, 1.2, 0.01, 0.8, '#6b1f2a');
@@ -321,6 +323,7 @@ export class Vendors {
         sit = false;
     }
     st.sit = sit && st.type !== 'money_changer';
+    st.seatH = SEAT;
     st.localProps = P;
     st.vendorLocal = { x: 0, z: st.type === 'money_changer' ? 0 : vendorZ };
     const r = st.type === 'money_changer' ? 0.5 : 1.15;
