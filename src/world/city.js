@@ -32,6 +32,7 @@ export class City {
     game.scene.add(this.group);
     this.quality = QUALITY[game.quality.level] || QUALITY.high;
     const heightAt = () => 0;
+    const T0 = performance.now(); const tick = (l) => console.info(`[city] ${l} ${Math.round(performance.now() - T0)}ms`);
 
     // Textures: one texture array for everything built (facades, roofs, props, signs) and one for
     // the ground surfaces.
@@ -43,6 +44,7 @@ export class City {
     const G = groundAtlas.index;
     const facadeTex = facadeAtlas.build(game.renderer);
     const groundTex = groundAtlas.build(game.renderer);
+    tick('textures');
     const urban = buildUrbanMask(data.buildings, data.meta.bounds);
     this.textureBytes = facadeAtlas.bytes + groundAtlas.bytes;
 
@@ -68,6 +70,7 @@ export class City {
       for (const x of f) this.frontages.push(x);
     }
 
+    tick('buildings');
     // Streets and ground.
     const crossingPoints = data.features.filter((f) => f.kind === 'traffic_signals' || f.kind === 'crossing');
     const streets = buildStreets({ ...ctx, crossingPoints });
@@ -75,6 +78,7 @@ export class City {
     this.crossingNodes = streets.crossingNodes;
     const grounds = buildGround({ ...ctx, skipArea: () => false });
 
+    tick('streets');
     // Physics for everything that sticks out of the plain footprint extrusions.
     for (const [id, col] of colliders) {
       if (!col.iCount) continue;
@@ -100,11 +104,10 @@ export class City {
     this._mesh(grounds.paths, mats.paths);
     this._mesh(streets.asphalt, mats.roads);
     this._mesh(streets.walks, mats.areas);
-    const marks = new GeoBuffer(8);
-    marks.append(streets.marks);
-    marks.append(grounds.marks);
-    this._mesh(marks, mats.marks);
+    streets.marks.append(grounds.marks);
+    this._mesh(streets.marks, mats.marks);
 
+    tick('meshes');
     this.setNight(game.sky?.nightFactor ?? 0);
   }
 

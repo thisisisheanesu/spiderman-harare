@@ -1,3 +1,4 @@
+import { closestOnSegment } from '../core/geo.js';
 import { MAP_COLORS, MAJOR_ROADS } from './mapPainter.js';
 import { drawPlaceIcon, drawPlayerArrow, drawRankIcon, drawWaypointPin, haloText } from './mapIcons.js';
 import { clamp, el, fitCanvas, fmtDistance, setText } from './dom.js';
@@ -361,11 +362,15 @@ export class BigMap {
       const shown = [];
       for (const seg of st.segs) {
         if (shown.length >= 3) break;
-        if (seg.len * zoom < tw + 24) break; // sorted longest first
+        const len = seg.len * zoom;
+        if (len < tw + 24) break; // sorted longest first
+        // Label at the point of the run nearest the view centre, far enough from its ends to fit.
+        const edge = (tw / 2 + 12) / len;
+        const t = clamp(closestOnSegment(this.cx, this.cz, seg.ax, seg.az, seg.bx, seg.bz).t, edge, 1 - edge);
         const [ax, ay] = this._toScreen(seg.ax, seg.az);
         const [bx, by] = this._toScreen(seg.bx, seg.bz);
-        const mx = (ax + bx) / 2;
-        const my = (ay + by) / 2;
+        const mx = ax + (bx - ax) * t;
+        const my = ay + (by - ay) * t;
         if (shown.some(([x, y]) => Math.hypot(x - mx, y - my) < 320)) continue;
         let ang = Math.atan2(by - ay, bx - ax);
         if (ang > Math.PI / 2) ang -= Math.PI;
@@ -441,28 +446,47 @@ function turn(ax, az, bx, bz, cx, cz) {
   return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
 }
 
+// Greedy chaining: from each unused run, keep extending forward and then backward through runs that
+// share the endpoint and continue the chain's overall direction within ~5 degrees.
 function joinRuns(runs) {
   const key = (x, z) => `${Math.round(x * 10)},${Math.round(z * 10)}`;
-  const out = runs.slice();
-  for (let changed = true; changed; ) {
-    changed = false;
-    const starts = new Map();
-    out.forEach((r, i) => {
-      starts.set(key(r[0], r[1]), [...(starts.get(key(r[0], r[1])) || []), [i, false]]);
-      starts.set(key(r[2], r[3]), [...(starts.get(key(r[2], r[3])) || []), [i, true]]);
-    });
-    for (let i = 0; i < out.length && !changed; i++) {
-      const a = out[i];
-      for (const [j, reversed] of starts.get(key(a[2], a[3])) || []) {
-        if (j === i) continue;
-        const b = reversed ? [out[j][2], out[j][3], out[j][0], out[j][1]] : out[j];
-        if (turn(a[0], a[1], a[2], a[3], b[2], b[3]) > 6 * DEG) continue;
-        out[i] = [a[0], a[1], b[2], b[3]];
-        out.splice(j, 1);
-        changed = true;
-        break;
+  const at = new Map();
+  runs.forEach((r, i) => {
+    for (const [end, k] of [
+      [0, key(r[0], r[1])],
+      [1, key(r[2], r[3])],
+    ]) {
+      if (!at.has(k)) at.set(k, []);
+      at.get(k).push([i, end]);
+    }
+  });
+  const used = new Uint8Array(runs.length);
+  const out = [];
+  for (let i = 0; i < runs.length; i++) {
+    if (used[i]) continue;
+    used[i] = 1;
+    let [ax, az, bx, bz] = runs[i];
+    for (const forward of [true, false]) {
+      for (;;) {
+        const [px, pz] = forward ? [bx, bz] : [ax, az];
+        let next = null;
+        for (const [j, end] of at.get(key(px, pz)) || []) {
+          if (used[j]) continue;
+          const r = runs[j];
+          const [qx, qz] = end === 0 ? [r[2], r[3]] : [r[0], r[1]]; // far end of run j
+          const ok = forward ? turn(ax, az, bx, bz, qx, qz) : turn(qx, qz, ax, az, bx, bz);
+          if (ok <= 5 * DEG) {
+            next = [j, qx, qz];
+            break;
+          }
+        }
+        if (!next) break;
+        used[next[0]] = 1;
+        if (forward) [bx, bz] = [next[1], next[2]];
+        else [ax, az] = [next[1], next[2]];
       }
     }
+    out.push([ax, az, bx, bz]);
   }
   return out;
 }
