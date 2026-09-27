@@ -1,0 +1,153 @@
+{
+ "version": 1,
+ "atlas": "glass/interiors_atlas.webp",
+ "atlasSmall": "glass/interiors_atlas_small.webp",
+ "size": [
+  2048,
+  1024
+ ],
+ "sizeSmall": [
+  1024,
+  512
+ ],
+ "grid": [
+  4,
+  2
+ ],
+ "colorSpace": "sRGB (THREE.SRGBColorSpace); rendered with Blender AgX, interior lights on",
+ "bytes": [
+  89900,
+  40740
+ ],
+ "projection": {
+  "room": "x in [0,1] across the window (left->right seen from outside), y in [0,1] floor->ceiling, z in [0,1] into the building; window plane z = 0, back wall z = 1 (baked room: 3 x 3 x 3 m)",
+  "camera": "pinhole at (0.5, 0.5, -1) looking +z, frustum = the window rectangle at z = 0 (FOV 53.13 deg)",
+  "cellUv": "uv = 0.5 + (p.xy - 0.5) / (1.0 + p.z)   (p = where the view ray hits the room box)",
+  "atlasUv": "atlasUv = (vec2(col, ROWS - 1 - row) + cellUv) / vec2(COLS, ROWS)   (three.js flipY = true)",
+  "depthScale": "a room deeper than the window is wide: divide the ray direction z by depth (1 = as baked)"
+ },
+ "usage": "Emissive-like radiance behind the glass: day x0.35-0.6, night lit x1.0-1.4, night dark x0.03. Pick a cell per window from a hash of the window id + facade class (kind); mirror x for variety.",
+ "cells": [
+  {
+   "index": 0,
+   "name": "office_open",
+   "kind": "office",
+   "col": 0,
+   "row": 0,
+   "uvRect": [
+    0.0,
+    0.5,
+    0.25,
+    1.0
+   ],
+   "meanLuminanceLinear": 0.3542,
+   "notes": "Open-plan office: fluorescent panels, desks with monitors, partitions, filing cabinets."
+  },
+  {
+   "index": 1,
+   "name": "office_cellular",
+   "kind": "office",
+   "col": 1,
+   "row": 0,
+   "uvRect": [
+    0.25,
+    0.5,
+    0.5,
+    1.0
+   ],
+   "meanLuminanceLinear": 0.166,
+   "notes": "Single office with venetian blind half down, desk, binders on shelves."
+  },
+  {
+   "index": 2,
+   "name": "apartment_living",
+   "kind": "residential",
+   "col": 2,
+   "row": 0,
+   "uvRect": [
+    0.5,
+    0.5,
+    0.75,
+    1.0
+   ],
+   "meanLuminanceLinear": 0.0721,
+   "notes": "Flat living room: warm pendant light, sofa, TV unit, curtains half drawn."
+  },
+  {
+   "index": 3,
+   "name": "apartment_bedroom",
+   "kind": "residential",
+   "col": 3,
+   "row": 0,
+   "uvRect": [
+    0.75,
+    0.5,
+    1.0,
+    1.0
+   ],
+   "meanLuminanceLinear": 0.0875,
+   "notes": "Flat bedroom: bed, wardrobe, bedside lamp, curtains mostly drawn."
+  },
+  {
+   "index": 4,
+   "name": "shop_supermarket",
+   "kind": "shop",
+   "col": 0,
+   "row": 1,
+   "uvRect": [
+    0.0,
+    0.0,
+    0.25,
+    0.5
+   ],
+   "meanLuminanceLinear": 0.3838,
+   "notes": "Supermarket / pharmacy: bright tubes, shelves of colourful goods, gondola, promo banner."
+  },
+  {
+   "index": 5,
+   "name": "shop_clothing",
+   "kind": "shop",
+   "col": 1,
+   "row": 1,
+   "uvRect": [
+    0.25,
+    0.0,
+    0.5,
+    0.5
+   ],
+   "meanLuminanceLinear": 0.3372,
+   "notes": "Clothing shop (Edgars / boutique): warm spots, rails of garments, two mannequins."
+  },
+  {
+   "index": 6,
+   "name": "shop_hardware",
+   "kind": "shop",
+   "col": 2,
+   "row": 1,
+   "uvRect": [
+    0.5,
+    0.0,
+    0.75,
+    0.5
+   ],
+   "meanLuminanceLinear": 0.194,
+   "notes": "General dealer / hardware: dense shelving, counter with till, stacked mealie-meal sacks."
+  },
+  {
+   "index": 7,
+   "name": "vacant_storage",
+   "kind": "vacant",
+   "col": 3,
+   "row": 1,
+   "uvRect": [
+    0.75,
+    0.0,
+    1.0,
+    0.5
+   ],
+   "meanLuminanceLinear": 0.0121,
+   "notes": "Vacant unit / storeroom: bare bulb, cardboard boxes, newspaper on the glass (dim)."
+  }
+ ],
+ "license": "CC0 1.0 (procedural, rendered by tools/materials/interiors_blender.py)"
+}

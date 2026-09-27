@@ -1,0 +1,2599 @@
+{
+ "version": 1,
+ "generator": "tools/materials/build_textures.py + gen_textures.py",
+ "conventions": {
+  "albedo": "sRGB (set texture.colorSpace = THREE.SRGBColorSpace)",
+  "normal": "tangent space, OpenGL (+Y green up) - three.js default; linear",
+  "orm": "R = ambient occlusion, G = roughness, B = metalness; linear. Use the same texture for aoMap, roughnessMap and metalnessMap",
+  "tileSizeMetres": "real-world [u, v] size one texture repeat covers; texture.repeat = surfaceSizeMetres / tileSizeMetres",
+  "avgColor": "mean albedo (sRGB hex; avgColorLinear in linear RGB). To tint a material to a target facade colour multiply albedo by target_linear / avgColorLinear"
+ },
+ "totalBytes": 7017110,
+ "materials": [
+  {
+   "name": "concrete_raw",
+   "category": "concrete",
+   "files": {
+    "albedo": "concrete/concrete_raw_albedo.webp",
+    "normal": "concrete/concrete_raw_normal.webp",
+    "orm": "concrete/concrete_raw_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#615d59",
+   "avgColorLinear": [
+    0.12,
+    0.11,
+    0.1002
+   ],
+   "roughnessMean": 0.7,
+   "metalnessMean": 0.003,
+   "tags": [
+    "wall",
+    "facade",
+    "raw",
+    "modernist",
+    "tintable",
+    "grey"
+   ],
+   "bytes": 142522,
+   "source": {
+    "site": "ambientCG",
+    "id": "Concrete042A",
+    "url": "https://ambientcg.com/view?id=Concrete042A",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Plain grey off-form concrete (1960s-80s slab blocks, parking decks, parapets). Size estimated."
+  },
+  {
+   "name": "concrete_board_formed",
+   "category": "concrete",
+   "files": {
+    "albedo": "concrete/concrete_board_formed_albedo.webp",
+    "normal": "concrete/concrete_board_formed_normal.webp",
+    "orm": "concrete/concrete_board_formed_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#7e7b74",
+   "avgColorLinear": [
+    0.2078,
+    0.1966,
+    0.1759
+   ],
+   "roughnessMean": 0.823,
+   "metalnessMean": 0.002,
+   "tags": [
+    "wall",
+    "facade",
+    "raw",
+    "brutalist",
+    "tintable",
+    "grey"
+   ],
+   "bytes": 161792,
+   "source": {
+    "site": "Poly Haven",
+    "id": "concrete_layers_02",
+    "url": "https://polyhaven.com/a/concrete_layers_02",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Board-marked concrete with horizontal lift lines: stair drums, service cores, Eastgate-style precast."
+  },
+  {
+   "name": "concrete_weathered",
+   "category": "concrete",
+   "files": {
+    "albedo": "concrete/concrete_weathered_albedo.webp",
+    "normal": "concrete/concrete_weathered_normal.webp",
+    "orm": "concrete/concrete_weathered_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.16,
+    2.16
+   ],
+   "avgColor": "#8b836e",
+   "avgColorLinear": [
+    0.2576,
+    0.2259,
+    0.1566
+   ],
+   "roughnessMean": 0.775,
+   "metalnessMean": 0.003,
+   "tags": [
+    "wall",
+    "facade",
+    "weathered",
+    "tintable",
+    "beige"
+   ],
+   "bytes": 140160,
+   "source": {
+    "site": "Poly Haven",
+    "id": "concrete_wall_007",
+    "url": "https://polyhaven.com/a/concrete_wall_007",
+    "author": "Dario Barresi, Rico Cilliers, Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Stained, weathered beige concrete / render for older blocks and back walls."
+  },
+  {
+   "name": "concrete_painted",
+   "category": "concrete",
+   "files": {
+    "albedo": "concrete/concrete_painted_albedo.webp",
+    "normal": "concrete/concrete_painted_normal.webp",
+    "orm": "concrete/concrete_painted_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#aba39f",
+   "avgColorLinear": [
+    0.4092,
+    0.367,
+    0.3481
+   ],
+   "roughnessMean": 0.92,
+   "metalnessMean": 0.002,
+   "tags": [
+    "wall",
+    "facade",
+    "painted",
+    "tintable",
+    "light"
+   ],
+   "bytes": 134036,
+   "source": {
+    "site": "Poly Haven",
+    "id": "painted_plaster_wall",
+    "url": "https://polyhaven.com/a/painted_plaster_wall",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted concrete / render, light and neutral: the base for most tinted facades."
+  },
+  {
+   "name": "plaster_smooth",
+   "category": "plaster",
+   "files": {
+    "albedo": "plaster/plaster_smooth_albedo.webp",
+    "normal": "plaster/plaster_smooth_normal.webp",
+    "orm": "plaster/plaster_smooth_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.5,
+    1.5
+   ],
+   "avgColor": "#d7d4d1",
+   "avgColorLinear": [
+    0.6823,
+    0.6592,
+    0.6347
+   ],
+   "roughnessMean": 0.84,
+   "metalnessMean": 0.004,
+   "tags": [
+    "wall",
+    "facade",
+    "render",
+    "smooth",
+    "tintable",
+    "white"
+   ],
+   "bytes": 169534,
+   "source": {
+    "site": "ambientCG",
+    "id": "Plaster003",
+    "url": "https://ambientcg.com/view?id=Plaster003",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Smooth cement render, near white: tint to cream/beige/sand facade colours. Size estimated."
+  },
+  {
+   "name": "plaster_textured",
+   "category": "plaster",
+   "files": {
+    "albedo": "plaster/plaster_textured_albedo.webp",
+    "normal": "plaster/plaster_textured_normal.webp",
+    "orm": "plaster/plaster_textured_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.4,
+    1.4
+   ],
+   "avgColor": "#847a64",
+   "avgColorLinear": [
+    0.229,
+    0.196,
+    0.1267
+   ],
+   "roughnessMean": 0.529,
+   "metalnessMean": 0.003,
+   "tags": [
+    "wall",
+    "facade",
+    "render",
+    "textured",
+    "tintable",
+    "sand"
+   ],
+   "bytes": 180750,
+   "source": {
+    "site": "ambientCG",
+    "id": "Concrete040",
+    "url": "https://ambientcg.com/view?id=Concrete040",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Coarse spray / tyrolean render in sand-tan (Monomotapa-type tan walls, boundary walls)."
+  },
+  {
+   "name": "plaster_peeling",
+   "category": "plaster",
+   "files": {
+    "albedo": "plaster/plaster_peeling_albedo.webp",
+    "normal": "plaster/plaster_peeling_normal.webp",
+    "orm": "plaster/plaster_peeling_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.0,
+    1.0
+   ],
+   "avgColor": "#bab9b2",
+   "avgColorLinear": [
+    0.4895,
+    0.4849,
+    0.4447
+   ],
+   "roughnessMean": 0.521,
+   "metalnessMean": 0.007,
+   "tags": [
+    "wall",
+    "facade",
+    "render",
+    "weathered",
+    "colonial",
+    "tintable"
+   ],
+   "bytes": 219674,
+   "source": {
+    "site": "Poly Haven",
+    "id": "white_rough_plaster",
+    "url": "https://polyhaven.com/a/white_rough_plaster",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Rough, patchy white plaster with worn paint: 1920s-50s colonial shopfronts and verandah walls."
+  },
+  {
+   "name": "brick_face_salmon",
+   "category": "brick",
+   "files": {
+    "albedo": "brick/brick_face_salmon_albedo.webp",
+    "normal": "brick/brick_face_salmon_normal.webp",
+    "orm": "brick/brick_face_salmon_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#a2755f",
+   "avgColorLinear": [
+    0.3624,
+    0.1776,
+    0.1151
+   ],
+   "roughnessMean": 0.629,
+   "metalnessMean": 0.004,
+   "tags": [
+    "wall",
+    "facade",
+    "face-brick",
+    "salmon"
+   ],
+   "bytes": 189262,
+   "source": {
+    "site": "ambientCG",
+    "id": "Bricks101",
+    "url": "https://ambientcg.com/view?id=Bricks101",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Salmon/red face brick, stretcher bond (Eastgate infill #b5957c, CABS, flats)."
+  },
+  {
+   "name": "brick_face_red",
+   "category": "brick",
+   "files": {
+    "albedo": "brick/brick_face_red_albedo.webp",
+    "normal": "brick/brick_face_red_normal.webp",
+    "orm": "brick/brick_face_red_orm.webp"
+   },
+   "size": [
+    1024,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     512
+    ],
+    "normal": [
+     1024,
+     512
+    ],
+    "orm": [
+     512,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    0.9
+   ],
+   "avgColor": "#8a7059",
+   "avgColorLinear": [
+    0.2555,
+    0.1616,
+    0.0991
+   ],
+   "roughnessMean": 0.58,
+   "metalnessMean": 0.005,
+   "tags": [
+    "wall",
+    "facade",
+    "face-brick",
+    "red-brown"
+   ],
+   "bytes": 128206,
+   "source": {
+    "site": "ambientCG",
+    "id": "Bricks094",
+    "url": "https://ambientcg.com/view?id=Bricks094",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Darker red-brown face brick (Harare station #8a5c46, older warehouses)."
+  },
+  {
+   "name": "brick_painted",
+   "category": "brick",
+   "files": {
+    "albedo": "brick/brick_painted_albedo.webp",
+    "normal": "brick/brick_painted_normal.webp",
+    "orm": "brick/brick_painted_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.05,
+    1.05
+   ],
+   "avgColor": "#ddd8d4",
+   "avgColorLinear": [
+    0.7242,
+    0.6857,
+    0.6559
+   ],
+   "roughnessMean": 0.586,
+   "metalnessMean": 0.005,
+   "tags": [
+    "wall",
+    "facade",
+    "painted",
+    "tintable",
+    "white"
+   ],
+   "bytes": 194284,
+   "source": {
+    "site": "ambientCG",
+    "id": "Bricks060",
+    "url": "https://ambientcg.com/view?id=Bricks060",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted (white) brick; tint for painted back walls, lanes, low shops."
+  },
+  {
+   "name": "block_painted",
+   "category": "brick",
+   "files": {
+    "albedo": "brick/block_painted_albedo.webp",
+    "normal": "brick/block_painted_normal.webp",
+    "orm": "brick/block_painted_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.4,
+    2.4
+   ],
+   "avgColor": "#878786",
+   "avgColorLinear": [
+    0.2405,
+    0.2408,
+    0.2386
+   ],
+   "roughnessMean": 0.622,
+   "metalnessMean": 0.002,
+   "tags": [
+    "wall",
+    "fence",
+    "block",
+    "painted",
+    "tintable",
+    "grey"
+   ],
+   "bytes": 152246,
+   "source": {
+    "site": "ambientCG",
+    "id": "Bricks066",
+    "url": "https://ambientcg.com/view?id=Bricks066",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted concrete block wall: boundary walls, service yards, rooftop plant rooms."
+  },
+  {
+   "name": "granite_dark_tiles",
+   "category": "stone",
+   "files": {
+    "albedo": "stone/granite_dark_tiles_albedo.webp",
+    "normal": "stone/granite_dark_tiles_normal.webp",
+    "orm": "stone/granite_dark_tiles_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.3,
+    2.3
+   ],
+   "avgColor": "#4e4f4f",
+   "avgColorLinear": [
+    0.0761,
+    0.0779,
+    0.0776
+   ],
+   "roughnessMean": 0.545,
+   "metalnessMean": 0.004,
+   "tags": [
+    "wall",
+    "facade",
+    "cladding",
+    "granite",
+    "podium",
+    "dark"
+   ],
+   "bytes": 90648,
+   "source": {
+    "site": "Poly Haven",
+    "id": "granite_tile",
+    "url": "https://polyhaven.com/a/granite_tile",
+    "author": "Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Dark grey granite slabs with joints: bank podiums (RBZ podium #8f9593 when tinted up), plinths."
+  },
+  {
+   "name": "stone_cladding_sand",
+   "category": "stone",
+   "files": {
+    "albedo": "stone/stone_cladding_sand_albedo.webp",
+    "normal": "stone/stone_cladding_sand_normal.webp",
+    "orm": "stone/stone_cladding_sand_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#b4a08a",
+   "avgColorLinear": [
+    0.4573,
+    0.3514,
+    0.2548
+   ],
+   "roughnessMean": 0.515,
+   "metalnessMean": 0.002,
+   "tags": [
+    "wall",
+    "facade",
+    "cladding",
+    "sandstone",
+    "beige"
+   ],
+   "bytes": 104126,
+   "source": {
+    "site": "ambientCG",
+    "id": "Tiles139",
+    "url": "https://ambientcg.com/view?id=Tiles139",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Beige stone slab cladding (1960s-70s office podiums, Pearl House-type ochre when tinted)."
+  },
+  {
+   "name": "metal_panel",
+   "category": "metal",
+   "files": {
+    "albedo": "metal/metal_panel_albedo.webp",
+    "normal": "metal/metal_panel_normal.webp",
+    "orm": "metal/metal_panel_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    4.8,
+    4.8
+   ],
+   "avgColor": "#a3a8ad",
+   "avgColorLinear": [
+    0.3671,
+    0.3891,
+    0.4182
+   ],
+   "roughnessMean": 0.433,
+   "metalnessMean": 0.148,
+   "tags": [
+    "wall",
+    "facade",
+    "cladding",
+    "aluminium",
+    "metal",
+    "tintable"
+   ],
+   "bytes": 30560,
+   "source": {
+    "site": "ambientCG",
+    "id": "MetalPlates004",
+    "url": "https://ambientcg.com/view?id=MetalPlates004",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted aluminium composite (ACP) panels with joints: shop fascias, modern refits, lift overruns. Metalness kept low (PVDF paint) so it tints like paint."
+  },
+  {
+   "name": "window_frame_aluminium",
+   "category": "metal",
+   "files": {
+    "albedo": "metal/window_frame_aluminium_albedo.webp",
+    "normal": "metal/window_frame_aluminium_normal.webp",
+    "orm": "metal/window_frame_aluminium_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.0,
+    1.0
+   ],
+   "avgColor": "#929598",
+   "avgColorLinear": [
+    0.2888,
+    0.2995,
+    0.3157
+   ],
+   "roughnessMean": 0.47,
+   "metalnessMean": 0.993,
+   "tags": [
+    "window",
+    "frame",
+    "mullion",
+    "aluminium",
+    "metal",
+    "tintable"
+   ],
+   "bytes": 21666,
+   "source": {
+    "site": "ambientCG",
+    "id": "Metal009",
+    "url": "https://ambientcg.com/view?id=Metal009",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Brushed / anodised aluminium for mullions, frames, handrails. Tint dark bronze or black as needed."
+  },
+  {
+   "name": "shutter_rolldown",
+   "category": "metal",
+   "files": {
+    "albedo": "metal/shutter_rolldown_albedo.webp",
+    "normal": "metal/shutter_rolldown_normal.webp",
+    "orm": "metal/shutter_rolldown_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#808487",
+   "avgColorLinear": [
+    0.2177,
+    0.2324,
+    0.2422
+   ],
+   "roughnessMean": 0.634,
+   "metalnessMean": 0.006,
+   "tags": [
+    "shopfront",
+    "shutter",
+    "security",
+    "metal",
+    "tintable"
+   ],
+   "bytes": 141152,
+   "source": {
+    "site": "Poly Haven",
+    "id": "painted_metal_shutter",
+    "url": "https://polyhaven.com/a/painted_metal_shutter",
+    "author": "Dario Barresi, Rico Cilliers, Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted steel roll-down shutter slats (closed shops, night). v runs across the slats."
+  },
+  {
+   "name": "corrugated_galvanised",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/corrugated_galvanised_albedo.webp",
+    "normal": "roof/corrugated_galvanised_normal.webp",
+    "orm": "roof/corrugated_galvanised_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.12,
+    1.12
+   ],
+   "avgColor": "#aab3af",
+   "avgColorLinear": [
+    0.4014,
+    0.4516,
+    0.4263
+   ],
+   "roughnessMean": 0.705,
+   "metalnessMean": 0.987,
+   "tags": [
+    "roof",
+    "corrugated",
+    "metal",
+    "galvanised",
+    "silver"
+   ],
+   "bytes": 182176,
+   "source": {
+    "site": "Poly Haven",
+    "id": "corrugated_iron",
+    "url": "https://polyhaven.com/a/corrugated_iron",
+    "author": "Jenelle van Heerden, Dimitrios Savva",
+    "license": "CC0 1.0"
+   },
+   "notes": "Clean galvanised corrugated iron (u across corrugations)."
+  },
+  {
+   "name": "corrugated_weathered",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/corrugated_weathered_albedo.webp",
+    "normal": "roof/corrugated_weathered_normal.webp",
+    "orm": "roof/corrugated_weathered_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#797876",
+   "avgColorLinear": [
+    0.1927,
+    0.1882,
+    0.1801
+   ],
+   "roughnessMean": 0.617,
+   "metalnessMean": 0.005,
+   "tags": [
+    "roof",
+    "corrugated",
+    "metal",
+    "weathered"
+   ],
+   "bytes": 190544,
+   "source": {
+    "site": "Poly Haven",
+    "id": "worn_corrugated_iron",
+    "url": "https://polyhaven.com/a/worn_corrugated_iron",
+    "author": "Jenelle van Heerden, Dimitrios Savva",
+    "license": "CC0 1.0"
+   },
+   "notes": "Dull, weathered galvanised corrugated sheet with streaks."
+  },
+  {
+   "name": "corrugated_rusty",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/corrugated_rusty_albedo.webp",
+    "normal": "roof/corrugated_rusty_normal.webp",
+    "orm": "roof/corrugated_rusty_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#592b1a",
+   "avgColorLinear": [
+    0.0999,
+    0.0246,
+    0.0101
+   ],
+   "roughnessMean": 0.937,
+   "metalnessMean": 0.005,
+   "tags": [
+    "roof",
+    "corrugated",
+    "metal",
+    "rust",
+    "kopje"
+   ],
+   "bytes": 101490,
+   "source": {
+    "site": "Poly Haven",
+    "id": "rusty_corrugated_iron",
+    "url": "https://polyhaven.com/a/rusty_corrugated_iron",
+    "author": "Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Rusted corrugated iron (Kopje/Mbare-side low roofs, lean-tos, vendor stalls)."
+  },
+  {
+   "name": "ibr_sheet_painted",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/ibr_sheet_painted_albedo.webp",
+    "normal": "roof/ibr_sheet_painted_normal.webp",
+    "orm": "roof/ibr_sheet_painted_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#6a2617",
+   "avgColorLinear": [
+    0.1446,
+    0.0195,
+    0.0087
+   ],
+   "roughnessMean": 0.447,
+   "metalnessMean": 0.005,
+   "tags": [
+    "roof",
+    "ibr",
+    "box-profile",
+    "painted",
+    "metal",
+    "tintable",
+    "red"
+   ],
+   "bytes": 48492,
+   "source": {
+    "site": "Poly Haven",
+    "id": "box_profile_metal_sheet",
+    "url": "https://polyhaven.com/a/box_profile_metal_sheet",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": "Painted IBR (box-profile) roof sheeting, red oxide. Tint to green/charcoal via avgColor ratio."
+  },
+  {
+   "name": "fibre_cement_roof",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/fibre_cement_roof_albedo.webp",
+    "normal": "roof/fibre_cement_roof_normal.webp",
+    "orm": "roof/fibre_cement_roof_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#746c64",
+   "avgColorLinear": [
+    0.174,
+    0.149,
+    0.1277
+   ],
+   "roughnessMean": 0.849,
+   "metalnessMean": 0.004,
+   "tags": [
+    "roof",
+    "corrugated",
+    "fibre-cement",
+    "grey"
+   ],
+   "bytes": 110926,
+   "source": {
+    "site": "Poly Haven",
+    "id": "asbestos_sheet_02",
+    "url": "https://polyhaven.com/a/asbestos_sheet_02",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": "Grey corrugated fibre-cement (\"asbestos\") roofing, very common on 1950s-70s buildings."
+  },
+  {
+   "name": "clay_tile_roof",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/clay_tile_roof_albedo.webp",
+    "normal": "roof/clay_tile_roof_normal.webp",
+    "orm": "roof/clay_tile_roof_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.9,
+    2.9
+   ],
+   "avgColor": "#a76046",
+   "avgColorLinear": [
+    0.3843,
+    0.1181,
+    0.0614
+   ],
+   "roughnessMean": 0.619,
+   "metalnessMean": 0.003,
+   "tags": [
+    "roof",
+    "tiles",
+    "clay",
+    "terracotta",
+    "red-brown"
+   ],
+   "bytes": 98146,
+   "source": {
+    "site": "ambientCG",
+    "id": "RoofingTiles012A",
+    "url": "https://ambientcg.com/view?id=RoofingTiles012A",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Interlocking clay roof tiles (Marseille type): station, Munhumutapa, colonial hip roofs."
+  },
+  {
+   "name": "clay_tile_roof_old",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/clay_tile_roof_old_albedo.webp",
+    "normal": "roof/clay_tile_roof_old_normal.webp",
+    "orm": "roof/clay_tile_roof_old_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.5,
+    2.5
+   ],
+   "avgColor": "#97532d",
+   "avgColorLinear": [
+    0.3088,
+    0.0863,
+    0.0266
+   ],
+   "roughnessMean": 0.916,
+   "metalnessMean": 0.006,
+   "tags": [
+    "roof",
+    "tiles",
+    "clay",
+    "terracotta",
+    "weathered"
+   ],
+   "bytes": 217396,
+   "source": {
+    "site": "Poly Haven",
+    "id": "clay_roof_tiles_02",
+    "url": "https://polyhaven.com/a/clay_roof_tiles_02",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": "Weathered barrel clay tiles with colour variation (older houses, Avenues)."
+  },
+  {
+   "name": "roof_membrane",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/roof_membrane_albedo.webp",
+    "normal": "roof/roof_membrane_normal.webp",
+    "orm": "roof/roof_membrane_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    20.0,
+    20.0
+   ],
+   "avgColor": "#3b3734",
+   "avgColorLinear": [
+    0.0432,
+    0.038,
+    0.0348
+   ],
+   "roughnessMean": 0.94,
+   "metalnessMean": 0.002,
+   "tags": [
+    "roof",
+    "flat-roof",
+    "bitumen",
+    "membrane",
+    "dark"
+   ],
+   "bytes": 75906,
+   "source": {
+    "site": "Poly Haven",
+    "id": "bitumen",
+    "url": "https://polyhaven.com/a/bitumen",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Torch-on bitumen membrane strips for flat roofs (large 20 m tile: seen from above / perches)."
+  },
+  {
+   "name": "roof_gravel",
+   "category": "roof",
+   "files": {
+    "albedo": "roof/roof_gravel_albedo.webp",
+    "normal": "roof/roof_gravel_normal.webp",
+    "orm": "roof/roof_gravel_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.5,
+    1.5
+   ],
+   "avgColor": "#dbd7cf",
+   "avgColorLinear": [
+    0.7053,
+    0.6811,
+    0.6246
+   ],
+   "roughnessMean": 0.775,
+   "metalnessMean": 0.008,
+   "tags": [
+    "roof",
+    "flat-roof",
+    "gravel",
+    "light"
+   ],
+   "bytes": 168444,
+   "source": {
+    "site": "ambientCG",
+    "id": "Gravel023",
+    "url": "https://ambientcg.com/view?id=Gravel023",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Pale gravel / chippings ballast for flat office roofs. Roughness raised from the source (mean 0.47) to ~0.78: dry stone chippings."
+  },
+  {
+   "name": "asphalt_bleached",
+   "category": "road",
+   "files": {
+    "albedo": "road/asphalt_bleached_albedo.webp",
+    "normal": "road/asphalt_bleached_normal.webp",
+    "orm": "road/asphalt_bleached_orm.webp"
+   },
+   "size": [
+    2048,
+    2048
+   ],
+   "mapSizes": {
+    "albedo": [
+     2048,
+     2048
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     1024,
+     1024
+    ]
+   },
+   "tileSizeMetres": [
+    2.5,
+    2.5
+   ],
+   "avgColor": "#83807a",
+   "avgColorLinear": [
+    0.228,
+    0.2147,
+    0.1935
+   ],
+   "roughnessMean": 0.771,
+   "metalnessMean": 0.002,
+   "tags": [
+    "road",
+    "asphalt",
+    "sun-bleached",
+    "pale"
+   ],
+   "bytes": 550048,
+   "source": {
+    "site": "ambientCG",
+    "id": "Asphalt031",
+    "url": "https://ambientcg.com/view?id=Asphalt031",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Main road surface: pale sun-bleached asphalt (#8f8c83-#9d998d in sun). Size estimated. 2K. Roughness raised from the source (mean 0.52) to ~0.77: dry, dusty, oxidised binder."
+  },
+  {
+   "name": "asphalt_cracked",
+   "category": "road",
+   "files": {
+    "albedo": "road/asphalt_cracked_albedo.webp",
+    "normal": "road/asphalt_cracked_normal.webp",
+    "orm": "road/asphalt_cracked_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    3.0,
+    3.0
+   ],
+   "avgColor": "#696761",
+   "avgColorLinear": [
+    0.1399,
+    0.1356,
+    0.1197
+   ],
+   "roughnessMean": 0.771,
+   "metalnessMean": 0.014,
+   "tags": [
+    "road",
+    "asphalt",
+    "worn",
+    "cracked"
+   ],
+   "bytes": 166600,
+   "source": {
+    "site": "Poly Haven",
+    "id": "asphalt_02",
+    "url": "https://polyhaven.com/a/asphalt_02",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Worn asphalt with longitudinal cracks (side streets, lanes, parking). Blend with asphalt_bleached; do not use alone on long roads (the crack pattern repeats every 3 m)."
+  },
+  {
+   "name": "asphalt_patch",
+   "category": "road",
+   "files": {
+    "albedo": "road/asphalt_patch_albedo.webp",
+    "normal": "road/asphalt_patch_normal.webp",
+    "orm": "road/asphalt_patch_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.1,
+    2.1
+   ],
+   "avgColor": "#444746",
+   "avgColorLinear": [
+    0.0584,
+    0.0628,
+    0.0613
+   ],
+   "roughnessMean": 0.661,
+   "metalnessMean": 0.004,
+   "tags": [
+    "road",
+    "asphalt",
+    "patch",
+    "dark",
+    "decal"
+   ],
+   "bytes": 136738,
+   "source": {
+    "site": "Poly Haven",
+    "id": "clean_asphalt",
+    "url": "https://polyhaven.com/a/clean_asphalt",
+    "author": "Dimitrios Savva",
+    "license": "CC0 1.0"
+   },
+   "notes": "Darker, fresher asphalt for repair patches / trench reinstatements (blend over asphalt_bleached)."
+  },
+  {
+   "name": "kerb_concrete",
+   "category": "road",
+   "files": {
+    "albedo": "road/kerb_concrete_albedo.webp",
+    "normal": "road/kerb_concrete_normal.webp",
+    "orm": "road/kerb_concrete_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    3.0,
+    3.0
+   ],
+   "avgColor": "#636461",
+   "avgColorLinear": [
+    0.1254,
+    0.128,
+    0.1208
+   ],
+   "roughnessMean": 0.542,
+   "metalnessMean": 0.005,
+   "tags": [
+    "kerb",
+    "curb",
+    "concrete",
+    "grey",
+    "tintable"
+   ],
+   "bytes": 16464,
+   "source": {
+    "site": "Poly Haven",
+    "id": "concrete_floor_worn_001",
+    "url": "https://polyhaven.com/a/concrete_floor_worn_001",
+    "author": "Dimitrios Savva, Rico Cilliers",
+    "license": "CC0 1.0"
+   },
+   "notes": "Worn precast kerb concrete. Painted kerb variants (black/white, yellow) are generated by gen_textures.py."
+  },
+  {
+   "name": "pavement_slabs",
+   "category": "paving",
+   "files": {
+    "albedo": "paving/pavement_slabs_albedo.webp",
+    "normal": "paving/pavement_slabs_normal.webp",
+    "orm": "paving/pavement_slabs_orm.webp"
+   },
+   "size": [
+    2048,
+    2048
+   ],
+   "mapSizes": {
+    "albedo": [
+     2048,
+     2048
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     1024,
+     1024
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#928c84",
+   "avgColorLinear": [
+    0.2876,
+    0.2618,
+    0.2309
+   ],
+   "roughnessMean": 0.863,
+   "metalnessMean": 0.007,
+   "tags": [
+    "sidewalk",
+    "pavement",
+    "slabs",
+    "concrete",
+    "grey"
+   ],
+   "bytes": 553976,
+   "source": {
+    "site": "Poly Haven",
+    "id": "concrete_pavement",
+    "url": "https://polyhaven.com/a/concrete_pavement",
+    "author": "Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Grey concrete sidewalk slabs (#bfbdbc sunlit) \u2014 the CBD default pavement. 2K."
+  },
+  {
+   "name": "pavers_interlocking",
+   "category": "paving",
+   "files": {
+    "albedo": "paving/pavers_interlocking_albedo.webp",
+    "normal": "paving/pavers_interlocking_normal.webp",
+    "orm": "paving/pavers_interlocking_orm.webp"
+   },
+   "size": [
+    2048,
+    2048
+   ],
+   "mapSizes": {
+    "albedo": [
+     2048,
+     2048
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     1024,
+     1024
+    ]
+   },
+   "tileSizeMetres": [
+    0.9,
+    0.9
+   ],
+   "avgColor": "#777b77",
+   "avgColorLinear": [
+    0.1838,
+    0.1995,
+    0.1851
+   ],
+   "roughnessMean": 0.675,
+   "metalnessMean": 0.002,
+   "tags": [
+    "sidewalk",
+    "pavers",
+    "interlocking",
+    "concrete",
+    "grey"
+   ],
+   "bytes": 555892,
+   "source": {
+    "site": "ambientCG",
+    "id": "PavingStones071",
+    "url": "https://ambientcg.com/view?id=PavingStones071",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Grey interlocking (zig-zag) concrete pavers: forecourts, parking, newer sidewalks. 2K."
+  },
+  {
+   "name": "pavers_herringbone_red",
+   "category": "paving",
+   "files": {
+    "albedo": "paving/pavers_herringbone_red_albedo.webp",
+    "normal": "paving/pavers_herringbone_red_normal.webp",
+    "orm": "paving/pavers_herringbone_red_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.75,
+    1.75
+   ],
+   "avgColor": "#95725f",
+   "avgColorLinear": [
+    0.3005,
+    0.1695,
+    0.1148
+   ],
+   "roughnessMean": 0.593,
+   "metalnessMean": 0.003,
+   "tags": [
+    "sidewalk",
+    "pavers",
+    "herringbone",
+    "clay",
+    "red"
+   ],
+   "bytes": 198852,
+   "source": {
+    "site": "ambientCG",
+    "id": "PavingStones118",
+    "url": "https://ambientcg.com/view?id=PavingStones118",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Red clay pavers in herringbone: First Street Mall / plazas / bank forecourts."
+  },
+  {
+   "name": "grass_dry",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/grass_dry_albedo.webp",
+    "normal": "ground/grass_dry_normal.webp",
+    "orm": "ground/grass_dry_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#ad936e",
+   "avgColorLinear": [
+    0.4189,
+    0.2901,
+    0.1571
+   ],
+   "roughnessMean": 0.809,
+   "metalnessMean": 0.014,
+   "tags": [
+    "ground",
+    "grass",
+    "dry",
+    "highveld",
+    "winter"
+   ],
+   "bytes": 199722,
+   "source": {
+    "site": "Poly Haven",
+    "id": "withered_grass",
+    "url": "https://polyhaven.com/a/withered_grass",
+    "author": "Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Dry, straw-coloured highveld grass (dry season May-Oct): verges, medians, vacant lots."
+  },
+  {
+   "name": "grass_patchy",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/grass_patchy_albedo.webp",
+    "normal": "ground/grass_patchy_normal.webp",
+    "orm": "ground/grass_patchy_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.51,
+    2.51
+   ],
+   "avgColor": "#6e613e",
+   "avgColorLinear": [
+    0.1566,
+    0.1189,
+    0.0485
+   ],
+   "roughnessMean": 0.938,
+   "metalnessMean": 0.008,
+   "tags": [
+    "ground",
+    "grass",
+    "patchy",
+    "olive"
+   ],
+   "bytes": 181398,
+   "source": {
+    "site": "Poly Haven",
+    "id": "grass_ground",
+    "url": "https://polyhaven.com/a/grass_ground",
+    "author": "Charlotte Baglioni",
+    "license": "CC0 1.0"
+   },
+   "notes": "Patchy olive grass with bare earth: park edges, road medians, Harare Gardens paths."
+  },
+  {
+   "name": "grass_green",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/grass_green_albedo.webp",
+    "normal": "ground/grass_green_normal.webp",
+    "orm": "ground/grass_green_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.4,
+    1.4
+   ],
+   "avgColor": "#626e32",
+   "avgColorLinear": [
+    0.1216,
+    0.1568,
+    0.0321
+   ],
+   "roughnessMean": 0.805,
+   "metalnessMean": 0.005,
+   "tags": [
+    "ground",
+    "grass",
+    "green",
+    "lawn",
+    "rainy-season"
+   ],
+   "bytes": 212844,
+   "source": {
+    "site": "ambientCG",
+    "id": "Grass004",
+    "url": "https://ambientcg.com/view?id=Grass004",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Green lawn for watered parks (Africa Unity Square, Harare Gardens) and the rainy season. Roughness raised from the source (mean 0.26) to ~0.80."
+  },
+  {
+   "name": "soil_red",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/soil_red_albedo.webp",
+    "normal": "ground/soil_red_normal.webp",
+    "orm": "ground/soil_red_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    2.0
+   ],
+   "avgColor": "#653f2f",
+   "avgColorLinear": [
+    0.1305,
+    0.0497,
+    0.0279
+   ],
+   "roughnessMean": 0.738,
+   "metalnessMean": 0.012,
+   "tags": [
+    "ground",
+    "soil",
+    "laterite",
+    "red",
+    "verge"
+   ],
+   "bytes": 196934,
+   "source": {
+    "site": "Poly Haven",
+    "id": "red_laterite_soil_stones",
+    "url": "https://polyhaven.com/a/red_laterite_soil_stones",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": "Red-brown laterite soil with stones (#7c6556): unkerbed verges, footpaths, construction sites."
+  },
+  {
+   "name": "dirt_dry",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/dirt_dry_albedo.webp",
+    "normal": "ground/dirt_dry_normal.webp",
+    "orm": "ground/dirt_dry_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    4.0,
+    4.0
+   ],
+   "avgColor": "#967650",
+   "avgColorLinear": [
+    0.3067,
+    0.1801,
+    0.0812
+   ],
+   "roughnessMean": 0.813,
+   "metalnessMean": 0.014,
+   "tags": [
+    "ground",
+    "dirt",
+    "dry",
+    "tan"
+   ],
+   "bytes": 75476,
+   "source": {
+    "site": "Poly Haven",
+    "id": "dry_ground_rocks",
+    "url": "https://polyhaven.com/a/dry_ground_rocks",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Dry tan dirt with pebbles: lanes, informal parking, kopje foot."
+  },
+  {
+   "name": "gravel_grey",
+   "category": "ground",
+   "files": {
+    "albedo": "ground/gravel_grey_albedo.webp",
+    "normal": "ground/gravel_grey_normal.webp",
+    "orm": "ground/gravel_grey_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.5,
+    1.5
+   ],
+   "avgColor": "#65655d",
+   "avgColorLinear": [
+    0.1289,
+    0.1305,
+    0.1093
+   ],
+   "roughnessMean": 0.776,
+   "metalnessMean": 0.002,
+   "tags": [
+    "ground",
+    "gravel",
+    "grey",
+    "rail-ballast"
+   ],
+   "bytes": 72162,
+   "source": {
+    "site": "ambientCG",
+    "id": "Gravel040",
+    "url": "https://ambientcg.com/view?id=Gravel040",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Grey crushed-stone gravel: rail ballast, yards, rooftop ballast. Size estimated. Roughness raised from the source (mean ~0.53) to ~0.77."
+  },
+  {
+   "name": "bark_grey",
+   "category": "wood",
+   "files": {
+    "albedo": "wood/bark_grey_albedo.webp",
+    "normal": "wood/bark_grey_normal.webp",
+    "orm": "wood/bark_grey_orm.webp"
+   },
+   "size": [
+    512,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     1024
+    ],
+    "normal": [
+     512,
+     1024
+    ],
+    "orm": [
+     256,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    1.0,
+    2.0
+   ],
+   "avgColor": "#82807a",
+   "avgColorLinear": [
+    0.2225,
+    0.2163,
+    0.1942
+   ],
+   "roughnessMean": 0.726,
+   "metalnessMean": 0.006,
+   "tags": [
+    "bark",
+    "tree",
+    "jacaranda",
+    "grey"
+   ],
+   "bytes": 126148,
+   "source": {
+    "site": "ambientCG",
+    "id": "Bark001",
+    "url": "https://ambientcg.com/view?id=Bark001",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Grey fissured bark (jacaranda, msasa, flamboyant trunks). Size estimated."
+  },
+  {
+   "name": "wood_planks_weathered",
+   "category": "wood",
+   "files": {
+    "albedo": "wood/wood_planks_weathered_albedo.webp",
+    "normal": "wood/wood_planks_weathered_normal.webp",
+    "orm": "wood/wood_planks_weathered_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.8,
+    1.8
+   ],
+   "avgColor": "#614d3b",
+   "avgColorLinear": [
+    0.1203,
+    0.0746,
+    0.0442
+   ],
+   "roughnessMean": 0.655,
+   "metalnessMean": 0.01,
+   "tags": [
+    "wood",
+    "planks",
+    "weathered",
+    "vendor",
+    "stall"
+   ],
+   "bytes": 60080,
+   "source": {
+    "site": "Poly Haven",
+    "id": "weathered_brown_planks",
+    "url": "https://polyhaven.com/a/weathered_brown_planks",
+    "author": "Dimitrios Savva, Rico Cilliers",
+    "license": "CC0 1.0"
+   },
+   "notes": "Weathered brown planks: vendor stalls, carts, hoardings, crates."
+  },
+  {
+   "name": "wood_planks_grey",
+   "category": "wood",
+   "files": {
+    "albedo": "wood/wood_planks_grey_albedo.webp",
+    "normal": "wood/wood_planks_grey_normal.webp",
+    "orm": "wood/wood_planks_grey_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.5,
+    1.5
+   ],
+   "avgColor": "#474641",
+   "avgColorLinear": [
+    0.0636,
+    0.0606,
+    0.0527
+   ],
+   "roughnessMean": 0.844,
+   "metalnessMean": 0.006,
+   "tags": [
+    "wood",
+    "planks",
+    "grey",
+    "weathered"
+   ],
+   "bytes": 49122,
+   "source": {
+    "site": "Poly Haven",
+    "id": "wood_planks_grey",
+    "url": "https://polyhaven.com/a/wood_planks_grey",
+    "author": "Rob Tuytel",
+    "license": "CC0 1.0"
+   },
+   "notes": "Sun-greyed planks: benches, market tables, doors."
+  },
+  {
+   "name": "plastic_matte",
+   "category": "plastic",
+   "files": {
+    "albedo": "plastic/plastic_matte_albedo.webp",
+    "normal": "plastic/plastic_matte_normal.webp",
+    "orm": "plastic/plastic_matte_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     512,
+     512
+    ],
+    "orm": [
+     256,
+     256
+    ]
+   },
+   "tileSizeMetres": [
+    1.0,
+    1.0
+   ],
+   "avgColor": "#a2a6ab",
+   "avgColorLinear": [
+    0.3623,
+    0.3835,
+    0.4095
+   ],
+   "roughnessMean": 0.364,
+   "metalnessMean": 0.002,
+   "tags": [
+    "plastic",
+    "tintable",
+    "white"
+   ],
+   "bytes": 8020,
+   "source": {
+    "site": "ambientCG",
+    "id": "Plastic010",
+    "url": "https://ambientcg.com/view?id=Plastic010",
+    "author": "Lennart Demes (ambientCG)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Light matte plastic; tint for water tanks (#3f7d5a), crates, chairs, signage boxes."
+  },
+  {
+   "name": "window_glass",
+   "category": "glass",
+   "files": {
+    "albedo": "glass/window_glass_albedo.webp",
+    "normal": "glass/window_glass_normal.webp",
+    "orm": "glass/window_glass_orm.webp"
+   },
+   "size": [
+    512,
+    512
+   ],
+   "mapSizes": {
+    "albedo": [
+     512,
+     512
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    3.0,
+    3.0
+   ],
+   "avgColor": "#b5afa6",
+   "avgColorLinear": [
+    0.4613,
+    0.4293,
+    0.3822
+   ],
+   "roughnessMean": 0.091,
+   "metalnessMean": 0.001,
+   "tags": [
+    "window",
+    "glass",
+    "facade",
+    "reflection",
+    "grime"
+   ],
+   "bytes": 49044,
+   "source": {
+    "site": "procedural",
+    "id": "gen_textures.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (generated)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Surface layer for facade glass (not the glass colour itself). albedo.rgb = dust/grime colour, albedo.a = grime coverage (~0.05 .. 0.4, mean ~0.1). ORM.g = roughness 0.04 clean .. ~0.4 smudged; normal = gentle float-glass waviness that breaks up reflections. Tint glass per building (RBZ #5b808c, Karigamombe #5177a4, Joina #5a7189, Monomotapa #5f6c73). See README \"Windows\"."
+  },
+  {
+   "name": "kerb_painted_bw",
+   "category": "road",
+   "files": {
+    "albedo": "road/kerb_painted_bw_albedo.webp",
+    "normal": "road/kerb_painted_bw_normal.webp",
+    "orm": "road/kerb_painted_bw_orm.webp"
+   },
+   "size": [
+    1024,
+    256
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     256
+    ],
+    "normal": [
+     1024,
+     256
+    ],
+    "orm": [
+     512,
+     128
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    0.5
+   ],
+   "avgColor": "#9b9b96",
+   "avgColorLinear": [
+    0.3298,
+    0.3267,
+    0.304
+   ],
+   "roughnessMean": 0.671,
+   "metalnessMean": 0.004,
+   "tags": [
+    "kerb",
+    "curb",
+    "painted",
+    "black-white",
+    "median"
+   ],
+   "bytes": 37388,
+   "source": {
+    "site": "procedural",
+    "id": "gen_textures.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (generated)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Kerb with alternating black / white 1 m paint blocks (Samora Machel medians). u runs along the kerb (one repeat = 2 m = black + white), v across it (0.5 m: map the kerb face + top into v)."
+  },
+  {
+   "name": "kerb_painted_rw",
+   "category": "road",
+   "files": {
+    "albedo": "road/kerb_painted_rw_albedo.webp",
+    "normal": "road/kerb_painted_rw_normal.webp",
+    "orm": "road/kerb_painted_rw_orm.webp"
+   },
+   "size": [
+    1024,
+    256
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     256
+    ],
+    "normal": [
+     1024,
+     256
+    ],
+    "orm": [
+     512,
+     128
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    0.5
+   ],
+   "avgColor": "#b69a94",
+   "avgColorLinear": [
+    0.4694,
+    0.3228,
+    0.2977
+   ],
+   "roughnessMean": 0.67,
+   "metalnessMean": 0.005,
+   "tags": [
+    "kerb",
+    "barrier",
+    "painted",
+    "red-white",
+    "median-nose"
+   ],
+   "bytes": 39604,
+   "source": {
+    "site": "procedural",
+    "id": "gen_textures.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (generated)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Red / white 1 m blocks for median noses and precast barrier blocks. Same mapping as kerb_painted_bw."
+  },
+  {
+   "name": "kerb_painted_yellow",
+   "category": "road",
+   "files": {
+    "albedo": "road/kerb_painted_yellow_albedo.webp",
+    "normal": "road/kerb_painted_yellow_normal.webp",
+    "orm": "road/kerb_painted_yellow_orm.webp"
+   },
+   "size": [
+    1024,
+    256
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     256
+    ],
+    "normal": [
+     1024,
+     256
+    ],
+    "orm": [
+     512,
+     128
+    ]
+   },
+   "tileSizeMetres": [
+    2.0,
+    0.5
+   ],
+   "avgColor": "#cca233",
+   "avgColorLinear": [
+    0.6036,
+    0.3589,
+    0.0325
+   ],
+   "roughnessMean": 0.669,
+   "metalnessMean": 0.004,
+   "tags": [
+    "kerb",
+    "curb",
+    "painted",
+    "yellow",
+    "rank",
+    "bus-stop"
+   ],
+   "bytes": 37190,
+   "source": {
+    "site": "procedural",
+    "id": "gen_textures.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (generated)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Kerb painted yellow (kombi ranks, bus stops, no-stopping zones). Same mapping as kerb_painted_bw."
+  },
+  {
+   "name": "granite_cladding_light",
+   "category": "stone",
+   "files": {
+    "albedo": "stone/granite_cladding_light_albedo.webp",
+    "normal": "stone/granite_cladding_light_normal.webp",
+    "orm": "stone/granite_cladding_light_orm.webp"
+   },
+   "size": [
+    1024,
+    1024
+   ],
+   "mapSizes": {
+    "albedo": [
+     1024,
+     1024
+    ],
+    "normal": [
+     1024,
+     1024
+    ],
+    "orm": [
+     512,
+     512
+    ]
+   },
+   "tileSizeMetres": [
+    2.4,
+    2.4
+   ],
+   "avgColor": "#b4b3ad",
+   "avgColorLinear": [
+    0.4579,
+    0.4484,
+    0.418
+   ],
+   "roughnessMean": 0.434,
+   "metalnessMean": 0.002,
+   "tags": [
+    "wall",
+    "facade",
+    "cladding",
+    "granite",
+    "light",
+    "podium",
+    "tintable"
+   ],
+   "bytes": 99270,
+   "source": {
+    "site": "ambientCG + procedural",
+    "id": "Granite002A",
+    "url": "https://ambientcg.com/view?id=Granite002A",
+    "author": "Lennart Demes (ambientCG); joints generated by tools/materials/gen_textures.py",
+    "license": "CC0 1.0"
+   },
+   "notes": "Honed light-grey granite in 1.2 x 0.6 m stack-bond panels with 8 mm joints (RBZ piers and friezes #aeb0ac, bank halls, podium cladding). Panel joints fall on u = 0, 0.5 and v = 0, .25, .5, .75."
+  }
+ ]
+}

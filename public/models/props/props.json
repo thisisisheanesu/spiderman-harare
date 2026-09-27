@@ -1,0 +1,1292 @@
+{
+ "version": 1,
+ "generator": "tools/materials/props_blender.py + optimize_props.cjs",
+ "conventions": {
+  "units": "metres, y up, feet at y = 0, footprint centred on x = z = 0",
+  "front": "+Z is the front (bench seat side, lamp arm, shelter opening, AC grille). Rotate about Y to place.",
+  "compression": "EXT_meshopt_compression (GLTFLoader.setMeshoptDecoder(MeshoptDecoder)); textures EXT_texture_webp",
+  "positions": "POSITION / TEXCOORD float32 (no quantization node transform): geometry can be reused in InstancedMesh as is; NORMAL is int8 normalised, declared through KHR_mesh_quantization (required, supported by GLTFLoader)",
+  "lod": "file = LOD0 (<= 3000 tris), lod1 = LOD1 (<= 600 tris, 128-256 px textures)",
+  "anchors": "web-swing anchor points in the prop's local space [x, y, z] (street lamps: pole top and arm tips)",
+  "heights": "height = top of the model (m); footprintRadius = max horizontal reach from the origin; baseRadius = radius of the part that touches the ground (for colliders / pedestrian avoidance)"
+ },
+ "totalBytes": 3807872,
+ "props": [
+  {
+   "name": "ac_unit",
+   "file": "ac_unit.glb",
+   "lod1": "ac_unit_lod1.glb",
+   "height": 0.608,
+   "footprintRadius": 0.402,
+   "baseRadius": 0.402,
+   "extent": [
+    0.8,
+    0.374
+   ],
+   "tris": [
+    2993,
+    577
+   ],
+   "bytes": [
+    261064,
+    33648
+   ],
+   "tags": [
+    "rooftop",
+    "aircon",
+    "wall-mounted",
+    "clutter"
+   ],
+   "anchors": [],
+   "materials": [
+    "exterior_aircon_unit_01",
+    "exterior_aircon_unit_02"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "exterior_aircon_unit",
+    "url": "https://polyhaven.com/a/exterior_aircon_unit",
+    "author": "Monsta3D",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "barrier_concrete",
+   "file": "barrier_concrete.glb",
+   "lod1": "barrier_concrete_lod1.glb",
+   "height": 0.831,
+   "footprintRadius": 0.823,
+   "baseRadius": 0.823,
+   "extent": [
+    1.545,
+    0.639
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    477512,
+    35028
+   ],
+   "tags": [
+    "barrier",
+    "concrete",
+    "jersey",
+    "roadworks",
+    "planter-base"
+   ],
+   "anchors": [],
+   "materials": [
+    "concrete_road_barrier"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "concrete_road_barrier",
+    "url": "https://polyhaven.com/a/concrete_road_barrier",
+    "author": "Amal Kumar",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "bench_timber",
+   "file": "bench_timber.glb",
+   "lod1": "bench_timber_lod1.glb",
+   "height": 0.867,
+   "footprintRadius": 1.271,
+   "baseRadius": 1.27,
+   "extent": [
+    2.452,
+    0.67
+   ],
+   "tris": [
+    2936,
+    572
+   ],
+   "bytes": [
+    278352,
+    43048
+   ],
+   "tags": [
+    "bench",
+    "seating",
+    "street-furniture",
+    "sidewalk",
+    "park"
+   ],
+   "anchors": [],
+   "materials": [
+    "modular_street_seating_armrests",
+    "modular_street_seating_supports",
+    "modular_street_seating_timber"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "modular_street_seating",
+    "url": "https://polyhaven.com/a/modular_street_seating",
+    "author": "Stuart Attenborrow",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "bin_metal",
+   "file": "bin_metal.glb",
+   "lod1": "bin_metal_lod1.glb",
+   "height": 0.906,
+   "footprintRadius": 0.333,
+   "baseRadius": 0.276,
+   "extent": [
+    0.651,
+    0.552
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    154216,
+    23708
+   ],
+   "tags": [
+    "bin",
+    "rubbish",
+    "litter",
+    "street-furniture"
+   ],
+   "anchors": [],
+   "materials": [
+    "metal_trash_can"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "metal_trash_can",
+    "url": "https://polyhaven.com/a/metal_trash_can",
+    "author": "GurJas Studios",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "bollard_concrete",
+   "file": "bollard_concrete.glb",
+   "lod1": "bollard_concrete_lod1.glb",
+   "height": 0.845,
+   "footprintRadius": 0.15,
+   "baseRadius": 0.15,
+   "extent": [
+    0.292,
+    0.3
+   ],
+   "tris": [
+    168,
+    168
+   ],
+   "bytes": [
+    5064,
+    5064
+   ],
+   "tags": [
+    "bollard",
+    "concrete",
+    "street-furniture"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Conical precast bollard (0.8 m)."
+  },
+  {
+   "name": "bollard_painted",
+   "file": "bollard_painted.glb",
+   "lod1": "bollard_painted_lod1.glb",
+   "height": 0.845,
+   "footprintRadius": 0.15,
+   "baseRadius": 0.15,
+   "extent": [
+    0.292,
+    0.3
+   ],
+   "tris": [
+    252,
+    252
+   ],
+   "bytes": [
+    6112,
+    6112
+   ],
+   "tags": [
+    "bollard",
+    "concrete",
+    "street-furniture",
+    "painted"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Conical precast bollard (0.8 m). Painted red/white bands."
+  },
+  {
+   "name": "bus_shelter",
+   "file": "bus_shelter.glb",
+   "lod1": "bus_shelter_lod1.glb",
+   "height": 2.82,
+   "footprintRadius": 2.482,
+   "baseRadius": 2.482,
+   "extent": [
+    4.4,
+    2.2
+   ],
+   "tris": [
+    472,
+    472
+   ],
+   "bytes": [
+    10112,
+    10112
+   ],
+   "tags": [
+    "bus-shelter",
+    "kombi-stop",
+    "rank",
+    "street-furniture"
+   ],
+   "anchors": [
+    [
+     0,
+     2.75,
+     1.05
+    ]
+   ],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Steel-post shelter with corrugated roof, bench, advert panel (4.0 x 1.7 m). Open side (front) faces +Z: put +Z toward the kerb. The advert panel face is swatch \"ad_panel\" (re-texture for posters)."
+  },
+  {
+   "name": "cardboard_box",
+   "file": "cardboard_box.glb",
+   "lod1": "cardboard_box_lod1.glb",
+   "height": 0.342,
+   "footprintRadius": 0.313,
+   "baseRadius": 0.313,
+   "extent": [
+    0.387,
+    0.516
+   ],
+   "tris": [
+    2938,
+    572
+   ],
+   "bytes": [
+    123760,
+    18484
+   ],
+   "tags": [
+    "box",
+    "cardboard",
+    "clutter",
+    "vendor"
+   ],
+   "anchors": [],
+   "materials": [
+    "cardboard_box_01"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "cardboard_box_01",
+    "url": "https://polyhaven.com/a/cardboard_box_01",
+    "author": "Rahul Chaudhary",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "chair_monobloc",
+   "file": "chair_monobloc.glb",
+   "lod1": "chair_monobloc_lod1.glb",
+   "height": 0.88,
+   "footprintRadius": 0.44,
+   "baseRadius": 0.44,
+   "extent": [
+    0.642,
+    0.628
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    155272,
+    30120
+   ],
+   "tags": [
+    "chair",
+    "plastic",
+    "monobloc",
+    "vendor",
+    "seating"
+   ],
+   "anchors": [],
+   "materials": [
+    "plastic_monobloc_chair_01"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "plastic_monobloc_chair_01",
+    "url": "https://polyhaven.com/a/plastic_monobloc_chair_01",
+    "author": "Kuutti Siitonen",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "crate_plastic_red",
+   "file": "crate_plastic_red.glb",
+   "lod1": "crate_plastic_red_lod1.glb",
+   "height": 0.267,
+   "footprintRadius": 0.274,
+   "baseRadius": 0.274,
+   "extent": [
+    0.481,
+    0.265
+   ],
+   "tris": [
+    2939,
+    588
+   ],
+   "bytes": [
+    245244,
+    31352
+   ],
+   "tags": [
+    "crate",
+    "plastic",
+    "vendor",
+    "clutter",
+    "beverage"
+   ],
+   "anchors": [],
+   "materials": [
+    "plastic_crate_03"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "plastic_crate_03",
+    "url": "https://polyhaven.com/a/plastic_crate_03",
+    "author": "Pacific Penguin",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "crate_plastic_yellow",
+   "file": "crate_plastic_yellow.glb",
+   "lod1": "crate_plastic_yellow_lod1.glb",
+   "height": 0.254,
+   "footprintRadius": 0.305,
+   "baseRadius": 0.305,
+   "extent": [
+    0.506,
+    0.406
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    143664,
+    26356
+   ],
+   "tags": [
+    "crate",
+    "plastic",
+    "vendor",
+    "clutter"
+   ],
+   "anchors": [],
+   "materials": [
+    "plastic_crate_02"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "plastic_crate_02",
+    "url": "https://polyhaven.com/a/plastic_crate_02",
+    "author": "Fabi_G",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "drum_plastic_blue",
+   "file": "drum_plastic_blue.glb",
+   "lod1": "drum_plastic_blue_lod1.glb",
+   "height": 0.88,
+   "footprintRadius": 0.244,
+   "baseRadius": 0.244,
+   "extent": [
+    0.488,
+    0.485
+   ],
+   "tris": [
+    2688,
+    572
+   ],
+   "bytes": [
+    95972,
+    21072
+   ],
+   "tags": [
+    "drum",
+    "barrel",
+    "plastic",
+    "vendor",
+    "water"
+   ],
+   "anchors": [],
+   "materials": [
+    "Barrel_02"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "Barrel_02",
+    "url": "https://polyhaven.com/a/Barrel_02",
+    "author": "Jorge Camacho",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "electrical_box",
+   "file": "electrical_box.glb",
+   "lod1": "electrical_box_lod1.glb",
+   "height": 1.12,
+   "footprintRadius": 0.506,
+   "baseRadius": 0.489,
+   "extent": [
+    0.92,
+    0.432
+   ],
+   "tris": [
+    2939,
+    572
+   ],
+   "bytes": [
+    145736,
+    27480
+   ],
+   "tags": [
+    "utility",
+    "electrical",
+    "kiosk",
+    "street-furniture"
+   ],
+   "anchors": [],
+   "materials": [
+    "utility_box_02"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "utility_box_02",
+    "url": "https://polyhaven.com/a/utility_box_02",
+    "author": "James Ray Cock",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "fire_hydrant",
+   "file": "fire_hydrant.glb",
+   "lod1": "fire_hydrant_lod1.glb",
+   "height": 0.799,
+   "footprintRadius": 0.179,
+   "baseRadius": 0.17,
+   "extent": [
+    0.275,
+    0.318
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    153992,
+    26460
+   ],
+   "tags": [
+    "hydrant",
+    "optional",
+    "not-harare-typical"
+   ],
+   "anchors": [],
+   "materials": [
+    "fire_hydrant"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "fire_hydrant",
+    "url": "https://polyhaven.com/a/fire_hydrant",
+    "author": "Gonçalo Felício",
+    "license": "CC0 1.0"
+   },
+   "notes": "US-style pillar hydrant: Harare mostly uses underground hydrants marked by yellow plates; use sparingly."
+  },
+  {
+   "name": "manhole_cover",
+   "file": "manhole_cover.glb",
+   "lod1": "manhole_cover_lod1.glb",
+   "height": 0.068,
+   "footprintRadius": 0.345,
+   "baseRadius": 0.345,
+   "extent": [
+    0.691,
+    0.691
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    163776,
+    31168
+   ],
+   "tags": [
+    "manhole",
+    "decal-like",
+    "road",
+    "sidewalk"
+   ],
+   "anchors": [],
+   "materials": [
+    "water_manhole_cover"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "water_manhole_cover",
+    "url": "https://polyhaven.com/a/water_manhole_cover",
+    "author": "Raunox",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "plant_aloe_pot",
+   "file": "plant_aloe_pot.glb",
+   "lod1": "plant_aloe_pot_lod1.glb",
+   "height": 0.8,
+   "footprintRadius": 0.3,
+   "baseRadius": 0.268,
+   "extent": [
+    0.502,
+    0.553
+   ],
+   "tris": [
+    2939,
+    572
+   ],
+   "bytes": [
+    199008,
+    26640
+   ],
+   "tags": [
+    "plant",
+    "aloe",
+    "pot",
+    "planter",
+    "succulent"
+   ],
+   "anchors": [],
+   "materials": [
+    "potted_plant_04"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "potted_plant_04",
+    "url": "https://polyhaven.com/a/potted_plant_04",
+    "author": "James Ray Cock",
+    "license": "CC0 1.0"
+   },
+   "notes": "Scaled from a 17 cm desk aloe to a 0.8 m street planter."
+  },
+  {
+   "name": "plant_leafy_pot",
+   "file": "plant_leafy_pot.glb",
+   "lod1": "plant_leafy_pot_lod1.glb",
+   "height": 0.842,
+   "footprintRadius": 0.442,
+   "baseRadius": 0.424,
+   "extent": [
+    0.701,
+    0.657
+   ],
+   "tris": [
+    2972,
+    571
+   ],
+   "bytes": [
+    214984,
+    35960
+   ],
+   "tags": [
+    "plant",
+    "pot",
+    "terracotta",
+    "shopfront"
+   ],
+   "anchors": [],
+   "materials": [
+    "potted_plant_02_pot",
+    "potted_plant_02_leaves"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "potted_plant_02",
+    "url": "https://polyhaven.com/a/potted_plant_02",
+    "author": "Rico Cilliers",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "planter_concrete",
+   "file": "planter_concrete.glb",
+   "lod1": "planter_concrete_lod1.glb",
+   "height": 0.6,
+   "footprintRadius": 0.849,
+   "baseRadius": 0.849,
+   "extent": [
+    1.2,
+    1.2
+   ],
+   "tris": [
+    72,
+    72
+   ],
+   "bytes": [
+    4384,
+    4384
+   ],
+   "tags": [
+    "planter",
+    "concrete",
+    "street-furniture",
+    "plaza"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "1.2 m square precast planter with soil at 0.5 m (plant vegetation into it)."
+  },
+  {
+   "name": "satellite_dish",
+   "file": "satellite_dish.glb",
+   "lod1": "satellite_dish_lod1.glb",
+   "height": 1.641,
+   "footprintRadius": 0.45,
+   "baseRadius": 0.354,
+   "extent": [
+    0.9,
+    0.741
+   ],
+   "tris": [
+    432,
+    432
+   ],
+   "bytes": [
+    7524,
+    7524
+   ],
+   "tags": [
+    "rooftop",
+    "satellite",
+    "dish",
+    "clutter"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "0.9 m DStv-style dish on a ballast frame, elevation ~55 deg, pointing toward -Z (north)."
+  },
+  {
+   "name": "street_lamp_double",
+   "file": "street_lamp_double.glb",
+   "lod1": "street_lamp_double_lod1.glb",
+   "height": 10.21,
+   "footprintRadius": 2.482,
+   "baseRadius": 0.28,
+   "extent": [
+    4.957,
+    0.56
+   ],
+   "tris": [
+    268,
+    268
+   ],
+   "bytes": [
+    9184,
+    9184
+   ],
+   "tags": [
+    "street-light",
+    "lamp",
+    "pole",
+    "web-anchor"
+   ],
+   "anchors": [
+    [
+     0,
+     10,
+     0
+    ],
+    [
+     1.858,
+     10.145,
+     0
+    ],
+    [
+     -1.858,
+     10.145,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette",
+    "LampLens"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Harare avenue lighting: tall grey galvanised pole on a concrete plinth. Lens faces use material \"LampLens\" (set its emissive at night). anchors = pole top and arm tips (web-swing points). Double arms reach along +-X: stand in the median with X across the road."
+  },
+  {
+   "name": "street_lamp_double_solar",
+   "file": "street_lamp_double_solar.glb",
+   "lod1": "street_lamp_double_solar_lod1.glb",
+   "height": 10.864,
+   "footprintRadius": 2.482,
+   "baseRadius": 0.28,
+   "extent": [
+    4.957,
+    0.788
+   ],
+   "tris": [
+    332,
+    332
+   ],
+   "bytes": [
+    10628,
+    10628
+   ],
+   "tags": [
+    "street-light",
+    "lamp",
+    "pole",
+    "web-anchor",
+    "solar"
+   ],
+   "anchors": [
+    [
+     0,
+     10.9,
+     0
+    ],
+    [
+     1.858,
+     10.145,
+     0
+    ],
+    [
+     -1.858,
+     10.145,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette",
+    "LampLens"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Harare avenue lighting: tall grey galvanised pole on a concrete plinth. Lens faces use material \"LampLens\" (set its emissive at night). anchors = pole top and arm tips (web-swing points). Double arms reach along +-X: stand in the median with X across the road. Solar panel tilts toward -Z: rotation.y = 0 makes it face north with the arms across a north-south road (along world X). For east-west roads use street_lamp_double_solar_ew."
+  },
+  {
+   "name": "street_lamp_double_solar_ew",
+   "file": "street_lamp_double_solar_ew.glb",
+   "lod1": "street_lamp_double_solar_ew_lod1.glb",
+   "height": 10.864,
+   "footprintRadius": 2.482,
+   "baseRadius": 0.28,
+   "extent": [
+    4.957,
+    1.2
+   ],
+   "tris": [
+    332,
+    332
+   ],
+   "bytes": [
+    10656,
+    10656
+   ],
+   "tags": [
+    "street-light",
+    "lamp",
+    "pole",
+    "web-anchor",
+    "solar"
+   ],
+   "anchors": [
+    [
+     0,
+     10.9,
+     0
+    ],
+    [
+     1.858,
+     10.145,
+     0
+    ],
+    [
+     -1.858,
+     10.145,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette",
+    "LampLens"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Harare avenue lighting: tall grey galvanised pole on a concrete plinth. Lens faces use material \"LampLens\" (set its emissive at night). anchors = pole top and arm tips (web-swing points). Double arms reach along +-X: stand in the median with X across the road. Solar panel tilts toward +X: rotation.y = +pi/2 makes it face north (Harare is in the southern hemisphere) with the arms across an east-west road (along world Z)."
+  },
+  {
+   "name": "street_lamp_single",
+   "file": "street_lamp_single.glb",
+   "lod1": "street_lamp_single_lod1.glb",
+   "height": 8.21,
+   "footprintRadius": 2.482,
+   "baseRadius": 0.28,
+   "extent": [
+    0.56,
+    2.758
+   ],
+   "tris": [
+    216,
+    216
+   ],
+   "bytes": [
+    8204,
+    8204
+   ],
+   "tags": [
+    "street-light",
+    "lamp",
+    "pole",
+    "web-anchor"
+   ],
+   "anchors": [
+    [
+     0,
+     8,
+     0
+    ],
+    [
+     0,
+     8.145,
+     1.858
+    ]
+   ],
+   "materials": [
+    "PropPalette",
+    "LampLens"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Harare avenue lighting: tall grey galvanised pole on a concrete plinth. Lens faces use material \"LampLens\" (set its emissive at night). anchors = pole top and arm tips (web-swing points). The arm reaches toward +Z (front): face +Z toward the carriageway."
+  },
+  {
+   "name": "traffic_cone",
+   "file": "traffic_cone.glb",
+   "lod1": "traffic_cone_lod1.glb",
+   "height": 0.7,
+   "footprintRadius": 0.269,
+   "baseRadius": 0.269,
+   "extent": [
+    0.38,
+    0.38
+   ],
+   "tris": [
+    200,
+    200
+   ],
+   "bytes": [
+    6008,
+    6008
+   ],
+   "tags": [
+    "traffic-cone",
+    "roadworks",
+    "clutter"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "0.7 m PVC traffic cone."
+  },
+  {
+   "name": "trash_bag",
+   "file": "trash_bag.glb",
+   "lod1": "trash_bag_lod1.glb",
+   "height": 0.575,
+   "footprintRadius": 0.264,
+   "baseRadius": 0.264,
+   "extent": [
+    0.528,
+    0.463
+   ],
+   "tris": [
+    2940,
+    572
+   ],
+   "bytes": [
+    150544,
+    24140
+   ],
+   "tags": [
+    "rubbish",
+    "bag",
+    "litter",
+    "clutter"
+   ],
+   "anchors": [],
+   "materials": [
+    "trashbag"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "trashbag",
+    "url": "https://polyhaven.com/a/trashbag",
+    "author": "Benny Weimer",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "tyre_old",
+   "file": "tyre_old.glb",
+   "lod1": "tyre_old_lod1.glb",
+   "height": 0.6,
+   "footprintRadius": 0.301,
+   "baseRadius": 0.299,
+   "extent": [
+    0.6,
+    0.165
+   ],
+   "tris": [
+    2880,
+    572
+   ],
+   "bytes": [
+    145196,
+    20064
+   ],
+   "tags": [
+    "tyre",
+    "junk",
+    "clutter",
+    "vendor"
+   ],
+   "anchors": [],
+   "materials": [
+    "old_tyre"
+   ],
+   "source": {
+    "site": "Poly Haven",
+    "id": "old_tyre",
+    "url": "https://polyhaven.com/a/old_tyre",
+    "author": "MP",
+    "license": "CC0 1.0"
+   },
+   "notes": ""
+  },
+  {
+   "name": "umbrella_blue_yellow",
+   "file": "umbrella_blue_yellow.glb",
+   "lod1": "umbrella_blue_yellow_lod1.glb",
+   "height": 2.55,
+   "footprintRadius": 1.25,
+   "baseRadius": 0.25,
+   "extent": [
+    2.5,
+    2.5
+   ],
+   "tris": [
+    168,
+    168
+   ],
+   "bytes": [
+    7612,
+    7612
+   ],
+   "tags": [
+    "vendor",
+    "umbrella",
+    "market",
+    "shade"
+   ],
+   "anchors": [
+    [
+     0,
+     2.5,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Street-vendor umbrella, 2.5 m canopy on a weighted base."
+  },
+  {
+   "name": "umbrella_green_white",
+   "file": "umbrella_green_white.glb",
+   "lod1": "umbrella_green_white_lod1.glb",
+   "height": 2.55,
+   "footprintRadius": 1.25,
+   "baseRadius": 0.25,
+   "extent": [
+    2.5,
+    2.5
+   ],
+   "tris": [
+    168,
+    168
+   ],
+   "bytes": [
+    7632,
+    7632
+   ],
+   "tags": [
+    "vendor",
+    "umbrella",
+    "market",
+    "shade"
+   ],
+   "anchors": [
+    [
+     0,
+     2.5,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Street-vendor umbrella, 2.5 m canopy on a weighted base."
+  },
+  {
+   "name": "umbrella_red_white",
+   "file": "umbrella_red_white.glb",
+   "lod1": "umbrella_red_white_lod1.glb",
+   "height": 2.55,
+   "footprintRadius": 1.25,
+   "baseRadius": 0.25,
+   "extent": [
+    2.5,
+    2.5
+   ],
+   "tris": [
+    168,
+    168
+   ],
+   "bytes": [
+    7652,
+    7652
+   ],
+   "tags": [
+    "vendor",
+    "umbrella",
+    "market",
+    "shade"
+   ],
+   "anchors": [
+    [
+     0,
+     2.5,
+     0
+    ]
+   ],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "Street-vendor umbrella, 2.5 m canopy on a weighted base."
+  },
+  {
+   "name": "water_tank",
+   "file": "water_tank.glb",
+   "lod1": "water_tank_lod1.glb",
+   "height": 2.1,
+   "footprintRadius": 0.931,
+   "baseRadius": 0.931,
+   "extent": [
+    1.655,
+    1.45
+   ],
+   "tris": [
+    796,
+    588
+   ],
+   "bytes": [
+    10944,
+    9520
+   ],
+   "tags": [
+    "rooftop",
+    "water-tank",
+    "jojo",
+    "plastic",
+    "green"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "JoJo-style ribbed green plastic tank (~2500 L)."
+  },
+  {
+   "name": "water_tank_stand",
+   "file": "water_tank_stand.glb",
+   "lod1": "water_tank_stand_lod1.glb",
+   "height": 4.16,
+   "footprintRadius": 1.131,
+   "baseRadius": 1.112,
+   "extent": [
+    1.73,
+    1.6
+   ],
+   "tris": [
+    952,
+    587
+   ],
+   "bytes": [
+    12652,
+    10192
+   ],
+   "tags": [
+    "rooftop",
+    "water-tank",
+    "jojo",
+    "plastic",
+    "green"
+   ],
+   "anchors": [],
+   "materials": [
+    "PropPalette"
+   ],
+   "source": {
+    "site": "procedural",
+    "id": "props_blender.py",
+    "url": "https://github.com/thisisisheanesu/spiderman-harare",
+    "author": "Spider-Man: Harare contributors (modelled in tools/materials/props_blender.py)",
+    "license": "CC0 1.0"
+   },
+   "notes": "JoJo-style ribbed green plastic tank (~2500 L) on a 2 m steel stand."
+  }
+ ]
+}
