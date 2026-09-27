@@ -1,0 +1,318 @@
+/* Compact HUD for phone-sized views (.hud.compact, set by hud.js when the smaller side of the view is
+   small; .portrait / .landscape follow the view). The world and Spider-Man get the screen: the location
+   and objective shrink to chips (the objective opens on tap), the subtitle is two short lines where the
+   action isn't (under the top HUD in portrait, low between the thumbs in landscape), toasts come one at a
+   time in the compass caption's place, and the controls hint shows only briefly. Loaded after hud.css
+   and touch.css so these rules win over theirs. */
+
+/* ---------------------------------------------------------------- subtitles, compact mode (any layout) */
+
+.subs.compact {
+  --sub-sn: 12.5; /* px, read by notices.js to split long lines into pages */
+  --sub-en: 11;
+  grid-template-columns: minmax(0, 1fr); /* a long unbroken line ellipsizes instead of widening the box */
+}
+
+.hud:not(.compact) .subs.compact {
+  --sub-sn: 15;
+  --sub-en: 13;
+}
+
+.subs.compact .sub {
+  padding: 4px 10px 5px;
+  border-radius: 9px;
+  background: rgba(6, 9, 14, 0.68);
+}
+
+.subs.compact .sub-line {
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: italic 600 calc(var(--sub-sn) * 1px) / 1.35 var(--font);
+}
+
+.subs.compact .sub-sn {
+  font: inherit;
+}
+
+.subs.compact .sub-speaker {
+  margin: 0 6px 0 0;
+  padding: 2px 6px 3px;
+  font-size: 8.5px;
+  font-style: normal;
+  vertical-align: 1px;
+}
+
+.subs.compact .sub-en {
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 calc(var(--sub-en) * 1px) / 1.3 var(--font);
+}
+
+/* Touch tablets (full HUD, compact subtitles by default): the two lines use the whole gap between the
+   joystick and the jump button (see the landscape phone rule below) instead of the narrow centred box,
+   so long lines need fewer pages. */
+.hud.touch:not(.compact) .subs.compact {
+  --subw: min(560px, calc(100% - var(--left) - var(--right) - 312px));
+  left: calc(var(--left) + 142px + (100% - var(--left) - var(--right) - 312px - var(--subw)) / 2);
+  width: var(--subw);
+  transform: none;
+}
+
+/* A line too long for its pages even at notices.js MAX_PAGES wraps instead of losing words. */
+.subs.compact .sub.wrap .sub-line,
+.subs.compact .sub.wrap .sub-en {
+  white-space: normal;
+}
+
+/* ---------------------------------------------------------------- location + objective chips */
+
+.hud.compact .hud-left {
+  z-index: 1; /* above the touch look zone, so the objective chip can be tapped */
+  gap: 6px;
+}
+
+.hud.compact .location {
+  padding: 5px 10px 6px 9px;
+  transition: opacity 0.5s ease;
+}
+
+.hud.compact .loc-street {
+  font-size: 11.5px;
+}
+
+.hud.compact .loc-near {
+  margin-top: 0;
+  font-size: 10.5px;
+}
+
+.hud.compact .loc-stats {
+  display: none;
+}
+
+.hud.compact .location.faded {
+  opacity: 0;
+}
+
+.hud.compact .objective {
+  padding: 5px 10px 6px 9px;
+  pointer-events: auto;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.hud.compact .objective:not(.shown) {
+  pointer-events: none;
+}
+
+.hud.compact .objective-step {
+  margin-left: 0;
+  color: var(--gold);
+}
+
+.hud.compact .objective-text {
+  font-size: 12.5px;
+}
+
+.hud.compact .objective-how {
+  font-size: 11px;
+}
+
+/* Folded: one line, "2/5  Swing down Samora Machel Av…  ⌄". */
+.hud.compact .objective:not(.open) {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.hud.compact .objective:not(.open) .objective-label,
+.hud.compact .objective:not(.open) .objective-how {
+  display: none;
+}
+
+.hud.compact .objective:not(.open) .eyebrow:has(.objective-step:empty) {
+  display: none;
+}
+
+.hud.compact .objective:not(.open) .objective-text {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.hud.compact .objective:not(.open)::after {
+  content: '';
+  flex: none;
+  width: 5px;
+  height: 5px;
+  margin: -3px 1px 0 1px;
+  border-right: 2px solid rgba(255, 255, 255, 0.6);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.6);
+  transform: rotate(45deg);
+}
+
+.hud.compact .objective.open .objective-label {
+  margin-right: 8px;
+}
+
+/* ---------------------------------------------------------------- toasts: one line in the caption's place */
+
+.hud.compact .toasts {
+  top: calc(var(--top) + 48px);
+  width: min(440px, calc(100% - var(--left) - var(--right)));
+}
+
+.hud.compact .toast {
+  padding: 5px 12px 6px;
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.hud.compact:has(.toast.in) .compass-caption {
+  opacity: 0;
+}
+
+.hud.compact .compass-caption {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+/* ---------------------------------------------------------------- controls hint: small and brief */
+
+.hud.compact .controls-hint {
+  padding: 7px 10px;
+  gap: 5px 10px;
+}
+
+.hud.compact .hint-item {
+  font-size: 11px;
+}
+
+.hud.compact.hinting:has(.subs .sub.in) .controls-hint {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------- portrait phones */
+
+/* Row 1: compass. Row 2: pause / map buttons, the location chip, the minimap. Row 3: the objective chip.
+   Then the subtitle (or the controls hint). The thumbs own the bottom; Spider-Man the middle. */
+.hud.compact.portrait .hud-left {
+  top: calc(var(--top) + 76px);
+  left: var(--left);
+  width: calc(100% - var(--left) - var(--right) - var(--mini) - 10px);
+}
+
+.hud.compact.portrait.touch .location {
+  margin-left: 104px; /* beside the pause / map buttons */
+  max-width: calc(100% - 104px);
+  height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.hud.compact.portrait .subs,
+.hud.compact.portrait .controls-hint,
+.hud.compact.portrait:has(.objective.shown) .controls-hint {
+  top: calc(var(--top) + 84px + var(--mini));
+  bottom: auto;
+}
+
+.hud.compact.portrait .subs {
+  width: calc(100% - var(--left) - var(--right));
+  align-items: start;
+}
+
+.hud.compact.portrait:has(.objective.open) .subs,
+.hud.compact.portrait:has(.objective.open) .controls-hint {
+  top: calc(var(--top) + 124px + var(--mini));
+}
+
+.hud.compact.portrait .controls-hint {
+  left: 50%;
+  max-width: calc(100% - var(--left) - var(--right));
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  transform: translate(-50%, 8px);
+}
+
+.hud.compact.portrait.hinting .controls-hint {
+  transform: translateX(-50%);
+}
+
+/* Short portrait screens (360 x 640): a slimmer top so the subtitle stays above the middle third. */
+@media (max-height: 700px) {
+  .hud.compact.portrait {
+    --mini: 80px;
+  }
+
+  .hud.compact.portrait .compass {
+    height: 40px;
+  }
+
+  .hud.compact.portrait .toasts {
+    top: calc(var(--top) + 42px);
+  }
+
+  .hud.compact.portrait .touch-top,
+  .hud.compact.portrait .minimap,
+  .hud.compact.portrait .hud-left {
+    top: calc(var(--top) + 70px);
+  }
+
+  .hud.compact.portrait .subs,
+  .hud.compact.portrait .controls-hint,
+  .hud.compact.portrait:has(.objective.shown) .controls-hint {
+    top: calc(var(--top) + 76px + var(--mini));
+  }
+
+  .hud.compact.portrait:has(.objective.open) .subs,
+  .hud.compact.portrait:has(.objective.open) .controls-hint {
+    top: calc(var(--top) + 120px + var(--mini));
+  }
+
+  .hud.compact.portrait .subs.compact .sub {
+    padding-top: 3px;
+    padding-bottom: 3px;
+  }
+}
+
+/* Spider-Man is where the subtitle would be (hud.js _keepSubtitleOffHero): in landscape it moves up
+   under the compass; with nowhere to go it waits hidden. */
+.hud.compact.subs-off .subs {
+  visibility: hidden;
+}
+
+/* ---------------------------------------------------------------- landscape phones */
+
+.hud.compact.landscape .hud-left {
+  width: min(250px, calc(50% - var(--left) - 8px));
+}
+
+/* One width for both subtitle slots (notices.js pages a line for the width it starts in), as wide as the
+   narrower slot allows: the usual one low between the joystick (left + 10 + 124 px) and the jump button
+   (right + 98 + 64 px), the other under the compass between the location / objective chips (left + 250
+   px) and the minimap. Each slot centres the box in its own gap. */
+.hud.compact.landscape {
+  --subw: min(460px, calc(100% - var(--left) - var(--right) - max(312px, var(--mini) + 266px)));
+}
+
+.hud.compact.landscape .subs {
+  bottom: var(--bottom);
+  left: calc(var(--left) + 142px + (100% - var(--left) - var(--right) - 312px - var(--subw)) / 2);
+  width: var(--subw);
+  transform: none;
+}
+
+.hud.compact.landscape.subs-alt .subs {
+  top: calc(var(--top) + 80px);
+  bottom: auto;
+  left: calc(var(--left) + 258px + (100% - var(--left) - var(--right) - var(--mini) - 266px - var(--subw)) / 2);
+}

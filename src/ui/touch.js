@@ -29,16 +29,16 @@ export class TouchControls {
     this.zone = el('div', 'touch-zone');
     this.knob = el('div', 'stick-knob');
     this.stick = el('div', 'stick', null, [this.knob]);
-    const cluster = el(
+    const cluster = (this.cluster = el(
       'div',
       'touch-cluster',
       null,
       BUTTONS.map(([action, label, cls]) => this._holdButton(action, label, cls)),
-    );
-    const top = el('div', 'touch-top', null, [
+    ));
+    const top = (this.top = el('div', 'touch-top', null, [
       el('button', 'tb tb-small', { type: 'button', 'aria-label': 'Pause', html: ICONS.pause, onclick: () => hud.openOverlay('pause') }),
       el('button', 'tb tb-small', { type: 'button', 'aria-label': 'Map', html: ICONS.map, onclick: () => hud.openOverlay('map') }),
-    ]);
+    ]));
     this.root = el('div', 'touch-ui', { 'aria-hidden': 'true' }, [this.zone, this.stick, cluster, top]);
     hud.root.append(this.root);
 
@@ -57,6 +57,11 @@ export class TouchControls {
     this.input.setVirtualMove(0, 0); // marks the input as touch-driven (no pointer lock requests)
     this.hud.root.classList.add('touch');
     this.hud.onResize();
+  }
+
+  // The controls' boxes on screen (joystick, thumb cluster, top buttons), for hud.screenBlocks().
+  blocks() {
+    return [this.stick, this.cluster, this.top];
   }
 
   // Release everything (overlay opened, tab hidden...). A no-op until touch is in use: feeding the

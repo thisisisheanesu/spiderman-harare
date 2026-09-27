@@ -162,7 +162,7 @@ export class Tour {
     this._dropWaypoint();
     hud.setObjective(null);
     const map = hud.hintMode() === 'touch' ? 'tap the minimap' : hud.hintMode() === 'gamepad' ? 'press Back' : 'press M';
-    hud.toast(`Tour complete! Harare is yours — ${map} to pick your next spot`, 6000);
+    hud.toast(hud.compact ? `Tour complete! ${map[0].toUpperCase()}${map.slice(1)} to explore` : `Tour complete! Harare is yours — ${map} to pick your next spot`, 6000);
     hud.setSetting('tour', false);
   }
 

@@ -4,6 +4,7 @@ import {
   POSE_SIZE,
   poseIdle,
   poseRun,
+  poseWalk,
   poseJump,
   poseFall,
   poseSkydive,
@@ -68,6 +69,7 @@ export class Animator {
     this.cur = new Float32Array(POSE_SIZE);
     this.tgt = new Float32Array(POSE_SIZE);
     this.tmp = new Float32Array(POSE_SIZE);
+    this.tmp2 = new Float32Array(POSE_SIZE);
     // Inputs for the pose functions (see poses.js).
     this.c = {
       time: 0,
@@ -125,12 +127,19 @@ export class Animator {
           poseTuck(tgt, c);
           return 26;
         }
+        // Walk below ~2.5 m/s, jog / run above, parkour sprint at the top (controller gaits).
         c.run01 = smooth(9, 13.5, hs);
-        c.runPhase = (c.runPhase + dt * TAU * (0.9 + 0.16 * hs)) % TAU;
+        const walkK = 1 - smooth(2.2, 3.4, hs);
+        const freq = walkK * Math.max(0.7, hs / 1.45) + (1 - walkK) * (0.9 + 0.16 * hs);
+        c.runPhase = (c.runPhase + dt * TAU * freq) % TAU;
         poseIdle(tgt, c);
-        const w = smooth(0.4, 3.5, hs);
+        const w = smooth(0.2, 1.0, hs);
         if (w > 0) {
           poseRun(tmp, c);
+          if (walkK > 0) {
+            poseWalk(this.tmp2, c);
+            lerpPose(tmp, this.tmp2, walkK);
+          }
           lerpPose(tgt, tmp, w);
         }
         if (ctrl.landMode === 'soft') {

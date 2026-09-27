@@ -1,0 +1,969 @@
+{
+ "version": 1,
+ "units": "metres",
+ "forward": "-Z",
+ "up": "+Y",
+ "vehicles": {
+  "bus_zupco": {
+   "title": "ZUPCO city bus",
+   "real_model": "Yutong ZK6118 / FAW CA6110 class 11.5 m single-deck bus as run by ZUPCO (2019+)",
+   "dimensions_m": {
+    "length": 11.5,
+    "width": 2.5,
+    "height": 3.25,
+    "wheelbase": 5.8,
+    "track_front": 2.05,
+    "track_rear": 1.86
+   },
+   "wheel_radius_m": 0.522,
+   "front_axle_z_m": -3.25,
+   "rear_axle_z_m": 2.55,
+   "steer_max_deg": 42,
+   "paints": [
+    "#f3f3f0"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -1.025,
+     0.522,
+     -3.25
+    ],
+    "wheel_fr": [
+     1.025,
+     0.522,
+     -3.25
+    ],
+    "wheel_rl": [
+     -0.93,
+     0.522,
+     2.55
+    ],
+    "wheel_rr": [
+     0.93,
+     0.522,
+     2.55
+    ]
+   },
+   "toggles": {
+    "dest_0": {
+     "group": "dest",
+     "default_visible": true,
+     "tris": 240
+    },
+    "dest_1": {
+     "group": "dest",
+     "default_visible": false,
+     "tris": 240
+    },
+    "dest_2": {
+     "group": "dest",
+     "default_visible": false,
+     "tris": 240
+    },
+    "dest_3": {
+     "group": "dest",
+     "default_visible": false,
+     "tris": 240
+    },
+    "dest_4": {
+     "group": "dest",
+     "default_visible": false,
+     "tris": 240
+    },
+    "dest_5": {
+     "group": "dest",
+     "default_visible": false,
+     "tris": 240
+    },
+    "livery_stripes": {
+     "group": "livery_stripes",
+     "default_visible": true,
+     "tris": 1400
+    }
+   },
+   "lod0": {
+    "file": "bus_zupco.glb",
+    "bytes": 244560,
+    "tris_total_all_nodes": 23402,
+    "tris_body": 13202,
+    "tris_default_view": 22202
+   },
+   "lod1": {
+    "file": "bus_zupco_lod1.glb",
+    "bytes": 85712,
+    "tris_total_all_nodes": 3786,
+    "tris_body": 2530,
+    "tris_default_view": 3396
+   }
+  },
+  "hatch_fit": {
+   "title": "Honda Fit (GE) hatchback",
+   "real_model": "Honda Fit / Jazz GE (2007-2013)",
+   "dimensions_m": {
+    "length": 3.9,
+    "width": 1.695,
+    "height": 1.525,
+    "wheelbase": 2.5,
+    "track_front": 1.475,
+    "track_rear": 1.465
+   },
+   "wheel_radius_m": 0.292,
+   "front_axle_z_m": -1.23,
+   "rear_axle_z_m": 1.27,
+   "steer_max_deg": 35,
+   "paints": [
+    "#eeeeea",
+    "#eeeeea",
+    "#b7bbbf",
+    "#b7bbbf",
+    "#7c8187",
+    "#16181b",
+    "#2b56a1",
+    "#7fa3c7",
+    "#a3171c",
+    "#9fbf3b",
+    "#d0671f",
+    "#e4e1d8"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.7375,
+     0.292,
+     -1.23
+    ],
+    "wheel_fr": [
+     0.7375,
+     0.292,
+     -1.23
+    ],
+    "wheel_rl": [
+     -0.7325,
+     0.292,
+     1.27
+    ],
+    "wheel_rr": [
+     0.7325,
+     0.292,
+     1.27
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "hatch_fit.glb",
+    "bytes": 136720,
+    "tris_total_all_nodes": 13629,
+    "tris_body": 8677,
+    "tris_default_view": 13629
+   },
+   "lod1": {
+    "file": "hatch_fit_lod1.glb",
+    "bytes": 50748,
+    "tris_total_all_nodes": 1964,
+    "tris_body": 1308,
+    "tris_default_view": 1964
+   }
+  },
+  "kombi": {
+   "title": "Toyota HiAce H100 Commuter (kombi)",
+   "real_model": "Toyota HiAce H100 Commuter LH114/LH125, long body, high roof (1989-2004)",
+   "dimensions_m": {
+    "length": 4.695,
+    "width": 1.69,
+    "height": 2.2,
+    "wheelbase": 2.79,
+    "track_front": 1.445,
+    "track_rear": 1.43
+   },
+   "wheel_radius_m": 0.345,
+   "front_axle_z_m": -1.4875,
+   "rear_axle_z_m": 1.3025,
+   "steer_max_deg": 35,
+   "paints": [
+    "#efeee8",
+    "#efeee8",
+    "#efeee8",
+    "#e4e1d8",
+    "#b7bbbf",
+    "#7fa3c7",
+    "#1e2d55",
+    "#5b1b22"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.7225,
+     0.345,
+     -1.4875
+    ],
+    "wheel_fr": [
+     0.7225,
+     0.345,
+     -1.4875
+    ],
+    "wheel_rl": [
+     -0.715,
+     0.345,
+     1.3025
+    ],
+    "wheel_rr": [
+     0.715,
+     0.345,
+     1.3025
+    ]
+   },
+   "toggles": {
+    "banner_0": {
+     "group": "banner",
+     "default_visible": true,
+     "tris": 138
+    },
+    "banner_1": {
+     "group": "banner",
+     "default_visible": false,
+     "tris": 138
+    },
+    "banner_2": {
+     "group": "banner",
+     "default_visible": false,
+     "tris": 138
+    },
+    "banner_3": {
+     "group": "banner",
+     "default_visible": false,
+     "tris": 138
+    },
+    "banner_4": {
+     "group": "banner",
+     "default_visible": false,
+     "tris": 138
+    },
+    "banner_5": {
+     "group": "banner",
+     "default_visible": false,
+     "tris": 138
+    },
+    "livery_stripe": {
+     "group": "livery_stripe",
+     "default_visible": false,
+     "tris": 192
+    },
+    "livery_zupco": {
+     "group": "livery_zupco",
+     "default_visible": false,
+     "tris": 198
+    },
+    "roof_rack": {
+     "group": "roof_rack",
+     "default_visible": false,
+     "tris": 548
+    },
+    "route_0": {
+     "group": "route",
+     "default_visible": true,
+     "tris": 24
+    },
+    "route_1": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_2": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_3": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_4": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_5": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_6": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    },
+    "route_7": {
+     "group": "route",
+     "default_visible": false,
+     "tris": 24
+    }
+   },
+   "lod0": {
+    "file": "kombi.glb",
+    "bytes": 232376,
+    "tris_total_all_nodes": 17296,
+    "tris_body": 9762,
+    "tris_default_view": 15500
+   },
+   "lod1": {
+    "file": "kombi_lod1.glb",
+    "bytes": 93512,
+    "tris_total_all_nodes": 3012,
+    "tris_body": 1512,
+    "tris_default_view": 2228
+   }
+  },
+  "pickup_hilux": {
+   "title": "Toyota Hilux double cab",
+   "real_model": "Toyota Hilux AN20/AN30 double cab 4x4, 2011-2015 facelift",
+   "dimensions_m": {
+    "length": 5.26,
+    "width": 1.835,
+    "height": 1.81,
+    "wheelbase": 3.085,
+    "track_front": 1.54,
+    "track_rear": 1.54
+   },
+   "wheel_radius_m": 0.369,
+   "front_axle_z_m": -1.76,
+   "rear_axle_z_m": 1.325,
+   "steer_max_deg": 35,
+   "paints": [
+    "#eeeeea",
+    "#eeeeea",
+    "#eeeeea",
+    "#b7bbbf",
+    "#7c8187",
+    "#4a4f55",
+    "#16181b",
+    "#a3171c",
+    "#1e2d55"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.77,
+     0.369,
+     -1.76
+    ],
+    "wheel_fr": [
+     0.77,
+     0.369,
+     -1.76
+    ],
+    "wheel_rl": [
+     -0.77,
+     0.369,
+     1.325
+    ],
+    "wheel_rr": [
+     0.77,
+     0.369,
+     1.325
+    ]
+   },
+   "toggles": {
+    "cargo": {
+     "group": "cargo",
+     "default_visible": false,
+     "tris": 220
+    },
+    "sports_bar": {
+     "group": "sports_bar",
+     "default_visible": false,
+     "tris": 148
+    }
+   },
+   "lod0": {
+    "file": "pickup_hilux.glb",
+    "bytes": 162488,
+    "tris_total_all_nodes": 16636,
+    "tris_body": 10564,
+    "tris_default_view": 16268
+   },
+   "lod1": {
+    "file": "pickup_hilux_lod1.glb",
+    "bytes": 67440,
+    "tris_total_all_nodes": 2622,
+    "tris_body": 1758,
+    "tris_default_view": 2414
+   }
+  },
+  "police_landcruiser": {
+   "title": "ZRP police Land Cruiser 200",
+   "real_model": "Toyota Land Cruiser 200 (UZJ200/VDJ200, 2007-2015)",
+   "dimensions_m": {
+    "length": 4.95,
+    "width": 1.97,
+    "height": 1.905,
+    "wheelbase": 2.85,
+    "track_front": 1.64,
+    "track_rear": 1.635
+   },
+   "wheel_radius_m": 0.4,
+   "front_axle_z_m": -1.555,
+   "rear_axle_z_m": 1.295,
+   "steer_max_deg": 35,
+   "paints": [
+    "#f2f2ee"
+   ],
+   "livery": "ZRP white/blue/gold (approx), baked into body; beacons: beacon_blue (left), beacon_red (right)",
+   "materials": [
+    "beacon_blue",
+    "beacon_red",
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.82,
+     0.4,
+     -1.555
+    ],
+    "wheel_fr": [
+     0.82,
+     0.4,
+     -1.555
+    ],
+    "wheel_rl": [
+     -0.8175,
+     0.4,
+     1.295
+    ],
+    "wheel_rr": [
+     0.8175,
+     0.4,
+     1.295
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "police_landcruiser.glb",
+    "bytes": 181820,
+    "tris_total_all_nodes": 17143,
+    "tris_body": 11439,
+    "tris_default_view": 17143
+   },
+   "lod1": {
+    "file": "police_landcruiser_lod1.glb",
+    "bytes": 69036,
+    "tris_total_all_nodes": 2541,
+    "tris_body": 1885,
+    "tris_default_view": 2541
+   }
+  },
+  "sedan_corolla": {
+   "title": "Toyota Corolla Axio (E160) saloon",
+   "real_model": "Toyota Corolla Axio E160 (2012-2019)",
+   "dimensions_m": {
+    "length": 4.4,
+    "width": 1.695,
+    "height": 1.46,
+    "wheelbase": 2.6,
+    "track_front": 1.48,
+    "track_rear": 1.465
+   },
+   "wheel_radius_m": 0.301,
+   "front_axle_z_m": -1.34,
+   "rear_axle_z_m": 1.26,
+   "steer_max_deg": 35,
+   "paints": [
+    "#eeeeea",
+    "#e4e1d8",
+    "#b7bbbf",
+    "#7c8187",
+    "#4a4f55",
+    "#16181b",
+    "#1e2d55",
+    "#c8b78e",
+    "#5b1b22"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.74,
+     0.301,
+     -1.34
+    ],
+    "wheel_fr": [
+     0.74,
+     0.301,
+     -1.34
+    ],
+    "wheel_rl": [
+     -0.7325,
+     0.301,
+     1.26
+    ],
+    "wheel_rr": [
+     0.7325,
+     0.301,
+     1.26
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "sedan_corolla.glb",
+    "bytes": 142476,
+    "tris_total_all_nodes": 14749,
+    "tris_body": 9085,
+    "tris_default_view": 14749
+   },
+   "lod1": {
+    "file": "sedan_corolla_lod1.glb",
+    "bytes": 50608,
+    "tris_total_all_nodes": 1945,
+    "tris_body": 1289,
+    "tris_default_view": 1945
+   }
+  },
+  "sedan_mercedes": {
+   "title": "Mercedes-Benz C-Class (W204) saloon",
+   "real_model": "Mercedes-Benz C-Class W204 (2007-2014)",
+   "dimensions_m": {
+    "length": 4.58,
+    "width": 1.77,
+    "height": 1.447,
+    "wheelbase": 2.76,
+    "track_front": 1.55,
+    "track_rear": 1.54
+   },
+   "wheel_radius_m": 0.316,
+   "front_axle_z_m": -1.49,
+   "rear_axle_z_m": 1.27,
+   "steer_max_deg": 35,
+   "paints": [
+    "#16181b",
+    "#16181b",
+    "#b7bbbf",
+    "#eeeeea",
+    "#1e2d55",
+    "#4a4f55"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.775,
+     0.316,
+     -1.49
+    ],
+    "wheel_fr": [
+     0.775,
+     0.316,
+     -1.49
+    ],
+    "wheel_rl": [
+     -0.77,
+     0.316,
+     1.27
+    ],
+    "wheel_rr": [
+     0.77,
+     0.316,
+     1.27
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "sedan_mercedes.glb",
+    "bytes": 145180,
+    "tris_total_all_nodes": 15064,
+    "tris_body": 9560,
+    "tris_default_view": 15064
+   },
+   "lod1": {
+    "file": "sedan_mercedes_lod1.glb",
+    "bytes": 52740,
+    "tris_total_all_nodes": 2030,
+    "tris_body": 1374,
+    "tris_default_view": 2030
+   }
+  },
+  "suv_landcruiser": {
+   "title": "Toyota Land Cruiser 200",
+   "real_model": "Toyota Land Cruiser 200 (UZJ200/VDJ200, 2007-2015)",
+   "dimensions_m": {
+    "length": 4.95,
+    "width": 1.97,
+    "height": 1.905,
+    "wheelbase": 2.85,
+    "track_front": 1.64,
+    "track_rear": 1.635
+   },
+   "wheel_radius_m": 0.4,
+   "front_axle_z_m": -1.555,
+   "rear_axle_z_m": 1.295,
+   "steer_max_deg": 35,
+   "paints": [
+    "#eeeeea",
+    "#e4e1d8",
+    "#16181b",
+    "#16181b",
+    "#b7bbbf",
+    "#4a4f55",
+    "#c8b78e"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.82,
+     0.4,
+     -1.555
+    ],
+    "wheel_fr": [
+     0.82,
+     0.4,
+     -1.555
+    ],
+    "wheel_rl": [
+     -0.8175,
+     0.4,
+     1.295
+    ],
+    "wheel_rr": [
+     0.8175,
+     0.4,
+     1.295
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "suv_landcruiser.glb",
+    "bytes": 153264,
+    "tris_total_all_nodes": 16311,
+    "tris_body": 10607,
+    "tris_default_view": 16311
+   },
+   "lod1": {
+    "file": "suv_landcruiser_lod1.glb",
+    "bytes": 54852,
+    "tris_total_all_nodes": 2237,
+    "tris_body": 1581,
+    "tris_default_view": 2237
+   }
+  },
+  "taxi": {
+   "title": "Metered taxi (Toyota Corolla Axio)",
+   "real_model": "Toyota Corolla Axio E160 (2012-2019)",
+   "dimensions_m": {
+    "length": 4.4,
+    "width": 1.695,
+    "height": 1.46,
+    "wheelbase": 2.6,
+    "track_front": 1.48,
+    "track_rear": 1.465
+   },
+   "wheel_radius_m": 0.301,
+   "front_axle_z_m": -1.34,
+   "rear_axle_z_m": 1.26,
+   "steer_max_deg": 35,
+   "paints": [
+    "#f2c21a",
+    "#f2c21a",
+    "#eeeeea",
+    "#b7bbbf"
+   ],
+   "livery": "yellow Harare cab: roof sign + checker band (baked into body)",
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.74,
+     0.301,
+     -1.34
+    ],
+    "wheel_fr": [
+     0.74,
+     0.301,
+     -1.34
+    ],
+    "wheel_rl": [
+     -0.7325,
+     0.301,
+     1.26
+    ],
+    "wheel_rr": [
+     0.7325,
+     0.301,
+     1.26
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "taxi.glb",
+    "bytes": 166612,
+    "tris_total_all_nodes": 14975,
+    "tris_body": 9311,
+    "tris_default_view": 14975
+   },
+   "lod1": {
+    "file": "taxi_lod1.glb",
+    "bytes": 62944,
+    "tris_total_all_nodes": 2017,
+    "tris_body": 1361,
+    "tris_default_view": 2017
+   }
+  },
+  "truck_isuzu": {
+   "title": "Isuzu N-series box truck",
+   "real_model": "Isuzu N-series NQR 500 (wide cab) with 5.1 m dry-freight box",
+   "dimensions_m": {
+    "length": 7,
+    "width": 2.2,
+    "height": 3,
+    "wheelbase": 3.9,
+    "track_front": 1.68,
+    "track_rear": 1.79
+   },
+   "wheel_radius_m": 0.383,
+   "front_axle_z_m": -2.4,
+   "rear_axle_z_m": 1.5,
+   "steer_max_deg": 40,
+   "paints": [
+    "#efefea",
+    "#efefea",
+    "#1f4e9c",
+    "#b01e23",
+    "#2e6b3f",
+    "#d9a520"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "livery",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.84,
+     0.383,
+     -2.4
+    ],
+    "wheel_fr": [
+     0.84,
+     0.383,
+     -2.4
+    ],
+    "wheel_rl": [
+     -0.895,
+     0.383,
+     1.5
+    ],
+    "wheel_rr": [
+     0.895,
+     0.383,
+     1.5
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "truck_isuzu.glb",
+    "bytes": 156728,
+    "tris_total_all_nodes": 12326,
+    "tris_body": 4966,
+    "tris_default_view": 12326
+   },
+   "lod1": {
+    "file": "truck_isuzu_lod1.glb",
+    "bytes": 55584,
+    "tris_total_all_nodes": 1680,
+    "tris_body": 1024,
+    "tris_default_view": 1680
+   }
+  },
+  "wagon_wish": {
+   "title": "Toyota Wish (AE10) compact MPV",
+   "real_model": "Toyota Wish AE10 (2003-2009)",
+   "dimensions_m": {
+    "length": 4.56,
+    "width": 1.695,
+    "height": 1.59,
+    "wheelbase": 2.75,
+    "track_front": 1.48,
+    "track_rear": 1.475
+   },
+   "wheel_radius_m": 0.317,
+   "front_axle_z_m": -1.42,
+   "rear_axle_z_m": 1.33,
+   "steer_max_deg": 35,
+   "paints": [
+    "#eeeeea",
+    "#b7bbbf",
+    "#b7bbbf",
+    "#7c8187",
+    "#16181b",
+    "#1e2d55",
+    "#c8b78e"
+   ],
+   "materials": [
+    "chrome",
+    "glass",
+    "indicator",
+    "interior",
+    "light_front",
+    "light_rear",
+    "paint",
+    "plate",
+    "rim",
+    "trim",
+    "tyre"
+   ],
+   "wheels": {
+    "wheel_fl": [
+     -0.74,
+     0.317,
+     -1.42
+    ],
+    "wheel_fr": [
+     0.74,
+     0.317,
+     -1.42
+    ],
+    "wheel_rl": [
+     -0.7375,
+     0.317,
+     1.33
+    ],
+    "wheel_rr": [
+     0.7375,
+     0.317,
+     1.33
+    ]
+   },
+   "toggles": {},
+   "lod0": {
+    "file": "wagon_wish.glb",
+    "bytes": 147000,
+    "tris_total_all_nodes": 15324,
+    "tris_body": 9620,
+    "tris_default_view": 15324
+   },
+   "lod1": {
+    "file": "wagon_wish_lod1.glb",
+    "bytes": 52288,
+    "tris_total_all_nodes": 2080,
+    "tris_body": 1424,
+    "tris_default_view": 2080
+   }
+  }
+ }
+}

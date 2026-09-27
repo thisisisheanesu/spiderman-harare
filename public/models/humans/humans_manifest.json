@@ -1,0 +1,775 @@
+{
+ "units": "metres, y up, characters face -Z, feet at y=0",
+ "skeleton": "MakeHuman game_engine rig (53 bones, UE-mannequin-like names); every file shares the same bone names and rest orientations",
+ "animations": "../anims/humans_anims.glb",
+ "reference_hip_height_m": 0.9729963541030884,
+ "spiderman": {
+  "file": "spiderman.glb",
+  "bytes": 1055028,
+  "tris": 22999,
+  "height_m": 1.786,
+  "hip_height_m": 0.9729963541030884,
+  "materials": [
+   "suit_classic",
+   "suit_symbiote"
+  ],
+  "variants": [
+   "classic",
+   "symbiote"
+  ]
+ },
+ "lod_distances_m": {
+  "desktop": {
+   "lod0": 0,
+   "lod1": 22,
+   "cull": 90
+  },
+  "phone": {
+   "lod0": 0,
+   "lod1": 12,
+   "cull": 55
+  }
+ },
+ "npcs": [
+  {
+   "id": "boy_high_school",
+   "gender": "male",
+   "roles": [
+    "school_kid"
+   ],
+   "description": "High school boy: white shirt, maroon tie, grey trousers, black shoes",
+   "height_m": 1.652,
+   "hip_height_m": 0.8775,
+   "lod0": {
+    "file": "npc_boy_high_school.glb",
+    "tris": 9798,
+    "bytes": 154236,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_boy_high_school_lod1.glb",
+    "tris": 1999,
+    "bytes": 52516,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_male_shirt_tie_tucked1",
+    "elvs_male_trouser",
+    "shoes04"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "boy_primary_school",
+   "gender": "male",
+   "roles": [
+    "school_kid"
+   ],
+   "description": "Primary school boy: khaki shirt and shorts, brown socks, black shoes",
+   "height_m": 1.332,
+   "hip_height_m": 0.6835,
+   "lod0": {
+    "file": "npc_boy_primary_school.glb",
+    "tris": 7738,
+    "bytes": 126380,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_boy_primary_school_lod1.glb",
+    "tris": 1999,
+    "bytes": 48020,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_crude_t-shirt_male",
+    "cortu_jeans_shorts",
+    "shoes04"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "girl_high_school",
+   "gender": "female",
+   "roles": [
+    "school_kid"
+   ],
+   "description": "High school girl: white top, navy skirt, white socks, black shoes, cornrows",
+   "height_m": 1.437,
+   "hip_height_m": 0.7631,
+   "lod0": {
+    "file": "npc_girl_high_school.glb",
+    "tris": 9798,
+    "bytes": 149264,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_girl_high_school_lod1.glb",
+    "tris": 1999,
+    "bytes": 53056,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_basic_tucked_t-shirt",
+    "elvs_gored_midi_skirt",
+    "toigo_mj_cloth_shoes"
+   ],
+   "hair": "cornrows",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "girl_primary_school",
+   "gender": "female",
+   "roles": [
+    "school_kid"
+   ],
+   "description": "Primary school girl: light blue dress, white socks, black shoes, cornrows",
+   "height_m": 1.208,
+   "hip_height_m": 0.6423,
+   "lod0": {
+    "file": "npc_girl_primary_school.glb",
+    "tris": 7771,
+    "bytes": 139268,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_girl_primary_school_lod1.glb",
+    "tris": 1999,
+    "bytes": 51256,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_shift_dress",
+    "toigo_mj_cloth_shoes"
+   ],
+   "hair": "cornrows",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "man_apostolic",
+   "gender": "male",
+   "roles": [
+    "apostolic"
+   ],
+   "description": "Apostolic church member: white knee-length robe, shaved head, full beard, barefoot",
+   "height_m": 1.865,
+   "hip_height_m": 1.0125,
+   "lod0": {
+    "file": "npc_man_apostolic.glb",
+    "tris": 7071,
+    "bytes": 120300,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_apostolic_lod1.glb",
+    "tris": 1999,
+    "bytes": 46664,
+    "texture": 256
+   },
+   "clothes": [
+    "wdg_mycenaean_tunic"
+   ],
+   "hair": "bald",
+   "skin": {
+    "base": "middleage_african_male",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "man_business_suit",
+   "gender": "male",
+   "roles": [
+    "office_man",
+    "street_preacher"
+   ],
+   "description": "Office worker in a charcoal two-piece suit, white shirt and maroon tie",
+   "height_m": 1.798,
+   "hip_height_m": 0.9695,
+   "lod0": {
+    "file": "npc_man_business_suit.glb",
+    "tris": 7770,
+    "bytes": 125804,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_business_suit_lod1.glb",
+    "tris": 1999,
+    "bytes": 47932,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_male_suit_tie_and_jacket",
+    "shoes04"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "middleage_african_male",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "man_elder_flatcap",
+   "gender": "male",
+   "roles": [
+    "elder"
+   ],
+   "description": "Elderly man in brown jacket, grey trousers and flat cap, grey stubble",
+   "height_m": 1.739,
+   "hip_height_m": 0.9421,
+   "lod0": {
+    "file": "npc_man_elder_flatcap.glb",
+    "tris": 8671,
+    "bytes": 166084,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_elder_flatcap_lod1.glb",
+    "tris": 2000,
+    "bytes": 53620,
+    "texture": 256
+   },
+   "clothes": [
+    "male_casualsuit05",
+    "jujube_newsboy_cap",
+    "shoes01"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "old_african_male",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "man_hoodie",
+   "gender": "male",
+   "roles": [
+    "youth",
+    "hwindi"
+   ],
+   "description": "Youth / kombi tout in grey hooded sweat jacket, dark jeans and white sneakers",
+   "height_m": 1.617,
+   "hip_height_m": 0.8589,
+   "lod0": {
+    "file": "npc_man_hoodie.glb",
+    "tris": 9798,
+    "bytes": 226020,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_hoodie_lod1.glb",
+    "tris": 2000,
+    "bytes": 72484,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_hooded_sweat_jacket1",
+    "punkduck_male_classic_jeans",
+    "culturalibre_sneakers"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "man_overalls",
+   "gender": "male",
+   "roles": [
+    "handcart_pusher",
+    "worker",
+    "car_washer"
+   ],
+   "description": "Worker in navy overalls over a grey t-shirt, work boots",
+   "height_m": 1.682,
+   "hip_height_m": 0.8948,
+   "lod0": {
+    "file": "npc_man_overalls.glb",
+    "tris": 7772,
+    "bytes": 133124,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_overalls_lod1.glb",
+    "tris": 2000,
+    "bytes": 49316,
+    "texture": 256
+   },
+   "clothes": [
+    "male_worksuit01",
+    "shoes03"
+   ],
+   "hair": "shaved",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "man_police_zrp",
+   "gender": "male",
+   "roles": [
+    "police"
+   ],
+   "description": "ZRP police officer: light blue-grey shirt, navy trousers and cap, black boots",
+   "height_m": 1.791,
+   "hip_height_m": 0.9657,
+   "lod0": {
+    "file": "npc_man_police_zrp.glb",
+    "tris": 9796,
+    "bytes": 160120,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_police_zrp_lod1.glb",
+    "tris": 2000,
+    "bytes": 55060,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_male_shirt_untucked_bd1",
+    "elvs_male_trouser",
+    "mindfront_patrol_cap",
+    "shoes03"
+   ],
+   "hair": "shaved",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#6b4430"
+   }
+  },
+  {
+   "id": "man_polo_chinos",
+   "gender": "male",
+   "roles": [
+    "casual_man"
+   ],
+   "description": "Man in yellow polo shirt, khaki chinos and brown shoes",
+   "height_m": 1.791,
+   "hip_height_m": 0.9592,
+   "lod0": {
+    "file": "npc_man_polo_chinos.glb",
+    "tris": 9797,
+    "bytes": 221004,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_polo_chinos_lod1.glb",
+    "tris": 1999,
+    "bytes": 57164,
+    "texture": 256
+   },
+   "clothes": [
+    "namuhekam_male_polo_shirt",
+    "toigo_wool_pants",
+    "shoes01"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "middleage_african_male",
+    "tone": "#6b4430"
+   }
+  },
+  {
+   "id": "man_security_guard",
+   "gender": "male",
+   "roles": [
+    "security_guard"
+   ],
+   "description": "Private security guard: blue-grey shirt, navy trousers, navy patrol cap, boots",
+   "height_m": 1.743,
+   "hip_height_m": 0.9331,
+   "lod0": {
+    "file": "npc_man_security_guard.glb",
+    "tris": 9797,
+    "bytes": 153580,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_security_guard_lod1.glb",
+    "tris": 2000,
+    "bytes": 53932,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_male_shirt_untucked_bd1",
+    "elvs_male_trouser",
+    "mindfront_patrol_cap",
+    "shoes03"
+   ],
+   "hair": "shaved",
+   "skin": {
+    "base": "middleage_african_male",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "man_shirt_tie",
+   "gender": "male",
+   "roles": [
+    "office_man"
+   ],
+   "description": "Clerk in light blue shirt, navy tie and grey trousers",
+   "height_m": 1.656,
+   "hip_height_m": 0.8799,
+   "lod0": {
+    "file": "npc_man_shirt_tie.glb",
+    "tris": 9797,
+    "bytes": 156164,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_shirt_tie_lod1.glb",
+    "tris": 1999,
+    "bytes": 52496,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_male_shirt_tie_tucked1",
+    "elvs_male_trouser",
+    "shoes01"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "man_tshirt_jeans_cap",
+   "gender": "male",
+   "roles": [
+    "casual_man",
+    "youth"
+   ],
+   "description": "Young man in red t-shirt, jeans and black baseball cap",
+   "height_m": 1.67,
+   "hip_height_m": 0.8913,
+   "lod0": {
+    "file": "npc_man_tshirt_jeans_cap.glb",
+    "tris": 9794,
+    "bytes": 195580,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_man_tshirt_jeans_cap_lod1.glb",
+    "tris": 1999,
+    "bytes": 51868,
+    "texture": 256
+   },
+   "clothes": [
+    "elvs_crude_t-shirt_male",
+    "punkduck_male_classic_jeans",
+    "toigo_maga_hat",
+    "shoes05"
+   ],
+   "hair": "crop",
+   "skin": {
+    "base": "young_african_male",
+    "tone": "#3b2219"
+   }
+  },
+  {
+   "id": "woman_apostolic",
+   "gender": "female",
+   "roles": [
+    "apostolic"
+   ],
+   "description": "Apostolic church member: white long dress and white headscarf, barefoot",
+   "height_m": 1.656,
+   "hip_height_m": 0.8592,
+   "lod0": {
+    "file": "npc_woman_apostolic.glb",
+    "tris": 7234,
+    "bytes": 115064,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_apostolic_lod1.glb",
+    "tris": 2000,
+    "bytes": 46412,
+    "texture": 256
+   },
+   "clothes": [
+    "wdg_mycenaean_tunic"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "middleage_african_female",
+    "tone": "#3b2219"
+   }
+  },
+  {
+   "id": "woman_blouse_skirt",
+   "gender": "female",
+   "roles": [
+    "casual_woman",
+    "office_woman"
+   ],
+   "description": "Woman in a cream tucked top and black pencil skirt with a red dhuku (head wrap)",
+   "height_m": 1.59,
+   "hip_height_m": 0.8272,
+   "lod0": {
+    "file": "npc_woman_blouse_skirt.glb",
+    "tris": 9949,
+    "bytes": 178028,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_blouse_skirt_lod1.glb",
+    "tris": 2000,
+    "bytes": 53664,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_basic_tucked_t-shirt",
+    "elvs_pencil_skirt",
+    "toigo_flats"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "middleage_african_female",
+    "tone": "#6b4430"
+   }
+  },
+  {
+   "id": "woman_casual_tee",
+   "gender": "female",
+   "roles": [
+    "casual_woman"
+   ],
+   "description": "Woman in a teal t-shirt and black trousers, hair in a bun under a black wrap",
+   "height_m": 1.506,
+   "hip_height_m": 0.793,
+   "lod0": {
+    "file": "npc_woman_casual_tee.glb",
+    "tris": 9970,
+    "bytes": 160132,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_casual_tee_lod1.glb",
+    "tris": 1999,
+    "bytes": 50924,
+    "texture": 256
+   },
+   "clothes": [
+    "joepal_crude_t-shirt_female",
+    "elvs_male_trouser",
+    "toigo_flats"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#6b4430"
+   }
+  },
+  {
+   "id": "woman_dress_bright",
+   "gender": "female",
+   "roles": [
+    "casual_woman"
+   ],
+   "description": "Woman in a bright blue knee-length shift dress, braids / cornrows",
+   "height_m": 1.473,
+   "hip_height_m": 0.7819,
+   "lod0": {
+    "file": "npc_woman_dress_bright.glb",
+    "tris": 7771,
+    "bytes": 125080,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_dress_bright_lod1.glb",
+    "tris": 1999,
+    "bytes": 47864,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_shift_dress",
+    "toigo_ballet_flats"
+   ],
+   "hair": "cornrows",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#4a2c20"
+   }
+  },
+  {
+   "id": "woman_elder",
+   "gender": "female",
+   "roles": [
+    "elder"
+   ],
+   "description": "Elderly woman in a cardigan, long skirt and headscarf",
+   "height_m": 1.593,
+   "hip_height_m": 0.8255,
+   "lod0": {
+    "file": "npc_woman_elder.glb",
+    "tris": 10015,
+    "bytes": 146680,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_elder_lod1.glb",
+    "tris": 2000,
+    "bytes": 50820,
+    "texture": 256
+   },
+   "clothes": [
+    "janexx_old_female_sweater",
+    "toigo_long_full_skirt",
+    "toigo_mj_cloth_shoes"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "old_african_female",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "woman_jeans_top",
+   "gender": "female",
+   "roles": [
+    "youth",
+    "casual_woman"
+   ],
+   "description": "Young woman in a pink top and tight jeans with an afro puff",
+   "height_m": 1.481,
+   "hip_height_m": 0.796,
+   "lod0": {
+    "file": "npc_woman_jeans_top.glb",
+    "tris": 9797,
+    "bytes": 231852,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_jeans_top_lod1.glb",
+    "tris": 2000,
+    "bytes": 70744,
+    "texture": 256
+   },
+   "clothes": [
+    "punkduck_v_neck_top",
+    "punkduck_female_tight_jeans",
+    "culturalibre_sneakers"
+   ],
+   "hair": "afro01",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#7a5038"
+   }
+  },
+  {
+   "id": "woman_office_suit",
+   "gender": "female",
+   "roles": [
+    "office_woman"
+   ],
+   "description": "Office worker in a navy skirt suit, black flats, relaxed bob",
+   "height_m": 1.555,
+   "hip_height_m": 0.8192,
+   "lod0": {
+    "file": "npc_woman_office_suit.glb",
+    "tris": 9371,
+    "bytes": 164748,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_office_suit_lod1.glb",
+    "tris": 2000,
+    "bytes": 54576,
+    "texture": 256
+   },
+   "clothes": [
+    "toigo_female_suit",
+    "toigo_flats"
+   ],
+   "hair": "bob02",
+   "skin": {
+    "base": "middleage_african_female",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "woman_vendor_apron",
+   "gender": "female",
+   "roles": [
+    "vendor",
+    "market_woman"
+   ],
+   "description": "Street vendor: orange t-shirt, wax-print wrap skirt, blue gingham apron, orange-print dhuku",
+   "height_m": 1.576,
+   "hip_height_m": 0.8255,
+   "lod0": {
+    "file": "npc_woman_vendor_apron.glb",
+    "tris": 9967,
+    "bytes": 406416,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_vendor_apron_lod1.glb",
+    "tris": 2000,
+    "bytes": 76224,
+    "texture": 256
+   },
+   "clothes": [
+    "joepal_crude_t-shirt_female",
+    "toigo_long_full_skirt",
+    "elvs_ladies_apron",
+    "toigo_flats"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "young_african_female",
+    "tone": "#5a3825"
+   }
+  },
+  {
+   "id": "woman_zambia_wrap",
+   "gender": "female",
+   "roles": [
+    "market_woman",
+    "vendor"
+   ],
+   "description": "Market woman in a zambia wrap cloth (wax print) over a t-shirt, yellow-print dhuku",
+   "height_m": 1.642,
+   "hip_height_m": 0.8511,
+   "lod0": {
+    "file": "npc_woman_zambia_wrap.glb",
+    "tris": 9988,
+    "bytes": 361088,
+    "texture": 1024
+   },
+   "lod1": {
+    "file": "npc_woman_zambia_wrap_lod1.glb",
+    "tris": 2000,
+    "bytes": 67904,
+    "texture": 256
+   },
+   "clothes": [
+    "joepal_crude_t-shirt_female",
+    "toigo_long_full_skirt",
+    "toigo_mj_cloth_shoes"
+   ],
+   "hair": "none",
+   "skin": {
+    "base": "middleage_african_female",
+    "tone": "#4a2c20"
+   }
+  }
+ ]
+}

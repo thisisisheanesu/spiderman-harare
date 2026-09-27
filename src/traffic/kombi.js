@@ -8,6 +8,9 @@ import { gloss, shout } from '../npc/streetVoices.js';
 // calls his kombi's destination out loud with a real recorded Shona phrase ("KuMarondera!"), twice,
 // from the door (streetVoices.js); the bubble then shows exactly that, otherwise the text-only calls.
 // A kombi has one destination: its text calls name the same place as its recorded calls (v.call).
+// Bubbles go through the street's shared bubble layer (bubbles.js -> src/npc/bubbles.js), which may refuse
+// one (phones: few bubbles, near speakers only, ambient calls only now and then); the call and its hoot
+// still happen.
 
 const CALL_RANGE = 40;
 const VOICE_RANGE = 30; // m: recorded destination calls

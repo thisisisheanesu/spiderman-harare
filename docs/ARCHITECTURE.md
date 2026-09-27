@@ -128,6 +128,23 @@ Towers hotel tower, id -7; Monomotapa's thickened slab) are registered with `wor
 `heading` (rad, 0 = facing north/-z, CCW positive, i.e. forward = (-sin h, 0, -cos h)), `object`, `suit`,
 `radius`, `height`, `teleport(x,y,z)`, `speed` (m/s getter), `setSuit(name)`, `hands` (world positions of both palms),
 `controller` (read-only traversal state, e.g. current swing anchor / wall normal).
+Locomotion for the animation system (getters, read every frame): `locomotion` 'idle'|'walk'|'run'|'sprint' (the ground
+gait; 'idle' whenever `state` isn't 'ground'/'perch'; thresholds on groundSpeed with hysteresis: walk > 0.25 m/s, run > 2.6
+(back to walk < 2.2), sprint > 9.5 (back to run < 8.5)), `groundSpeed` (horizontal m/s on the ground, 0 off it: walk
+~1.0-1.8, run ~3.6-7, sprint ~13, more for a moment after landing out of a swing — speed-match clips with
+playbackRate = groundSpeed / clipSpeed, e.g. walk 1.4, run 4, sprint 6.5 m/s at rate 1), `turnRate` (rad/s, + = turning
+left/CCW, smoothed, 0 off the ground); `controller.skid` (reversing at speed: planted skid, then a pivot).
+Gaits (controller.js): stick below 0.55 (or Alt held / CapsLock on) walks ~1.6 m/s, beyond it runs ~7 m/s (keyboard W
+runs); the swing action held ON THE GROUND is the parkour sprint (~13 m/s; auto-vaults, runs up walls on contact),
+jump while sprinting is a web launch (two lines yank you up and on) and the still-held swing webs on once airborne;
+holding swing standing still (no stick) also launches. Acceleration/braking are eased, turn rate is limited by
+lateral grip (26 m/s²: ~2 rad/s at a sprint), reversing above 4.5 m/s skids.
+Swinging (swing.js): a rope pendulum whose pivot IS the web anchor (`controller.swing.anchor`, same vector as `.pivot`),
+stiff critically-damped rope with a capped catch tug (no velocity snaps), smooth reel-in only when the anchor is too low
+for the arc's clearance, 1.5 g on the web, forward input pumps along the arc; anchors are chosen by simulating each
+candidate's swing (clear of walls/street, where the release carries you). Readable swing state: `ropeLen`, `dist`,
+`tension` (m/s² along the rope, 0 when slack), `taut` (s since taut, -1 before), `kick` (plunge catch: 1 heading for the
+facade, 2 pushed off it), `side` (+1 right hand / -1 left), `stats` (anchor-search counters, telemetry only).
 
 **cameraRig**: `yaw` (same convention as heading: the camera looks along (-sin yaw, 0, -cos yaw)), `pitch`,
 `shake(amount)`, `fovKick(amount)`, `preset` ('close'|'far', V toggles), `snap()` (jump to the target pose).
@@ -179,6 +196,7 @@ city paints and pedestrians stay on the sidewalks the city builds.
 
 `player:land {pos, speed, hard}`, `player:jump`, `player:webShot {from, to}`, `player:swingStart {anchor}`,
 `player:swingEnd {pos, vel}`, `player:zip {from, to}`, `player:wallStart {pos, normal}`, `player:perch {pos}`,
+`player:wallKick {pos}` (a foot-plant push off a wall brushed mid-swing; the web stays on),
 `player:suit {suit}`, `npc:speak {npc, clip, text}`, `hud:toast {text, ms}`, `game:pause {paused}`, `game:start`.
 
 ### Input actions (`src/core/input.js`)
@@ -187,6 +205,8 @@ city paints and pedestrians stay on the sidewalks the city builds.
 actions `jump swing zip dive suit map pause help camera time`. Keyboard: WASD/arrows, Space jump, Shift or
 left-click (pointer-locked) swing, E/Q or right-click zip, C dive (not Ctrl: Ctrl+W closes the tab), F suit, M map, Esc/P pause, H help, V camera,
 T time of day. Gamepad: sticks, A jump, RT swing, LB/RB/LT zip, B dive, Y suit, Back map, Start pause.
+(Swing held on the ground = parkour sprint; the controller also reads `input.keys` for Alt (hold = walk) and the key
+events' CapsLock state (on = walk), see player/controller.js.)
 Touch UI calls `input.setVirtualMove(x, y)`, `input.addLook(dx, dy)`, `input.setVirtualButton(action, down)`.
 
 ## Rules for every module

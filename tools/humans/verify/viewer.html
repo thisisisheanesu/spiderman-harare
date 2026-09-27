@@ -1,0 +1,106 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>humans verify</title>
+<style>html,body{margin:0;background:#8a9099;font:12px sans-serif}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Contact-sheet renderer used to verify the humans assets in three.js (not Blender):
+// loads character glb(s) + the shared animation glb with GLTFLoader + MeshoptDecoder, plays clips with
+// AnimationMixer at several times and renders a grid (rows = clips, columns = time x view).
+// URL params: models=a.glb,b.glb  anims=humans_anims.glb  clips=walk,run  times=4  views=front,side
+//             cell=220  scale pelvis tracks by each model's userData.hipHeight vs the anim rig's.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+const P = new URLSearchParams(location.search);
+const models = (P.get('models') || '').split(',').filter(Boolean);
+const animsUrl = P.get('anims');
+const clipNames = (P.get('clips') || 'idle').split(',');
+const nT = +(P.get('times') || 4);
+const views = (P.get('views') || 'front,side').split(',');
+const cell = +(P.get('cell') || 200);
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const log = (...a) => { console.log(...a); (window.__log ||= []).push(a.join(' ')); };
+window.onerror = (m) => { log('ERR', m); window.__done = true; };
+const load = (u) => new Promise((res, rej) => loader.load(u, res, undefined, rej));
+
+// pelvis position tracks are authored for the reference rig; scale them per character
+function clipFor(clip, s) {
+  if (Math.abs(s - 1) < 1e-3) return clip;
+  const c = clip.clone();
+  for (const t of c.tracks) if (t.name.endsWith('.position')) for (let i = 0; i < t.values.length; i++) t.values[i] *= s;
+  return c;
+}
+
+(async () => {
+  const anim = animsUrl ? await load(animsUrl) : null;
+  let refHip = 1;
+  if (anim) anim.scene.traverse(o => { if (o.userData && o.userData.hipHeight) refHip = o.userData.hipHeight; });
+  const chars = [];
+  for (const m of models) {
+    const g = await load(m);
+    const root = g.scene;
+    let hip = refHip;
+    root.traverse(o => { if (o.userData && o.userData.hipHeight) hip = o.userData.hipHeight; if (o.isMesh) { o.frustumCulled = false; } });
+    // optional material variant (KHR_materials_variants), e.g. &variant=symbiote
+    const want = P.get('variant');
+    if (want) {
+      const json = g.parser.json;
+      const idx = (json.materials || []).findIndex(mm => mm.name === 'suit_' + want);
+      if (idx >= 0) {
+        const mat = await g.parser.getDependency('material', idx);
+        root.traverse(o => { if (o.isSkinnedMesh) o.material = mat; });
+        log('variant', want, 'material', idx);
+      } else log('variant not found', want);
+    }
+    const mixer = new THREE.AnimationMixer(root);
+    let tris = 0; root.traverse(o => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+    log('model', m, 'tris', tris, 'hip', hip, 'refHip', refHip, 'anims in model', g.animations.length);
+    chars.push({ root, mixer, scale: hip / refHip, clips: g.animations });
+  }
+  const allClips = anim ? anim.animations : chars[0].clips;
+  log('clips', allClips.map(c => c.name + ':' + c.duration.toFixed(2)).join(' '));
+  // cells: for each clip row, for each character, for each time, for each view
+  const cells = [];
+  for (let r = 0; r < clipNames.length; r++) for (let ci = 0; ci < chars.length; ci++)
+    for (let ti = 0; ti < nT; ti++) for (const v of views) cells.push({ r, ci, ti, v });
+  const perRow = +(P.get('perRow') || (nT * views.length * chars.length));
+  const nRows = Math.ceil(cells.length / perRow);
+  const W = perRow * cell, H = nRows * cell;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1); renderer.setSize(W, H); renderer.setScissorTest(true);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  scene.add(new THREE.HemisphereLight(0xdde8ff, 0x554433, 1.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 2.2); sun.position.set(2, 4, 3); scene.add(sun);
+  const grid = new THREE.GridHelper(4, 8, 0x333333, 0x555555); scene.add(grid);
+  const cam = new THREE.PerspectiveCamera(+(P.get('fov') || 30), 1, 0.1, 50);
+  for (const c of chars) scene.add(c.root);
+  const dist = +(P.get('dist') || 5.2), camY = +(P.get('camY') || 1.0), lookY = +(P.get('lookY') || 0.95);
+  cells.forEach((cl, k) => {
+    const src = allClips.find(c => c.name === clipNames[cl.r]);
+    if (!src) { if (cl.ti === 0) log('missing clip', clipNames[cl.r]); return; }
+    const ch = chars[cl.ci];
+    for (const c of chars) c.root.visible = false;
+    ch.root.visible = true;
+    ch.mixer.stopAllAction();
+    const act = ch.mixer.clipAction(clipFor(src, ch.scale));
+    act.play();
+    act.time = src.duration * cl.ti / nT; ch.mixer.update(0);
+    ch.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(ch.root, true);
+    const ctr = box.getCenter(new THREE.Vector3());
+    const dir = { front: [0, 0, -1], side: [1, 0, 0], back: [0, 0, 1], q: [0.7, 0, -0.7], left: [-1, 0, 0] }[cl.v];
+    cam.position.set(ctr.x + dir[0] * dist, camY, ctr.z + dir[2] * dist);
+    cam.lookAt(ctr.x, lookY, ctr.z);
+    const col = k % perRow, row = Math.floor(k / perRow);
+    const px = col * cell, py = H - (row + 1) * cell;
+    renderer.setViewport(px, py, cell, cell); renderer.setScissor(px, py, cell, cell);
+    renderer.setClearColor(cl.ci % 2 ? 0x9aa0a8 : 0x8a9099);
+    renderer.render(scene, cam);
+  });
+  window.__done = true;
+  log('done');
+})().catch(e => { log('ERR', e.stack || e); window.__done = true; });
+</script></body></html>

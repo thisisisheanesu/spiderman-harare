@@ -1,6 +1,7 @@
 // Player settings, persisted in localStorage (every access is guarded: private mode, blocked storage
 // and sandboxed iframes all throw). Volumes are 0..1, sensitivity is a multiplier, quality is
-// 'low' | 'medium' | 'high' | null (null = pick automatically).
+// 'low' | 'medium' | 'high' | null (null = pick automatically), subtitles is 'full' | 'compact' | 'off' |
+// 'auto' ('auto' = compact on phones and touch tablets, full with a mouse; see hud.subtitleMode).
 
 const KEY = 'spiderman-harare.settings.v1';
 
@@ -12,7 +13,7 @@ const DEFAULTS = {
   muted: false,
   sensitivity: 1,
   invertY: false,
-  subtitles: true,
+  subtitles: 'auto',
   tour: true, // first-time objective chain (src/ui/tour.js); switched off when finished
   quality: null,
 };
@@ -71,6 +72,8 @@ export function storedQuality() {
   return q === 'low' || q === 'medium' || q === 'high' ? q : null;
 }
 
+export const SUBTITLE_MODES = ['full', 'compact', 'off'];
+
 export class Settings {
   constructor() {
     this.values = { ...DEFAULTS };
@@ -80,6 +83,9 @@ export class Settings {
       if (typeof v === typeof DEFAULTS[k] && (typeof v !== 'number' || Number.isFinite(v))) this.values[k] = v;
     }
     this.values.quality = storedQuality();
+    // Subtitles used to be an on/off switch: off stays off, on becomes 'auto'.
+    const sub = stored.subtitles;
+    this.values.subtitles = sub === false ? 'off' : SUBTITLE_MODES.includes(sub) ? sub : 'auto';
   }
 
   get(k) {

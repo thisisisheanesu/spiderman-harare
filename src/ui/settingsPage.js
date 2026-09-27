@@ -8,6 +8,11 @@ const QUALITIES = [
   ['medium', 'Medium'],
   ['high', 'High'],
 ];
+const SUBTITLES = [
+  ['full', 'Full'],
+  ['compact', 'Compact'],
+  ['off', 'Off'],
+];
 
 export class SettingsPage {
   constructor(hud) {
@@ -27,7 +32,7 @@ export class SettingsPage {
         this._slider('sensitivity', 'Look sensitivity', 0.2, 3, 0.1, (v) => `${v.toFixed(1)}×`),
         this._toggle('invertY', 'Invert vertical look'),
       ]),
-      this._group('Display', [this._quality(), this._toggle('subtitles', 'Subtitles')]),
+      this._group('Display', [this._quality(), this._subtitles()]),
       this._group('World', [
         this._toggle('tour', 'Guided tour (objectives)'),
         this.game.sky?.setTimeOfDay ? this._timeOfDay() : null,
@@ -107,6 +112,33 @@ export class SettingsPage {
     return el('div', 'setting', null, [
       el('span', 'setting-label', { text: 'Graphics quality' }),
       el('div', 'setting-quality', null, [el('div', 'segmented', { role: 'group', 'aria-label': 'Graphics quality' }, buttons), reload]),
+    ]);
+  }
+
+  // Full / Compact / Off. Until the player picks one, the choice follows the device ('auto': compact on
+  // phones and touch tablets), and the button of the mode in use is lit.
+  _subtitles() {
+    const buttons = SUBTITLES.map(([mode, text]) =>
+      el('button', 'seg-btn', {
+        type: 'button',
+        text,
+        'data-mode': mode,
+        onclick: () => {
+          this.hud.setSetting('subtitles', mode);
+          sync();
+        },
+      }),
+    );
+    const label = el('span', 'setting-label', { text: 'Subtitles' });
+    const sync = () => {
+      const mode = this.hud.subtitleMode;
+      for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.mode === mode));
+      label.textContent = this.settings.get('subtitles') === 'auto' ? 'Subtitles (auto)' : 'Subtitles';
+    };
+    this.refreshers.push(sync);
+    return el('div', 'setting', null, [
+      label,
+      el('div', 'setting-quality', null, [el('div', 'segmented', { role: 'group', 'aria-label': 'Subtitles' }, buttons)]),
     ]);
   }
 

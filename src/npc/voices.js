@@ -19,6 +19,13 @@ const MIN_GAP = 1.1; // s between two voice starts
 const REPEAT_AFTER = 150;
 // Swinging away from someone mid-sentence: their subtitle goes once they are this far off (m).
 const SUBTITLE_RANGE = 45;
+// Compact subtitles (hud.subtitleMode 'compact': phones by default): overheard lines are subtitled when the
+// speaker is on screen and within LINE_RANGE, or right next to Spider-Man (this close, m); the others are
+// street ambience (heard, not written out). A player who picks Full subtitles gets every line. On phones
+// (hud.compact) people on screen are also likelier to be the ones who speak.
+const COMPACT_NEAR = 6;
+const COMPACT_ON_SCREEN = 4; // weight factor for a speaker on screen...
+const COMPACT_OFF_SCREEN = 0.35; // ...and off it
 
 export class VoiceDirector {
   constructor(game) {
@@ -38,6 +45,7 @@ export class VoiceDirector {
     this.lastStart = -1e9;
     this.nextLine = 4;
     this._head = new THREE.Vector3();
+    this._ndc = new THREE.Vector3();
     this.street = streetVoices(game);
   }
 
@@ -107,13 +115,28 @@ export class VoiceDirector {
     if (handle) this.street.noteVoice(t + dur);
     const speaker = agent.role || agent.name || 'Passer-by';
     if (clip.kind === 'line') {
-      game.hud?.showSubtitle?.({ speaker, sn: clip.sn, en: clip.en, ms: dur * 1000 + 1500 });
-      game.events.emit('npc:speak', { npc: agent, clip, text: clip.en || clip.sn });
+      const subtitle = this._subtitled(agent);
+      if (subtitle) game.hud?.showSubtitle?.({ speaker, sn: clip.sn, en: clip.en, ms: dur * 1000 + 1500 });
+      game.events.emit('npc:speak', { npc: agent, clip, text: clip.en || clip.sn, subtitle });
     } else {
       // The HUD subtitles npc:speak from clip.sn/en, so pass the exclamation the bubble shows.
       game.events.emit('npc:speak', { npc: agent, clip: { ...clip, sn: shown?.sn || '', en: shown?.en || '' }, text: shown?.sn || '' });
     }
     return dur;
+  }
+
+  // Should this line be written out? Always, except with compact subtitles for someone neither on screen
+  // nor close.
+  _subtitled(agent) {
+    if (this.game.hud?.subtitleMode !== 'compact') return true;
+    const p = this.game.player?.position;
+    const d = p ? Math.hypot(agent.position.x - p.x, agent.position.z - p.z) : 0;
+    return d <= COMPACT_NEAR || (d <= LINE_RANGE && this._onScreen(agent));
+  }
+
+  _onScreen(agent) {
+    const v = this._ndc.set(agent.position.x, agent.position.y + 1.6 * (agent.look?.scale ?? 1), agent.position.z).project(this.game.camera);
+    return v.z < 1 && Math.abs(v.x) < 0.95 && Math.abs(v.y) < 0.95;
   }
 
   bark(agent, shown) {
@@ -147,11 +170,13 @@ export class VoiceDirector {
     let total = 0;
     const pool = this._pool || (this._pool = []);
     pool.length = 0;
+    const compact = !!this.game.hud?.compact;
     for (const a of candidates) {
       if (a.look.child || a.talkUntil > t || t - a.lastSpoke < 40 || a.state === 'flee') continue;
       const d = Math.hypot(a.position.x - ctx.px, a.position.z - ctx.pz);
       if (d > LINE_RANGE) continue;
-      const w = (a.state === 'chat' ? 3 : a.kind === 'vendor' || a.kind === 'rank' ? 2 : 1) * (1.4 - d / LINE_RANGE);
+      let w = (a.state === 'chat' ? 3 : a.kind === 'vendor' || a.kind === 'rank' ? 2 : 1) * (1.4 - d / LINE_RANGE);
+      if (compact) w *= this._onScreen(a) ? COMPACT_ON_SCREEN : COMPACT_OFF_SCREEN;
       pool.push(a, w);
       total += w;
     }

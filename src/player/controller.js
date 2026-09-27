@@ -8,24 +8,54 @@ import { WallMove } from './wall.js';
 // Traversal state machine. Owns ground / air / dive movement, landings, vaults and perching, and
 // delegates swinging, zipping and wall movement to their move modules. Movement is sub-stepped
 // (≤ 0.3 m per step) so nothing tunnels through walls even at dive speed.
-//   ground → run (auto-vault low ledges, auto wall-climb), jump, roll / superhero landings
+//   ground → walk / run / parkour sprint (see _ground), auto-vault and wall-run while sprinting, jump,
+//            roll / superhero landings
 //   air / dive → air control, grab walls, mantle ledges, head-first dive with a forward carve
 //   perch → crouched on a ledge facing out; step off, leap, dive or swing away
+//
+// Ground locomotion (Marvel's Spider-Man style: the swing trigger sprints on the ground and swings in
+// the air):
+//   stick < WALK_INPUT (or Alt held / CapsLock on) → walk (~1.6 m/s)
+//   stick beyond it, keyboard W                    → run (~7 m/s), a fast superhero jog
+//   swing held on the ground                       → parkour sprint (~13 m/s): auto-vaults and runs up
+//                                                    walls on contact; keep holding through a jump or
+//                                                    off a ledge and the web goes out once airborne
+// Speed eases in and out (ACCEL / BRAKE, exponential near the target), the turn rate is limited by a
+// lateral acceleration (LAT_ACCEL), so the turning radius grows with speed, and reversing at speed
+// skids to a stop and pivots. Exposed for animation: player.locomotion ('idle' | 'walk' | 'run' |
+// 'sprint'), player.groundSpeed (m/s), player.turnRate (rad/s, + = turning left / CCW).
 
 const G = 26;
-const RUN_SPEED = 10;
-const SPRINT_SPEED = 14;
-const SPRINT_AFTER = 1.0;
-const GROUND_ACCEL = 9;
-const GROUND_TURN = 14;
-const GROUND_FRICTION = 12;
+const G_FLIGHT = 20; // gravity in a flight after letting go of a web (graceful arcs between swings)
+const WALK_INPUT = 0.55;
+const WALK_SPEED = 1.6;
+const WALK_MIN = 1.0; // slowest walk (stick just past the dead zone)
+const RUN_SPEED = 7;
+const JOG_MIN = 3.6; // stick just past WALK_INPUT
+const SPRINT_SPEED = 13;
+const ACCEL = { walk: 5, run: 14, sprint: 9 }; // m/s² max acceleration per gait
+const SPEED_RATE = 4.5; // 1/s: exponential approach once near the target speed
+const BRAKE = 20; // m/s² max braking (no input, or slowing to a lower gait)
+const SKID_ANGLE = 2.0; // rad: reversing further than this above SKID_SPEED skids and pivots
+const SKID_SPEED = 4.5;
+const SKID_BRAKE = 26;
+const LAT_ACCEL = 26; // m/s² cornering grip: max turn rate = LAT_ACCEL / speed...
+const TURN_MAX = 9; // ...capped at this (rad/s) when slow
+const TURN_GAIN = 10; // 1/s: turn rate per radian still to turn
+const UPHILL = 0.35; // speed lost per unit of uphill slope (rise / run)
+// Gait thresholds on groundSpeed (m/s), with hysteresis.
+const IDLE_BELOW = 0.25;
+const RUN_ABOVE = 2.6;
+const RUN_BELOW = 2.2;
+const SPRINT_ABOVE = 9.5;
+const SPRINT_BELOW = 8.5;
 const JUMP_V = 15.5;
 const JUMP_HOLD_GRAVITY = 0.62;
 const AIR_ACCEL = 11;
 const AIR_DRAG = G / (38 * 38);
 const AIR_TURN = 1.2;
 const DIVE_G = G * 1.5;
-const DIVE_DRAG = DIVE_G / (56 * 56);
+const DIVE_DRAG = DIVE_G / (46 * 46); // head-first terminal speed ~46 m/s
 const DIVE_GLIDE = 16;
 const CENTER_Y = 0.95;
 const VAULT_MAX = 1.25;
@@ -35,8 +65,8 @@ const BOUNDS_MARGIN = 150;
 // Leaving a perch with a big drop below (the RBZ crown) turns into a head-first plunge down the
 // facade: little horizontal drift, no forward carve, until close to what is below or a web catches.
 const PLUNGE_DROP = 45;
-const PLUNGE_OUT = 4.5; // m/s outward hop when diving off
-const PLUNGE_HS = 5.5; // max horizontal drift while plunging
+const PLUNGE_OUT = 7; // m/s outward hop when diving off
+const PLUNGE_HS = 8; // max horizontal drift while plunging
 const PLUNGE_DRIFT = 3.5; // ...and the least
 const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
 const PLUNGE_RUN_HS = 10; // running / jumping off a tower's roof: the plunge keeps up to this drift
@@ -66,6 +96,7 @@ export class Controller {
     this.move = { x: 0, y: 0 };
     this.camFwd = new THREE.Vector3(0, 0, -1);
     this.camRight = new THREE.Vector3(1, 0, 0);
+    this._listenKeys();
     this.swing = new SwingMove(this);
     this.zip = new ZipMove(this);
     this.wall = new WallMove(this);
@@ -92,8 +123,21 @@ export class Controller {
     this.trick = null; // 'flip' | 'twirl' | 'corkscrew' after a release
     this.trickT = 0;
     this.trickDur = 0;
-    this.runTime = 0;
     this.standTime = 0;
+    // Ground locomotion (see _ground): travel direction, gait, skid, walk modifier.
+    this.moveDir = new THREE.Vector3(0, 0, -1);
+    this.locomotion = 'idle';
+    this.groundSpeed = 0;
+    this.turnRate = 0;
+    this.skid = false;
+    this.sprint = false;
+    this.walkLock = false; // CapsLock on (walk)
+    this.altHeld = false;
+    this._lastHeading = 0;
+    // Post-swing flight (lighter gravity) and short pushes applied over a few frames (boosts).
+    this.flight = false;
+    this.pushV = new THREE.Vector3();
+    this.pushT = 0;
     this.wallTime = 0;
     this.coyote = 0;
     this.jumpHeld = false;
@@ -145,6 +189,8 @@ export class Controller {
     this.wall.cooldown -= dt;
     this.swing.retry -= dt;
     this.swing.lateBoost -= dt;
+    this.swing.sinceRelease += dt;
+    this.swing.updateLaunch(dt);
     this.coyote -= dt;
     if (this.landMode && (this.landT += dt) >= this.landDur) this.landMode = null;
     if (this.trick && (this.trickT += dt) >= this.trickDur) this.trick = null;
@@ -172,9 +218,14 @@ export class Controller {
       }
     }
     if (p.state === 'swing' || p.state === 'zip' || p.state === 'wall' || p.state === 'perch') this.fromRoof = false;
+    if (p.state !== 'air' && p.state !== 'dive') {
+      this.flight = false;
+      this.pushT = 0;
+    }
     this._safety(dt);
     this._checkPerch(dt);
-    this._updateHeading();
+    this._updateHeading(dt);
+    this._updateGait(dt);
   }
 
   // ---------------------------------------------------------------- input
@@ -186,6 +237,22 @@ export class Controller {
     this.move.x = input.move.x;
     this.move.y = input.move.y;
     this.wish.set(0, 0, 0).addScaledVector(this.camFwd, input.move.y).addScaledVector(this.camRight, input.move.x);
+    // Walk modifier: Alt held, or CapsLock on (read from the key events' modifier state, so it is
+    // right on every platform), see _listenKeys.
+    const keys = input.keys;
+    this.altHeld = !!keys && (keys.has('AltLeft') || keys.has('AltRight'));
+  }
+
+  // CapsLock state for the walk toggle, and Alt kept from focusing the browser's menu bar.
+  _listenKeys() {
+    if (typeof window === 'undefined' || this._keysBound) return;
+    this._keysBound = true;
+    const onKey = (e) => {
+      if (e.getModifierState) this.walkLock = e.getModifierState('CapsLock');
+      if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
   }
 
   _buttons(input) {
@@ -196,6 +263,9 @@ export class Controller {
     if (input.pressed('dive')) this._divePressed();
     const st = this.p.state;
     const held = input.down('swing');
+    // On the ground the swing trigger is the parkour sprint (with the stick pushed); see tryStart
+    // for what it does standing still.
+    this.sprint = held && (st === 'ground' || st === 'perch');
     if (st === 'swing') {
       if (!held) this.swing.release(false);
     } else if (held && st !== 'zip' && (input.pressed('swing') || this.swing.retry <= 0)) {
@@ -208,7 +278,9 @@ export class Controller {
     const v = p.velocity;
     switch (p.state) {
       case 'ground':
-        if (this.landMode !== 'hard' || this.landT > 0.3) this.launch(v.x, JUMP_V, v.z);
+        if (this.landMode === 'hard' && this.landT < 0.3) break;
+        // Sprinting (swing held): a web launch, up and on into the swing; else a plain jump.
+        if (!this.sprint || !this.swing.webLaunch()) this.launch(v.x, JUMP_V, v.z);
         break;
       case 'air':
         // Tapped just after a swing let go by itself: still the boosted release.
@@ -232,6 +304,12 @@ export class Controller {
     }
   }
 
+  // Add velocity dv over `time` seconds (boosted releases), instead of in one frame.
+  push(dv, time) {
+    this.pushV.copy(dv).divideScalar(time);
+    this.pushT = time;
+  }
+
   launch(vx, vy, vz) {
     const p = this.p;
     // (Off the ground, or a coyote-time jump just after running off an edge.)
@@ -241,6 +319,7 @@ export class Controller {
     p.state = 'air';
     this.coyote = 0;
     this.jumpHeld = true;
+    this.flight = false;
     this.landMode = null;
     this.plunge = false;
     this.plungeArmed = false;
@@ -298,8 +377,9 @@ export class Controller {
     if (p.state === 'perch') {
       // Swan dive off the ledge: a small hop out, then head-first (straight down a tall facade).
       const high = this._perchDrop() > PLUNGE_DROP;
-      v.copy(this.perchOut).multiplyScalar(high ? PLUNGE_OUT : 8);
-      v.y = 4;
+      // The hop out, pushed over a few frames (the legs extend) rather than in one.
+      v.set(0, 0, 0);
+      this.push(_b.copy(this.perchOut).multiplyScalar(high ? PLUNGE_OUT : 8).setY(4), 0.15);
       this.emit('player:jump', { pos: p.position.clone() });
       if (high) {
         this._startPlunge();
@@ -344,6 +424,7 @@ export class Controller {
   dropWebs() {
     this.zip.dropLines();
     this.swing.dropLine();
+    this.swing.dropLaunch();
   }
 
   // ---------------------------------------------------------------- collision
@@ -396,8 +477,9 @@ export class Controller {
     return !!hit && Math.abs(hit.normal.y) < 0.5;
   }
 
-  // Ran or flew into an obstacle: vault it if it is low, otherwise grab it and climb.
-  obstacle(n, speed) {
+  // Ran or flew into an obstacle: vault it if it is low, otherwise grab it and climb (unless climb is
+  // false: running without the sprint only vaults).
+  obstacle(n, speed, climb = true) {
     const p = this.p;
     const ledge = probeLedge(this.world, p.position, n, p.radius, VAULT_MAX, _ledge);
     if (ledge) {
@@ -406,48 +488,72 @@ export class Controller {
       this.startVault(_b.copy(ledge).addScaledVector(n, -0.55), 0.22 + 0.1 * (rise / VAULT_MAX), 'ground', _a);
       return;
     }
+    if (!climb) return;
     this.wall.enter(n);
     if (p.state === 'wall' && this.move.y > 0.3) p.velocity.y = Math.max(p.velocity.y, speed * 0.85);
   }
 
   // ---------------------------------------------------------------- ground
 
+  // Target gait from the input: null (no input / recovering from a hard landing), 'walk', 'run' or
+  // 'sprint', with its target speed in this._target.
+  _gaitIntent(mag) {
+    if (mag < 0.05) return null;
+    if (this.sprint) {
+      this._target = SPRINT_SPEED;
+      return 'sprint';
+    }
+    if (mag < WALK_INPUT || this.altHeld || this.walkLock) {
+      this._target = WALK_MIN + (WALK_SPEED + 0.2 - WALK_MIN) * clamp((Math.min(mag, WALK_INPUT) - 0.1) / (WALK_INPUT - 0.1), 0, 1);
+      return 'walk';
+    }
+    this._target = JOG_MIN + (RUN_SPEED - JOG_MIN) * clamp((mag - WALK_INPUT) / 0.35, 0, 1);
+    return 'run';
+  }
+
   _ground(h) {
     const p = this.p;
     const v = p.velocity;
     const hard = this.landMode === 'hard' && this.landT < 0.4;
-    const wishLen = this.wish.length();
-    if (wishLen > 0.05 && !hard) {
-      this.runTime += h;
-      const top = RUN_SPEED + (SPRINT_SPEED - RUN_SPEED) * smooth(SPRINT_AFTER, SPRINT_AFTER + 0.8, this.runTime);
-      const wx = this.wish.x / wishLen;
-      const wz = this.wish.z / wishLen;
-      // Rotate the existing velocity towards the input rather than braking through zero.
-      const hs = Math.hypot(v.x, v.z);
-      if (hs > 1) {
-        const turn = 1 - Math.exp(-GROUND_TURN * h);
-        const nx = v.x / hs + (wx - v.x / hs) * turn;
-        const nz = v.z / hs + (wz - v.z / hs) * turn;
-        const nl = Math.hypot(nx, nz) || 1;
-        v.x = (nx / nl) * hs;
-        v.z = (nz / nl) * hs;
+    let speed = Math.hypot(v.x, v.z);
+    const dir = this.moveDir;
+    if (speed > 0.3) dir.set(v.x / speed, 0, v.z / speed);
+    else dir.set(-Math.sin(p.heading), 0, -Math.cos(p.heading));
+    const mag = this.wish.length();
+    const gait = hard ? null : this._gaitIntent(mag);
+    let a;
+    this.skid = false;
+    if (gait) {
+      const wx = this.wish.x / mag;
+      const wz = this.wish.z / mag;
+      const cur = Math.atan2(dir.x, dir.z);
+      let diff = Math.atan2(wx, wz) - cur;
+      diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+      if (Math.abs(diff) > SKID_ANGLE && speed > SKID_SPEED) {
+        // Reversing at speed: plant and skid to a stop, then pivot and go.
+        this.skid = true;
+        a = -SKID_BRAKE;
+      } else {
+        const omega = Math.min(TURN_MAX, LAT_ACCEL / Math.max(speed, 0.5));
+        const turn = clamp(diff * TURN_GAIN, -omega, omega) * h;
+        const ang = cur + turn;
+        dir.set(Math.sin(ang), 0, Math.cos(ang));
+        // Cornering hard costs a little speed; so does running uphill.
+        let target = this._target * (1 - 0.3 * smooth(0.5, 1.6, Math.abs(diff)));
+        const gn = this.contact.groundNormal;
+        if (gn.y > 0.5 && gn.y < 0.999) {
+          const up = -(gn.x * dir.x + gn.z * dir.z) / gn.y;
+          if (up > 0) target *= Math.max(0.5, 1 - UPHILL * up);
+        }
+        a = speed < target ? Math.min(ACCEL[gait], (target - speed) * SPEED_RATE) : -Math.min(BRAKE, (speed - target) * SPEED_RATE * 1.5 + 1);
       }
-      const k = 1 - Math.exp(-GROUND_ACCEL * h);
-      v.x += (wx * top * wishLen - v.x) * k;
-      v.z += (wz * top * wishLen - v.z) * k;
     } else {
-      this.runTime = 0;
-      const k = 1 - Math.exp(-(hard ? 7 : GROUND_FRICTION) * h);
-      v.x -= v.x * k;
-      v.z -= v.z * k;
+      a = -Math.min(hard ? 14 : BRAKE, speed * 6 + 3);
     }
-    if (this.landMode === 'roll') {
-      const hs = Math.hypot(v.x, v.z);
-      if (hs > 0.1 && hs < 7) {
-        v.x *= 7 / hs;
-        v.z *= 7 / hs;
-      }
-    }
+    speed = Math.max(0, speed + a * h);
+    if (this.landMode === 'roll' && speed > 0.1 && speed < 7) speed = 7;
+    v.x = dir.x * speed;
+    v.z = dir.z * speed;
     v.y = -4;
     p.position.addScaledVector(v, h);
     const x = p.position.x;
@@ -474,9 +580,49 @@ export class Controller {
         return;
       }
     }
-    if (res.wall && !hard && wishLen > 0.3 && this.wish.dot(res.wallNormal) < -0.45 * wishLen) {
-      this.obstacle(res.wallNormal, Math.max(Math.hypot(v.x, v.z), this.wallImpact));
+    // Into a wall: walking just stops (sliding along it); running vaults low obstacles; the sprint
+    // also runs up walls.
+    if (res.wall && !hard && gait && gait !== 'walk' && mag > 0.3 && this.wish.dot(res.wallNormal) < -0.45 * mag) {
+      this.obstacle(res.wallNormal, Math.max(Math.hypot(v.x, v.z), this.wallImpact), gait === 'sprint');
+      if (p.state !== 'ground') return;
     }
+    // Held back by something the contacts don't count as a wall (a knee-high lip): the speed is what
+    // was actually covered, so nothing runs on the spot at full speed.
+    if (res.hit && speed > 0.5) {
+      const moved = ((p.position.x - x) * dir.x + (p.position.z - z) * dir.z + speed * h) / h;
+      if (moved < speed * 0.6) {
+        // Running into a lip / parapet: vault it (as with a wall) rather than stall against it.
+        const dl = Math.hypot(d.x, d.z);
+        if (gait && gait !== 'walk' && dl > 1e-4 && !hard) {
+          this.obstacle(_b.set(d.x / dl, 0, d.z / dl), speed, false);
+          if (this.vault.active) return;
+        }
+        const k = Math.max(0, moved) / speed;
+        v.x *= k;
+        v.z *= k;
+      }
+    }
+  }
+
+  // player.locomotion / groundSpeed / turnRate for the animation system.
+  _updateGait(dt) {
+    const p = this.p;
+    const v = p.velocity;
+    const gs = Math.hypot(v.x, v.z);
+    const grounded = p.state === 'ground' || p.state === 'perch';
+    this.groundSpeed = grounded ? gs : 0;
+    let dh = p.heading - this._lastHeading;
+    dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+    this._lastHeading = p.heading;
+    const rate = grounded ? dh / Math.max(dt, 1e-3) : 0;
+    this.turnRate += (rate - this.turnRate) * Math.min(1, dt * 12);
+    let g = this.locomotion;
+    if (!grounded || gs < IDLE_BELOW) g = 'idle';
+    else if (g === 'idle') g = gs > SPRINT_ABOVE ? 'sprint' : gs > RUN_ABOVE ? 'run' : 'walk';
+    else if (g === 'walk') g = gs > SPRINT_ABOVE ? 'sprint' : gs > RUN_ABOVE ? 'run' : 'walk';
+    else if (g === 'run') g = gs > SPRINT_ABOVE ? 'sprint' : gs < RUN_BELOW ? 'walk' : 'run';
+    else if (g === 'sprint') g = gs < RUN_BELOW ? 'walk' : gs < SPRINT_BELOW ? 'run' : 'sprint';
+    this.locomotion = g;
   }
 
   // ---------------------------------------------------------------- air & dive
@@ -500,12 +646,16 @@ export class Controller {
         dive = true;
       }
     }
-    let g = dive ? DIVE_G : G;
+    let g = dive ? DIVE_G : this.flight ? G_FLIGHT : G;
     // Floatier rise only while the jump button that launched us is still held (launches by swing /
     // wall moves set jumpHeld too, and without the button check it stuck until the next Space tap,
     // making every later swing release climb half as high again).
     if (!dive && this.jumpHeld && v.y > 0 && this.game.input.down('jump')) g *= JUMP_HOLD_GRAVITY;
     v.y -= g * h;
+    if (this.pushT > 0) {
+      v.addScaledVector(this.pushV, Math.min(h, this.pushT));
+      this.pushT -= h;
+    }
     v.multiplyScalar(1 - (dive ? DIVE_DRAG : AIR_DRAG) * v.length() * h);
     // Air control steers but never adds speed beyond what you already carry.
     const hs0 = Math.hypot(v.x, v.z);
@@ -552,6 +702,9 @@ export class Controller {
     const wasDive = p.state === 'dive';
     const hs = Math.hypot(v.x, v.z);
     p.state = 'ground';
+    // Run on the way we were going (or facing), not the last ground direction.
+    if (hs > 0.3) this.moveDir.set(v.x / hs, 0, v.z / hs);
+    else this.moveDir.set(-Math.sin(p.heading), 0, -Math.cos(p.heading));
     this.trick = null;
     this.plunge = false;
     this.plungeArmed = false;
@@ -724,8 +877,11 @@ export class Controller {
     } else if (p.state === 'perch') {
       p.heading = Math.atan2(-this.perchOut.x, -this.perchOut.z);
     } else if (!this.vault.active) {
-      if (Math.hypot(v.x, v.z) > 0.8) p.heading = Math.atan2(-v.x, -v.z);
-      else if (p.state === 'ground' && this.wish.lengthSq() > 0.04) p.heading = Math.atan2(-this.wish.x, -this.wish.z);
+      // On the ground the body faces the travel direction, which turns at a limited rate (so a
+      // standing turn pivots instead of snapping round).
+      if (p.state === 'ground') {
+        if (Math.hypot(v.x, v.z) > 0.3 || this.wish.lengthSq() > 0.0025) p.heading = Math.atan2(-this.moveDir.x, -this.moveDir.z);
+      } else if (Math.hypot(v.x, v.z) > 0.8) p.heading = Math.atan2(-v.x, -v.z);
     }
   }
 }

@@ -5,7 +5,12 @@ import { streetVoices, greetingPart, gloss, shout, GREET_REPEAT, GREETINGS as GR
 // point, cheer, film on a phone, cower, run), greetings as he walks past, vendors' and touts' calls,
 // and the odd overheard remark. Bubbles carry the Shona text with a small English gloss.
 // Men also say some of it out loud with the real recorded Shona phrases (streetVoices.js: one male
-// voice, so women keep text-only bubbles and their FLEURS barks); a bubble always shows what is heard.
+// voice, so women keep text-only bubbles and their FLEURS barks); a bubble shows what is heard when the
+// bubble layer (bubbles.js) has room for it. On phones ('compact' bubbles) the street says less on screen:
+// one reaction bubble per landing, greetings and swing reactions further apart, overheard remarks rarer,
+// and text-only calls and remarks are only attempted when the layer would take them (it lets ambient
+// chatter through only when nothing else is up, every 6-9 s). What is voiced still plays; only its bubble
+// may be skipped.
 
 const REACTIONS = STREETLIFE.REACTIONS?.length ? STREETLIFE.REACTIONS : [{ sn: 'Hezvo!', en: 'There it is!' }, { sn: 'Maiwe!', en: 'Oh my!' }];
 const SCARY = /Ndatya|Zvinotyisa|Chenjera|Mhanya|Yowe|Mwari wangu|Maiwe|Mira!|Eish/;
@@ -21,6 +26,8 @@ const AIRBORNE = new Set(['air', 'swing', 'zip', 'dive', 'wall']);
 // speaker id: a person keeps the one voice he was first heard with (VoiceDirector finds no FLEURS clips
 // for this id, and a man bound to a FLEURS speaker gets no street phrases).
 const FSI_VOICE = 'fsi';
+// Cadence on compact screens (s): between swing-reaction bubbles, between greetings, between remarks.
+const COMPACT = { swingGap: 6, greetGap: 5, remark: [12, 20] };
 
 function pick(list) {
   return list[Math.floor(Math.random() * list.length)];
@@ -149,6 +156,8 @@ export class Social {
     let bubbles = 0;
     let barked = false;
     let clipped = false;
+    const compact = this.bubbles.compact;
+    const maxBubbles = compact ? 1 : 3;
     for (const { a, d } of list) {
       if (!hard && t < (a.reactCool || 0)) continue;
       const notice = d < 9 ? 1 : 1 - (d - 9) / (R - 9);
@@ -171,7 +180,8 @@ export class Social {
         type = this._excitedType(a);
         this.crowd.startReaction(a, type, 3 + Math.random() * 4, delay);
       }
-      if (bubbles < 3 && (bubbles === 0 || Math.random() < 0.5)) {
+      // (On a phone the one bubble goes to someone the player can see.)
+      if (bubbles < maxBubbles && (bubbles === 0 || Math.random() < 0.5) && (!compact || this.bubbles.canShow('react', a.position))) {
         const line = pick(scared ? FEAR : AWE);
         bubbles++;
         // One man says it out loud with a real recording (the bubble then shows his words)...
@@ -193,14 +203,22 @@ export class Social {
     return r < 0.3 ? 'photo' : r < 0.5 ? 'cheer' : r < 0.72 ? 'point' : 'watch';
   }
 
+  // Returns the bubble, or null when the bubble layer had no room for it.
   _say(a, sn, en, ms, kind, delay = 0) {
-    this.bubbles.show(a, sn, en, ms, kind, delay);
+    return this.bubbles.show(a, sn, en, ms, kind, delay);
+  }
+
+  // Text-only ambient bubbles (calls, remarks): on a compact screen only tried when the layer would show
+  // them, so a speaker's turn isn't used up for nothing.
+  _ambientOk(a, kind) {
+    return !this.bubbles.compact || this.bubbles.canShow(kind, a.position);
   }
 
   update(dt, ctx) {
     const game = this.game;
     const t = game.time;
     const state = game.player?.state;
+    const compact = this.bubbles.compact;
     // Low swing overhead: heads turn, some point or film.
     if ((this.swingT -= dt) <= 0) {
       this.swingT = 0.4;
@@ -214,7 +232,7 @@ export class Social {
           if (Math.random() > 0.18 * (1 - Math.sqrt(d2) / 26)) continue;
           a.reactCool = t + 10;
           this.crowd.startReaction(a, this._excitedType(a), 2.2 + Math.random() * 2.5, Math.random() * 0.3);
-          if (!said && t - this.lastBubble > 2.5) {
+          if (!said && t - this.lastBubble > (compact ? COMPACT.swingGap : 2.5) && (!compact || this.bubbles.canShow('react', a.position))) {
             const line = pick(AWE);
             if (!(Math.random() < 0.35 && this._reactClip(a, REACT_SWING, line, 0.25))) {
               this._say(a, line.sn, line.en, 2200, 'react');
@@ -244,12 +262,13 @@ export class Social {
           this._say(a, g.sn, g.en, 2200, 'say');
         }
         if (!a.stall?.sit) this.crowd.startReaction(a, 'wave', 1.6, 0);
-        this.greetAt = t + 2.2;
+        this.greetAt = t + (compact ? COMPACT.greetGap : 2.2);
         break;
       }
     }
     // Calls from vendors and touts, overheard remarks.
     if (this.bubbles.activeCount() >= 6) return;
+    const ambient = !compact || this.bubbles.canShow('call');
     for (const a of this.pop.list) {
       if (a.state === 'react') continue;
       const d2 = (a.position.x - ctx.px) ** 2 + (a.position.z - ctx.pz) ** 2;
@@ -270,15 +289,17 @@ export class Social {
           a.nextBubble += 3;
           return;
         }
+        if (!this._ambientOk(a, 'call')) continue;
         const call = this._hwindiCall(a);
         this._say(a, call.text, call.en, 2300, 'call');
         a.timer = 2.5;
         return;
       }
       if (a.kind === 'vendor' && d2 < 24 * 24) {
+        if (!ambient) continue;
         a.nextBubble = t + 9 + Math.random() * 14;
         const calls = a.stall?.def?.callouts;
-        if (!calls?.length) continue;
+        if (!calls?.length || !this._ambientOk(a, 'call')) continue;
         const c = pick(calls);
         this._say(a, c.sn, c.en, 2600, 'call');
         a.talkUntil = t + 1.2;
@@ -286,12 +307,12 @@ export class Social {
       }
     }
     if (t > this.remarkAt && REMARKS.length) {
-      this.remarkAt = t + 5 + Math.random() * 7;
+      this.remarkAt = t + (compact ? COMPACT.remark[0] + Math.random() * (COMPACT.remark[1] - COMPACT.remark[0]) : 5 + Math.random() * 7);
       const near = this.crowd.near(ctx.px, ctx.pz, 10, this.near).filter((a) => (a.state === 'chat' || a.state === 'walk') && !this.bubbles.hasBubble(a));
       if (near.length) {
         const a = pick(near);
         const r = pick(REMARKS);
-        this._say(a, r.sn, r.en, 2600, 'say');
+        if (this._ambientOk(a, 'remark')) this._say(a, r.sn, r.en, 2600, 'remark');
       }
     }
   }

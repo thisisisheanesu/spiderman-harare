@@ -18,6 +18,13 @@ import { roofEdgeFacing } from './anchors.js';
 //   radius, height, speed (m/s getter)
 //   teleport(x, y, z)
 //   hands      {L, R} world positions of the palms (web anchors), updated every frame
+//   locomotion 'idle' | 'walk' | 'run' | 'sprint': the ground gait (meaningful while state is 'ground';
+//              'idle' in every other state). Thresholds on groundSpeed with hysteresis: walk above
+//              0.25 m/s, run above 2.6 (back to walk below 2.2), sprint above 9.5 (back below 8.5).
+//   groundSpeed horizontal speed on the ground, m/s (0 off the ground). Typical: walk ~1.0-1.8,
+//              run ~3.6-7, sprint ~13, more for a moment after landing out of a swing.
+//   turnRate   rad/s the body is turning on the ground (+ = left / CCW seen from above), smoothed;
+//              0 off the ground. (controller.skid is true while reversing at speed skids.)
 // Emits player:jump / land / webShot / swingStart / swingEnd / zip / wallStart / perch / suit.
 
 const PALM = new THREE.Vector3(0, -0.09, -0.012);
@@ -60,6 +67,18 @@ export class Player {
 
   get speed() {
     return this.velocity.length();
+  }
+
+  get locomotion() {
+    return this.controller?.locomotion ?? 'idle';
+  }
+
+  get groundSpeed() {
+    return this.controller?.groundSpeed ?? 0;
+  }
+
+  get turnRate() {
+    return this.controller?.turnRate ?? 0;
   }
 
   async init(game) {

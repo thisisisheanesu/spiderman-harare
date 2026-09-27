@@ -9,8 +9,12 @@ import * as THREE from 'three';
 //   preset          0 = close, 1 = far (V toggles)
 //   snap()          jump straight behind the player (used on teleports)
 // Orbit with mouse / right stick; while swinging, diving or zipping the rig swings in behind the motion
-// unless the player moved the camera in the last 1.5 s. Distance and FOV grow with speed, the camera
-// never clips into buildings, and it rolls gently into swings.
+// unless the player moved the camera in the last 1.5 s, and running on the ground it drifts in behind
+// the runner (slowly: a walk leaves it alone). Distance and FOV grow with speed; on the web the boom
+// also pulls back and trails the swing a little, so the arc and the anchor stay in frame. The
+// camera never clips into buildings (pulled in at once when blocked, eased back out after a short
+// hold so a lamp post or corner flicking past doesn't pump it in and out), and it rolls gently into
+// swings.
 
 const PRESETS = [
   { dist: 4.4, height: 1.55, side: 0.5 },
@@ -32,6 +36,12 @@ const WHIP_TIME = 1.4; // s of faster re-alignment after a plunge
 // with its normal); otherwise the rig turns towards facing the wall at this rate.
 const WALL_BACK = 0.45;
 const WALL_YAW_RATE = 3;
+const SWING_PULLBACK = 1.6; // m of extra boom on the web
+const LEAD = 0.035; // s of velocity the look target leads by
+const RUN_FOLLOW = 0.09; // 1/s of yaw follow per m/s of running speed (ground, above RUN_FOLLOW_MIN)
+const RUN_FOLLOW_MIN = 3;
+const COL_HOLD = 0.35; // s a pulled-in boom waits before easing back out
+const SOFT_IDS = new Set([-5, -6, -8, -9, -10]); // world collider ids of street furniture (city.js)
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const damp = (a, b, rate, dt) => a + (b - a) * (1 - Math.exp(-rate * dt));
@@ -67,6 +77,8 @@ export class CameraRig {
     this._diveK = 0;
     this._plungeK = 0;
     this._whip = 0;
+    this._swingK = 0;
+    this._colHold = 0;
   }
 
   async init(game) {
@@ -134,7 +146,8 @@ export class CameraRig {
 
     const plunging = p.state === 'dive' && !!p.controller?.plunge;
     this._plungeK = damp(this._plungeK, plunging ? 1 : 0, 2.5, dt);
-    let want = preset.dist + speedK * (p.state === 'dive' ? 0.5 : 3.4) + PLUNGE_DIST * this._plungeK;
+    this._swingK = damp(this._swingK, p.state === 'swing' || (p.state === 'air' && p.controller?.flight) ? 1 : 0, 1.5, dt);
+    let want = preset.dist + speedK * (p.state === 'dive' ? 0.5 : 3.4) + PLUNGE_DIST * this._plungeK + SWING_PULLBACK * this._swingK;
     if (p.state === 'perch') want += 1.0;
     this.distance = damp(this.distance, want, 3, dt);
 
@@ -167,7 +180,14 @@ export class CameraRig {
     _want.copy(_dir).negate();
     const hit = world.raycast(_pivot, _want, this.distance + 0.4);
     const allowed = hit ? Math.max(0.6, hit.distance - 0.4) : this.distance;
-    this._col = allowed < this._col ? allowed : damp(this._col, allowed, 4, dt);
+    if (allowed < this._col - 0.01) {
+      // Buildings and terrain: at once (never inside a wall). Street furniture flicking past
+      // (shelters, billboards, planters, statue, fountain): quickly but smoothly.
+      this._col = hit && SOFT_IDS.has(hit.buildingId) ? damp(this._col, allowed, 16, dt) : allowed;
+      this._colHold = COL_HOLD;
+    } else if ((this._colHold -= dt) <= 0) {
+      this._col = damp(this._col, allowed, 4, dt);
+    }
     cam.position.copy(_pivot).addScaledVector(_want, this._col);
     if (cam.position.y < 0.35) cam.position.y = 0.35;
 
@@ -180,7 +200,7 @@ export class CameraRig {
       cam.position.y += s * 0.32 * (Math.sin(t * 1.7 + 2) + 0.5 * Math.sin(t * 3.1));
     }
 
-    _look.copy(_pivot).addScaledVector(_dir, 3);
+    _look.copy(_pivot).addScaledVector(_dir, 3).addScaledVector(v, LEAD * this._swingK);
     cam.lookAt(_look);
 
     // Roll into the swing (towards the anchor side) and into hard yaw turns.
@@ -226,9 +246,15 @@ export class CameraRig {
       return;
     }
     if (st === 'ground' || st === 'wall') {
-      // Ease back to a level view after dives and falls (looking up a wall while climbing it);
-      // yaw stays with the player.
+      // Ease back to a level view after dives and falls (looking up a wall while climbing it).
       this.pitch = damp(this.pitch, st === 'wall' && v.y > 3 ? 0.3 : -0.2, 0.8, dt);
+      // Running: drift round behind the runner (faster the faster he goes; walking leaves it be). Only
+      // with the stick mostly forward: following a strafe would turn the run into a circle.
+      const m = ctrl?.move;
+      const fwd = !m || m.y > 0.7 * Math.hypot(m.x, m.y);
+      if (st === 'ground' && hs > RUN_FOLLOW_MIN && fwd && !ctrl?.skid) {
+        this.yaw = dampAngle(this.yaw, p.heading, RUN_FOLLOW * (hs - RUN_FOLLOW_MIN), dt);
+      }
       return;
     }
     if (hs < 3) return;

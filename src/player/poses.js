@@ -100,6 +100,31 @@ export function poseRun(p, c) {
   }
 }
 
+// Walk cycle (the controller's walk gait, ~1-2 m/s); c.runPhase advances one cycle per two steps.
+// Upright, a small hip sway, the knee folding only while the foot swings through, heel-toe feet and
+// loose arms opposite the legs.
+export function poseWalk(p, c) {
+  const ph = c.runPhase;
+  clear(p);
+  hips(p, 0, -0.035 + 0.018 * Math.cos(2 * ph), 0);
+  rot(p, B.hips, 0, 0.09 * Math.sin(ph), 0.03 * Math.cos(2 * ph));
+  rot(p, B.spine, 0.02, -0.06 * Math.sin(ph));
+  rot(p, B.chest, -0.02, -0.07 * Math.sin(ph));
+  rot(p, B.neck, -0.02);
+  rot(p, B.head, 0.02, 0.03 * Math.sin(ph));
+  for (const s of SIDES) {
+    const leg = ph + (s < 0 ? 0 : Math.PI);
+    const sw = Math.sin(leg);
+    const swing = Math.max(0, Math.cos(leg)); // foot off the ground, travelling forward
+    rot(p, bone('thigh', s), 0.06 + 0.36 * sw + 0.12 * swing, 0, s * 0.04);
+    rot(p, bone('shin', s), -(0.06 + 0.85 * swing ** 1.6 + 0.12 * Math.max(0, -sw)));
+    rot(p, bone('foot', s), 0.18 * Math.max(0, sw) * (1 - swing) - 0.3 * Math.max(0, -sw) * (1 - swing) - 0.1 * swing);
+    rot(p, bone('upperArm', s), 0.04 - 0.32 * sw, 0, s * 0.13);
+    rot(p, bone('forearm', s), 0.28 + 0.18 * Math.max(0, -sw));
+    rot(p, bone('hand', s), 0.1, 0, s * 0.1);
+  }
+}
+
 export function poseJump(p, c) {
   clear(p);
   const up = clamp(c.vy / 12, 0, 1);

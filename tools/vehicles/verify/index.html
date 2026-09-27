@@ -1,0 +1,134 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Vehicle check</title>
+<style>html,body{margin:0;background:#9fb4c8;overflow:hidden}canvas{display:block}
+#lbl{position:fixed;left:8px;top:6px;font:13px/1.3 monospace;color:#111;background:#fff8;padding:2px 6px}</style>
+<script type="importmap">{"imports":{"three":"/three/build/three.module.js","three/addons/":"/three/examples/jsm/"}}</script>
+</head>
+<body>
+<div id="lbl"></div>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ?models=a,b,c&lod=0|1&view=front34|rear34|side|top|high&night=0|1&cols=4&toggles=roof_rack,...
+const q = new URLSearchParams(location.search);
+const models = (q.get('models') || '').split(',').filter(Boolean);
+const lod = q.get('lod') || '0';
+const view = q.get('view') || 'front34';
+const night = q.get('night') === '1';
+const cols = +(q.get('cols') || Math.ceil(Math.sqrt(models.length)));
+const showToggles = new Set((q.get('toggles') || '').split(',').filter(Boolean));
+const W = innerWidth, H = innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W, H);
+renderer.setPixelRatio(1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = night ? 0.6 : 1.0;
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(night ? 0x0b1020 : 0x9fb4c8);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = night ? 0.08 : 0.9;
+const sun = new THREE.DirectionalLight(0xfff4e0, night ? 0.05 : 2.2);
+sun.position.set(-30, 50, 25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 150 });
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xcfe0ff, 0x6b5a48, night ? 0.05 : 0.6));
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: night ? 0x202020 : 0x8f8c83, roughness: 0.95 }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const stats = {};
+const group = new THREE.Group();
+scene.add(group);
+const gap = +(q.get('gap') || 7);
+let maxLen = 0;
+
+const loaded = await Promise.all(models.map((m) => loader.loadAsync(`/models/${m}${lod === '1' ? '_lod1' : ''}.glb`).then((g) => [m, g]).catch((e) => [m, null, String(e)])));
+loaded.forEach(([name, gltf, err], i) => {
+  if (!gltf) { stats[name] = { error: err }; return; }
+  const root = gltf.scene;
+  const info = { nodes: [], materials: new Set(), tris: 0, wheels: {}, toggles: [], extras: root.children[0]?.userData };
+  const vehicle = root.children[0];
+  const paints = (() => { try { return JSON.parse(vehicle.userData.paints || '[]'); } catch { return []; } })();
+  const paint = q.get('paint') || paints[(i * 3) % Math.max(1, paints.length)] || '#b7bbbf';
+  root.traverse((o) => {
+    info.nodes.push(o.name);
+    if (o.userData && o.userData.toggle) {
+      info.toggles.push(o.name);
+      o.visible = showToggles.has(o.name) || (!showToggles.size && !!o.userData.default_visible);
+    }
+    if (/^wheel_(f|r)(l|r)$/.test(o.name)) {
+      const p = new THREE.Vector3();
+      o.getWorldPosition(p);
+      info.wheels[o.name] = p.toArray().map((v) => +v.toFixed(3));
+    }
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const mat of mats) {
+        info.materials.add(mat.name);
+        if (mat.name === 'paint') mat.color.set(paint);
+        if (night && mat.userData.emissiveNight) {
+          mat.emissive.fromArray(mat.userData.emissiveNight);
+          mat.emissiveIntensity = mat.name === 'light_rear' ? 1.5 : 2.5;
+        }
+      }
+      const idx = o.geometry.index;
+      info.tris += (idx ? idx.count : o.geometry.attributes.position.count) / 3;
+    }
+  });
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  info.bbox = { min: box.min.toArray().map((v) => +v.toFixed(3)), max: box.max.toArray().map((v) => +v.toFixed(3)), size: size.toArray().map((v) => +v.toFixed(3)) };
+  info.materials = [...info.materials].sort();
+  info.nodes = info.nodes.filter((n) => n && !/^(Scene|)$/.test(n));
+  stats[name] = info;
+  maxLen = Math.max(maxLen, size.z);
+  root.userData.name = name;
+  root.userData.idx = i;
+  group.add(root);
+});
+// grid layout: columns along x, rows along z; each row as deep as its longest vehicle
+{
+  const items = [...group.children].sort((a, b) => a.userData.idx - b.userData.idx);
+  const sizes = items.map((r) => new THREE.Box3().setFromObject(r).getSize(new THREE.Vector3()));
+  const cw = Math.max(...sizes.map((s) => s.x)) + +(q.get('gap') || 1.0);
+  let z = 0;
+  for (let row = 0; row * cols < items.length; row++) {
+    const idx = items.slice(row * cols, row * cols + cols).map((_, k) => row * cols + k);
+    const depth = Math.max(...idx.map((k) => sizes[k].z)) + 1.2;
+    idx.forEach((k, c) => items[k].position.set((c - (cols - 1) / 2) * cw, 0, z + depth / 2));
+    z += depth;
+  }
+}
+const box = new THREE.Box3().setFromObject(group);
+const center = box.getCenter(new THREE.Vector3());
+const size = box.getSize(new THREE.Vector3());
+const cam = new THREE.PerspectiveCamera(q.get('fov') ? +q.get('fov') : 30, W / H, 0.1, 1000);
+const R = Math.max(0.5 * Math.hypot(size.x, size.y, size.z), 2);
+const dirs = { front34: [-0.75, 0.45, -1], rear34: [0.8, 0.45, 1], side: [-1, 0.12, 0], top: [0, 1, 0.001], high: [-0.6, 1.2, -1], front: [0, 0.15, -1], rear: [0, 0.15, 1] };
+const d = new THREE.Vector3(...(dirs[view] || dirs.front34)).normalize();
+const dist = (+(q.get('zoom') || 1)) * R / Math.sin(THREE.MathUtils.degToRad(cam.fov / 2)) * 0.8;
+cam.position.copy(center).addScaledVector(d, dist);
+cam.lookAt(center.x, (view === 'top' ? 0 : size.y * 0.3), center.z);
+renderer.render(scene, cam);
+document.getElementById('lbl').textContent = `${models.join(', ')}  lod${lod}  ${view}${night ? ' night' : ''}`;
+window.__stats = stats;
+window.__ready = true;
+</script>
+</body>
+</html>
