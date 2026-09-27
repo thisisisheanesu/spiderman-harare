@@ -70,11 +70,20 @@ def fsize(p):
 def main():
     vi = json.load(open(os.path.join(S, 'npcs', 'variants_info.json')))
     ci = json.load(open(os.path.join(S, 'anims', 'clips_info.json')))
+    _, an_ex0 = glb_tris_extras(os.path.join(PA, 'humans_anims.glb'))
+    ref_hip = an_ex0.get('hipHeight') or 0.973
+    # measured with verify/review_viewer.html (mode=stats) + verify/ground_offsets.py
+    gpath = os.path.join(HERE, 'ground_offsets.json')
+    ground = json.load(open(gpath)) if os.path.exists(gpath) else {}
     variants = []
     for vid in sorted(vi):
         v = vi[vid]
         variants.append(dict(id=vid, gender=v['gender'], roles=v['roles'], description=v['desc'],
                              height_m=v['height'], hip_height_m=v['hipHeight'],
+                             # clips' speed_mps is for the reference hip height: multiply by this
+                             stride_scale=round(v['hipHeight'] / ref_hip, 3),
+                             # lift the model by this much: soles otherwise sink this far into the ground in idle / walk
+                             ground_offset_m=ground.get(vid, 0.0),
                              lod0=dict(file=f'npc_{vid}.glb', tris=v['tris_lod0'], bytes=fsize(os.path.join(PH, f'npc_{vid}.glb')), texture=1024),
                              lod1=dict(file=f'npc_{vid}_lod1.glb', tris=v['tris_lod1'], bytes=fsize(os.path.join(PH, f'npc_{vid}_lod1.glb')), texture=256),
                              clothes=v['clothes'], hair=v['hair'], skin=dict(base=v['skin'][0], tone=v['skin'][1])))
@@ -87,8 +96,11 @@ def main():
         reference_hip_height_m=an_ex.get('hipHeight'),
         spiderman=dict(file='spiderman.glb', bytes=fsize(os.path.join(PH, 'spiderman.glb')), tris=sm_tris,
                        height_m=round(sm_ex.get('height', 0), 3), hip_height_m=sm_ex.get('hipHeight'),
+                       stride_scale=1.0, ground_offset_m=ground.get('spiderman', 0.0),
                        materials=['suit_classic', 'suit_symbiote'], variants=['classic', 'symbiote']),
         lod_distances_m=dict(desktop=dict(lod0=0, lod1=22, cull=90), phone=dict(lod0=0, lod1=12, cull=55)),
+        stride_note='ground speed of a locomotion clip on a character = clip speed_mps * stride_scale * timeScale '
+                    '(stride_scale = hipHeight / reference_hip_height_m; Spider-Man = 1.0)',
         npcs=variants)
     clips = []
     for name in sorted(ci):

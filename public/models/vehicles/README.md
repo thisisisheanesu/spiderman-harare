@@ -1,6 +1,6 @@
 # Harare traffic: vehicle models
 
-There are 11 vehicles, each with two LODs (22 GLBs), about **2.6 MB** in total. Geometry is
+There are 11 vehicles, each with two LODs (22 GLBs), about **2.5 MB** in total. Geometry is
 meshopt-compressed and textures are WebP. Every model is original and procedurally generated (see
 `CREDITS.md`); to rebuild them, run `tools/vehicles/build_all.sh`. `manifest.json` has the same facts as
 the table below in machine-readable form: dimensions, axle positions, wheel pivots, toggles, triangle
@@ -10,21 +10,26 @@ and the kombi toggles.
 
 | Model | Real vehicle | L x W x H (m) | Wheelbase / track F-R (m) | Wheel r (m) | Axle z F / R (m) | LOD0 tris (body / as shown) | LOD1 tris | LOD0 / LOD1 KB | Toggle groups |
 |---|---|---|---|---|---|---|---|---|---|
-| `kombi` | Toyota HiAce H100 Commuter, long body, high roof (1989-2004) | 4.695 x 1.69 x 2.2 | 2.79 / 1.445-1.43 | 0.345 | -1.4875 / 1.3025 | 9762 / 15500 | 2228 | 226 / 91 | roof_rack, livery_stripe, livery_zupco, banner, route |
-| `hatch_fit` | Honda Fit / Jazz GE (2007-2013) | 3.9 x 1.695 x 1.525 | 2.5 / 1.475-1.465 | 0.292 | -1.23 / 1.27 | 8677 / 13629 | 1964 | 133 / 49 | - |
-| `sedan_corolla` | Toyota Corolla Axio E160 (2012-2019) | 4.4 x 1.695 x 1.46 | 2.6 / 1.48-1.465 | 0.301 | -1.34 / 1.26 | 9085 / 14749 | 1945 | 139 / 49 | - |
-| `sedan_mercedes` | Mercedes-Benz C-Class W204 (2007-2014) | 4.58 x 1.77 x 1.447 | 2.76 / 1.55-1.54 | 0.316 | -1.49 / 1.27 | 9560 / 15064 | 2030 | 141 / 51 | - |
-| `wagon_wish` | Toyota Wish AE10 (2003-2009) | 4.56 x 1.695 x 1.59 | 2.75 / 1.48-1.475 | 0.317 | -1.42 / 1.33 | 9620 / 15324 | 2080 | 143 / 51 | - |
-| `pickup_hilux` | Toyota Hilux AN20/AN30 double cab 4x4 (2011-2015) | 5.26 x 1.835 x 1.81 | 3.085 / 1.54-1.54 | 0.369 | -1.76 / 1.325 | 10564 / 16268 | 2414 | 158 / 65 | cargo, sports_bar |
-| `suv_landcruiser` | Toyota Land Cruiser 200 (2007-2015) | 4.95 x 1.97 x 1.905 | 2.85 / 1.64-1.635 | 0.400 | -1.555 / 1.295 | 10607 / 16311 | 2237 | 149 / 53 | - |
-| `taxi` | Corolla Axio E160 in Harare cab yellow, TAXI roof sign, checker band | 4.4 x 1.695 x 1.46 | 2.6 / 1.48-1.465 | 0.301 | -1.34 / 1.26 | 9311 / 14975 | 2017 | 162 / 61 | - |
-| `police_landcruiser` | ZRP Land Cruiser 200: blue/gold band, POLICE, light bar, push bar | 4.95 x 1.97 x 1.905 | 2.85 / 1.64-1.635 | 0.400 | -1.555 / 1.295 | 11439 / 17143 | 2541 | 177 / 67 | - |
-| `bus_zupco` | 11.5 m Yutong/FAW-class city bus in the ZUPCO 2019+ white/blue/gold livery | 11.5 x 2.5 x 3.25 | 5.8 / 2.05-1.86 | 0.522 | -3.25 / 2.55 | 13202 / 22202 | 3396 | 238 / 83 | livery_stripes, dest |
-| `truck_isuzu` | Isuzu N-series NQR 500 wide cab with a 5.1 m box | 7.0 x 2.2 x 3.0 | 3.9 / 1.68-1.79 | 0.383 | -2.4 / 1.5 | 4966 / 12326 | 1680 | 153 / 54 | - |
+| `kombi` | Toyota HiAce H100 Commuter, long body, high roof (1989-2004) | 4.695 x 1.69 x 2.2 | 2.79 / 1.445-1.43 | 0.345 | -1.4875 / 1.3025 | 11018 / 17118 | 2228 | 240 / 90 | roof_rack, livery_stripe, livery_zupco, banner, route |
+| `hatch_fit` | Honda Fit / Jazz GE (2007-2013) | 3.9 x 1.695 x 1.525 | 2.5 / 1.475-1.465 | 0.292 | -1.23 / 1.27 | 9614 / 14686 | 1964 | 139 / 49 | - |
+| `sedan_corolla` | Toyota Corolla Axio E160 (2012-2019) | 4.4 x 1.695 x 1.46 | 2.6 / 1.48-1.465 | 0.301 | -1.34 / 1.26 | 9649 / 15433 | 1942 | 142 / 49 | - |
+| `sedan_mercedes` | Mercedes-Benz C-Class W204 (2007-2014) | 4.58 x 1.77 x 1.447 | 2.76 / 1.55-1.54 | 0.316 | -1.49 / 1.27 | 9560 / 15184 | 2030 | 141 / 51 | - |
+| `wagon_wish` | Toyota Wish AE10 (2003-2009) | 4.56 x 1.695 x 1.59 | 2.75 / 1.48-1.475 | 0.317 | -1.42 / 1.33 | 10527 / 16351 | 2080 | 149 / 50 | - |
+| `pickup_hilux` | Toyota Hilux AN20/AN30 double cab 4x4 (2011-2015) | 5.26 x 1.835 x 1.81 | 3.085 / 1.54-1.54 | 0.369 | -1.76 / 1.325 | 11063 / 16887 | 2414 | 161 / 65 | cargo, sports_bar |
+| `suv_landcruiser` | Toyota Land Cruiser 200 (2007-2015) | 4.95 x 1.97 x 1.905 | 2.85 / 1.64-1.635 | 0.400 | -1.555 / 1.295 | 10809 / 16633 | 2237 | 150 / 53 | - |
+| `taxi` | Corolla Axio E160 in Harare cab yellow, TAXI roof sign, checker band | 4.4 x 1.695 x 1.46 | 2.6 / 1.48-1.465 | 0.301 | -1.34 / 1.26 | 9875 / 15659 | 2014 | 166 / 61 | - |
+| `police_landcruiser` | ZRP Land Cruiser 200: blue/gold band, POLICE, light bar, push bar | 4.95 x 1.97 x 1.905 | 2.85 / 1.64-1.635 | 0.400 | -1.555 / 1.295 | 12099 / 17923 | 2541 | 181 / 67 | - |
+| `bus_zupco` | 11.5 m Yutong/FAW-class city bus in the ZUPCO 2019+ white/blue/gold livery | 11.5 x 2.5 x 3.25 | 5.8 / 2.05-1.86 | 0.522 | -3.25 / 2.55 | 15510 / 24990 | 3636 | 253 / 89 | livery_stripes, dest |
+| `truck_isuzu` | Isuzu N-series NQR 500 wide cab with a 5.1 m box | 7.0 x 2.2 x 3.0 | 3.9 / 1.68-1.79 | 0.383 | -2.4 / 1.5 | 5990 / 13470 | 1920 | 159 / 60 | - |
 
 "as shown" means body + 4 wheels + the default-visible toggles; this is the triangle count per vehicle on
-screen. The wheel mesh is stored once and instanced 4 times (about 1.4k tris; 2.2k for dual rear wheels).
-Bus and truck have dual rear wheels (`wheel_rl` / `wheel_rr` carry both tyres).
+screen. The wheel mesh is stored once and instanced 4 times (about 1.45k tris; 2.3k for dual rear wheels).
+Bus and truck have dual rear wheels (`wheel_rl` / `wheel_rr` carry both tyres, in both LODs).
+
+The nominal L x W x H above is the manufacturer body size. Mirrors, roof equipment and bars stick out of it
+(bus roof air-con pod to 3.47 m, kombi roof vent to 2.26 m, police light bar to 2.02 m and push bar 0.1 m
+ahead, Hilux step bumper + tow hitch 0.2 m behind). For collision boxes use the exact default-view bounds in
+`manifest.json` -> `vehicles.<name>.lod0.bbox_m` (`{min, max}` in metres, glTF axes).
 
 ## Conventions
 
@@ -63,6 +68,18 @@ Bus and truck have dual rear wheels (`wheel_rl` / `wheel_rr` carry both tyres).
   WebP):
   `new GLTFLoader().setMeshoptDecoder(MeshoptDecoder)` with
   `import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'`.
+
+- **Environment map (required).** `chrome` (metalness 1), `rim` (0.75) and the glossy `paint`/`glass` get
+  most of their look from `scene.environment`. The game currently lights the city with only a
+  `HemisphereLight` + sun (`src/world/sky.js`), and a hemisphere light adds no specular, so without an
+  environment the wheels, grilles and bumpers render near-black. Add one once at start-up, e.g.
+  `scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.6;` (lower it at night), or a PMREM of the sky.
+- **Paint is white in the file.** Always tint `paint` per instance; the taxi in particular is white until
+  it gets `userData.paints[0]` (`#f2c21a`, cab yellow).
+- **Manifest extras:** besides dimensions, axles, wheels and toggles, each `lod0` / `lod1` entry has
+  `materials` (the materials really present in that file; LOD1 of the hatch, saloons, wagon, taxi, bus and
+  truck has no `chrome`) and `bbox_m` (exact default-view bounds, see above).
 
 ## Materials (names are the contract)
 
@@ -191,12 +208,48 @@ grey, black, navy, champagne. pickup_hilux: white (x3), silver, grey, gunmetal, 
 suv_landcruiser: white, pearl, black, silver, gunmetal, champagne. taxi `#f2c21a` yellow, white, silver.
 police `#f2f2ee`. bus `#f3f3f0`. truck cab: white, blue, red, green, gold (the box is its own livery).
 
+## Review fixes (independent review, 2026-09-27)
+
+Checked in headless Chromium with three.js r186 (GLTFLoader + MeshoptDecoder, PMREM environment, sun,
+back-face and wireframe overlays) and with the glTF validator. Fixed in `tools/vehicles/` and rebuilt with
+`build_all.sh`:
+
+- **Wheels were inside-out on every model.** The tyre, rim face, lip and barrel were wound backwards, so
+  three.js back-face culling showed the inner wall of the far side of the tyre and an empty black wheel
+  (Cycles previews hid this because Cycles renders both sides). All wheels now face outwards, show their
+  alloy / steel / hub-cap faces, and have a disc that closes the inner side of the wheel.
+  LOD1 of the bus and truck now also has the inner dual tyre.
+- **Decals sank into curved panels** (bow-tie fog lamps and vents, torn lower-grille ends, half-buried
+  POLICE on the tailgate, ragged kombi rear window). LOD0 decals are now re-meshed or lifted until they
+  clear the body. The kombi rear window is a flat stack (backing, stickers, glass), and the POLICE lettering
+  on the police car's tailgate now sits below the glass.
+- **Number plates:** the emblem was drawn over the fourth character; letters and digits now fit on either
+  side of it.
+- **Door and panel lines** were aliased 2 px staircases; the paint detail is now drawn at 4x and
+  downsampled.
+- **Land Cruiser / police flares** hung 8 cm below the sills as white tabs; they now end at the sill.
+- **Atlas textures** (livery, plates, lamps) now use CLAMP_TO_EDGE; REPEAT bled the opposite atlas edge into
+  cells on the edge (a dark line beside the tailgate POLICE).
+- The manifest now has per-LOD `materials` and `bbox_m`.
+- The glTF validator reports 0 errors. Each file has 2-3 `MESH_PRIMITIVE_GENERATED_TANGENT_SPACE`
+  warnings, one per normal-mapped primitive: the normal maps ship without tangents, and three.js derives
+  them in the shader. These warnings are expected and harmless. The producer's build had them too.
+
 ## Known limitations
 
 - Door, bonnet and boot shut lines are texture and normal-map detail, not geometry, and the doors don't
   open. The kombi's sliding door is closed.
 - The bus windscreen is real glass. The kombi, van and bus rear windows are glass decals over a dark
-  backing, so the interior only shows through the side and front glass there.
+  backing, so the interior only shows through the side and front glass there. The kombi's rear-window
+  slogan banner and ZUPCO roundel sit between the backing and the glass, like stickers inside the window.
 - ZRP and ZUPCO livery colours are approximate (as flagged in `docs/references/STREETLIFE.md`). The
   Harare-yellow plates follow the photo survey in `docs/references/PHOTOS.md`.
 - No motorbike; no damage or dirt variants beyond the baked grime (kombis are the dirtiest).
+- Still not GTA-grade at close range: interiors are block seats, mirrors are boxy, and door, bonnet and boot
+  lines are texture only. The Corolla/taxi C-pillar sweeps into a sharp fin over the rear wheel that the
+  real E160 does not have. The Hilux is about 10 cm long at the rear bumper (plus a 10 cm tow hitch).
+- The bus air-con pod makes the bus 3.47 m tall overall. The body roof is at 3.25 m.
+- LOD1 has no door mirrors on most cars, and its 12-segment wheels have a thin sliver at the dish edge that
+  shows the inside of the wheel. Neither is visible at LOD1 distances.
+- The Cycles sheets in `tools/vehicles/previews/cycles_*.jpg` predate the review fixes: they show the old
+  plates and LC200 flares. The `threejs_*.jpg` sheets and `review_before_after.jpg` are current.

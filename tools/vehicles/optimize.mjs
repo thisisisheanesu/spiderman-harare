@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 const base = process.env.VEH_NODE || process.cwd();
 const require = createRequire(path.join(base, 'package.json'));
 const imp = (m) => import(pathToFileURL(require.resolve(m)).href);
-const { NodeIO, PropertyType } = await imp('@gltf-transform/core');
+const { NodeIO, PropertyType, TextureInfo } = await imp('@gltf-transform/core');
 const { ALL_EXTENSIONS } = await imp('@gltf-transform/extensions');
 const F = await imp('@gltf-transform/functions');
 const { MeshoptEncoder, MeshoptDecoder } = await imp('meshoptimizer');
@@ -70,6 +70,13 @@ for (const f of files) {
     }
     if (n === 'paint') ex.tintable = true;
     m.setExtras(ex);
+    // atlas textures must not wrap: with the default REPEAT, bilinear filtering at a cell touching u=0/1
+    // pulled in the opposite edge of the atlas (dark line beside the police tailgate lettering)
+    if (['livery', 'plate', 'light_front', 'light_rear', 'indicator', 'beacon_blue', 'beacon_red'].includes(n)) {
+      for (const info of [m.getBaseColorTextureInfo(), m.getEmissiveTextureInfo()]) {
+        if (info) info.setWrapS(TextureInfo.WrapMode.CLAMP_TO_EDGE).setWrapT(TextureInfo.WrapMode.CLAMP_TO_EDGE);
+      }
+    }
   }
   await doc.transform(
     // never merge materials: their names are the integration contract (indicator == light_rear otherwise)
@@ -134,6 +141,16 @@ for (const f of outFiles) {
   };
   // materials actually present in this file (LOD1 drops e.g. chrome on some models)
   lod.materials = root.listMaterials().map((m) => m.getName()).sort();
+  // exact axis-aligned bounds of the default view (body + wheels + default-visible toggles), metres, glTF axes:
+  // includes mirrors, roof equipment, bars and hitches, so it can differ from the nominal dimensions_m
+  const bb = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] };
+  for (const n of top.listChildren()) {
+    const ex = n.getExtras() || {};
+    if (ex.toggle && !ex.default_visible) continue;
+    const b = F.getBounds(n);
+    for (let i = 0; i < 3; i++) { bb.min[i] = Math.min(bb.min[i], b.min[i]); bb.max[i] = Math.max(bb.max[i], b.max[i]); }
+  }
+  lod.bbox_m = { min: bb.min.map((v) => +v.toFixed(3)), max: bb.max.map((v) => +v.toFixed(3)) };
   if (lod1) entry.lod1 = lod;
   else {
     const ex = top.getExtras() || {};

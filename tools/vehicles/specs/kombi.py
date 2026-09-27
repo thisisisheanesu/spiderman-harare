@@ -125,6 +125,23 @@ class Kombi(Base):
         liveries.kombi(path)
 
     # ------------------------------------------------------------------------------------------------
+    @staticmethod
+    def _rear_window_ref(ctx, origin, half_w, half_h, step=0.04):
+        """Rearmost body point inside the rear-window rectangle (projected from behind)."""
+        from mathutils import Vector
+        ax, ay, d = ctx._frame('rear')
+        o = Vector(origin)
+        best, best_t = None, None
+        na, nb = int(2 * half_w / step) + 1, int(2 * half_h / step) + 1
+        for i in range(na + 1):
+            for j in range(nb + 1):
+                a = -half_w + 2 * half_w * i / na
+                b = -half_h + 2 * half_h * j / nb
+                loc, _n = ctx.proj.hit(o + ax * a + ay * b, d)
+                if loc is not None and (best_t is None or (loc - o).dot(d) < best_t):
+                    best, best_t = loc.copy(), (loc - o).dot(d)
+        return tuple(best) if best is not None else origin
+
     def details(self, ctx):
         yf, yr = self.yf, self.yr
         lod = ctx.lod
@@ -146,10 +163,14 @@ class Kombi(Base):
                 ctx.strip('front', (0, yf, 0.53 + dz), [(-0.3, 0), (0.3, 0)], 0.018, 'trim', offset=0.004)
         # --- rear: hatch window (dark backing + glass), vertical tail lamps, plate, handle
         rw = C.rrect(1.44, 0.6, 0.06)
-        # flat=1: the rear cap is a Coons patch with ~1 cm diagonal ridges; a conforming pane showed them as
-        # an 'X' in the reflections and sank into them at the corners, so the backing and glass are flat panes
-        ctx.patch('rear', (0, yr, 1.5), rw, 'interior', offset=0.003, rings=1, flat=1.0)
-        ctx.patch('rear', (0, yr, 1.5), rw, 'glass', offset=0.007, rings=1, bezel=('trim', 0.02), flat=1.0)
+        # flat=1: the rear cap is a Coons patch with ~1-2 cm diagonal ridges; a conforming pane showed them
+        # as an 'X' in the reflections and sank into them at the corners, so the rear window is a stack of
+        # flat panes sharing one reference point (the rearmost panel point inside the window):
+        # backing 2 mm, stickers (slogan banner, ZUPCO roundel) 6 mm, glass 10 mm.
+        self.rw_ref = self._rear_window_ref(ctx, (0, yr, 1.5), 0.72, 0.3)
+        ctx.patch('rear', (0, yr, 1.5), rw, 'interior', offset=0.002, rings=1, flat=1.0, flat_ref=self.rw_ref)
+        ctx.patch('rear', (0, yr, 1.5), rw, 'glass', offset=0.010, rings=1, bezel=('trim', 0.02), flat=1.0,
+                  flat_ref=self.rw_ref)
         tl = C.rect(0.12, 0.40)
         ctx.patch('rear', (0.765, yr, 0.9), tl, 'light_rear', yaw=30, mirror=True, offset=0.007, rings=rings,
                   uv_rect=C.uv('tail'), depth=0.012, side_mat='trim')
@@ -198,15 +219,17 @@ class Kombi(Base):
                   uv_rect=flip_u(LAY['zupco_side']), mb=mb)
         ctx.patch('front', (0, yf, 1.745), C.rect(1.1, 0.06), 'livery', offset=0.004, rings=1,
                   uv_rect=flip_u(LAY['zupco_wind']), mb=mb, pitch=0)
-        ctx.patch('rear', (-0.45, yr, 1.72), C.ellipse(0.07, 0.07, 12), 'livery', offset=0.01, rings=1,
-                  uv_rect=flip_u(LAY['zupco_round']), mb=mb)
+        # rear-window stickers sit between the flat backing and the flat glass (see the rear window above);
+        # the roundel is below the slogan banner so the two toggles can be shown together
+        ctx.patch('rear', (-0.45, yr, 1.58), C.ellipse(0.07, 0.07, 12), 'livery', offset=0.006, rings=1,
+                  uv_rect=flip_u(LAY['zupco_round']), mb=mb, flat=1.0, flat_ref=self.rw_ref)
         # slogan banners (windscreen top + rear window top): one toggle per slogan
         for i in range(6):
             mb = ctx.tog(f'banner_{i}')
             ctx.patch('front', (0, yf, 1.615), C.rect(1.2, 0.1), 'livery', offset=0.005, rings=1,
                       uv_rect=flip_u(LAY[f'banner_{i}']), mb=mb)
-            ctx.patch('rear', (0, yr, 1.72), C.rect(1.3, 0.09), 'livery', offset=0.011, rings=1,
-                      uv_rect=flip_u(LAY[f'banner_{i}']), mb=mb)
+            ctx.patch('rear', (0, yr, 1.72), C.rect(1.3, 0.09), 'livery', offset=0.006, rings=1,
+                      uv_rect=flip_u(LAY[f'banner_{i}']), mb=mb, flat=1.0, flat_ref=self.rw_ref)
         # route cards (kerb side, bottom of the windscreen)
         for i in range(8):
             mb = ctx.tog(f'route_{i}')

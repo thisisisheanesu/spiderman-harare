@@ -759,11 +759,14 @@ class Projector:
         return worst
 
     def patch(self, mb, origin, ax, ay, d, outline, mat, *, offset=0.004, uv_rect=(0, 0, 1, 1), rings=2,
-              depth=0.0, bezel=None, flat=0.0, side_mat=None, max_edge=0.12, conform=False):
+              depth=0.0, bezel=None, flat=0.0, side_mat=None, max_edge=0.12, conform=False, flat_ref=None):
         """Project polygon `outline` [(a, b)] given in the plane (origin, ax, ay) along direction d onto the
         body; builds a filled patch (concentric rings -> centre fan) facing -d. UVs map the outline bbox to
         uv_rect. depth > 0 adds a side wall (lamp body) back into the surface. bezel=(mat, width) adds a
-        rim around it. flat in 0..1 flattens the patch towards its mean plane (a lens instead of a decal)."""
+        rim around it. flat in 0..1 flattens the patch towards its mean plane (a lens instead of a decal).
+        flat_ref: a body-surface point; with flat, the plane is placed `offset` in front of it instead of in
+        front of the patch's own front-most point, so several stacked panes (backing, sticker, glass) share
+        one reference and keep their separation."""
         origin, ax, ay, d = Vector(origin), Vector(ax), Vector(ay), Vector(d).normalized()
         facing = -d
         outline0 = outline
@@ -836,6 +839,8 @@ class Projector:
         if flat > 0:
             allp = [p for ring in P for p in ring] + [cP]
             far = min((p - origin).dot(d) for p in allp)  # front-most point along d
+            if flat_ref is not None:
+                far = (Vector(flat_ref) - origin).dot(d) - offset
             P = [[p - d * (((p - origin).dot(d) - far) * flat) for p in ring] for ring in P]
             cP = cP - d * (((cP - origin).dot(d) - far) * flat)
         n = len(outline)

@@ -5,10 +5,12 @@
  "reference_hip_height_m": 0.9729963541030884,
  "spiderman": {
   "file": "spiderman.glb",
-  "bytes": 1055028,
+  "bytes": 1055048,
   "tris": 22999,
   "height_m": 1.786,
   "hip_height_m": 0.9729963541030884,
+  "stride_scale": 1.0,
+  "ground_offset_m": 0.011,
   "materials": [
    "suit_classic",
    "suit_symbiote"
@@ -30,6 +32,7 @@
    "cull": 55
   }
  },
+ "stride_note": "ground speed of a locomotion clip on a character = clip speed_mps * stride_scale * timeScale (stride_scale = hipHeight / reference_hip_height_m; Spider-Man = 1.0)",
  "npcs": [
   {
    "id": "boy_high_school",
@@ -40,16 +43,18 @@
    "description": "High school boy: white shirt, maroon tie, grey trousers, black shoes",
    "height_m": 1.652,
    "hip_height_m": 0.8775,
+   "stride_scale": 0.902,
+   "ground_offset_m": 0.009,
    "lod0": {
     "file": "npc_boy_high_school.glb",
     "tris": 9798,
-    "bytes": 154236,
+    "bytes": 154824,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_boy_high_school_lod1.glb",
     "tris": 1999,
-    "bytes": 52516,
+    "bytes": 52944,
     "texture": 256
    },
    "clothes": [
@@ -69,24 +74,26 @@
    "roles": [
     "school_kid"
    ],
-   "description": "Primary school boy: khaki shirt and shorts, brown socks, black shoes",
+   "description": "Primary school boy: short-sleeved khaki shirt, khaki shorts to above the knee, brown socks, black shoes",
    "height_m": 1.332,
    "hip_height_m": 0.6835,
+   "stride_scale": 0.702,
+   "ground_offset_m": 0.007,
    "lod0": {
     "file": "npc_boy_primary_school.glb",
-    "tris": 7738,
-    "bytes": 126380,
+    "tris": 9549,
+    "bytes": 156644,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_boy_primary_school_lod1.glb",
-    "tris": 1999,
-    "bytes": 48020,
+    "tris": 2000,
+    "bytes": 55496,
     "texture": 256
    },
    "clothes": [
-    "elvs_crude_t-shirt_male",
-    "cortu_jeans_shorts",
+    "elvs_male_shirt_untucked_bd1",
+    "elvs_male_trouser",
     "shoes04"
    ],
    "hair": "crop",
@@ -104,16 +111,18 @@
    "description": "High school girl: white top, navy skirt, white socks, black shoes, cornrows",
    "height_m": 1.437,
    "hip_height_m": 0.7631,
+   "stride_scale": 0.784,
+   "ground_offset_m": 0.025,
    "lod0": {
     "file": "npc_girl_high_school.glb",
     "tris": 9798,
-    "bytes": 149264,
+    "bytes": 149312,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_girl_high_school_lod1.glb",
     "tris": 1999,
-    "bytes": 53056,
+    "bytes": 53464,
     "texture": 256
    },
    "clothes": [
@@ -136,16 +145,18 @@
    "description": "Primary school girl: light blue dress, white socks, black shoes, cornrows",
    "height_m": 1.208,
    "hip_height_m": 0.6423,
+   "stride_scale": 0.66,
+   "ground_offset_m": 0.026,
    "lod0": {
     "file": "npc_girl_primary_school.glb",
     "tris": 7771,
-    "bytes": 139268,
+    "bytes": 136448,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_girl_primary_school_lod1.glb",
     "tris": 1999,
-    "bytes": 51256,
+    "bytes": 50660,
     "texture": 256
    },
    "clothes": [
@@ -167,16 +178,18 @@
    "description": "Apostolic church member: white knee-length robe, shaved head, full beard, barefoot",
    "height_m": 1.865,
    "hip_height_m": 1.0125,
+   "stride_scale": 1.041,
+   "ground_offset_m": 0.008,
    "lod0": {
     "file": "npc_man_apostolic.glb",
     "tris": 7071,
-    "bytes": 120300,
+    "bytes": 121672,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_apostolic_lod1.glb",
     "tris": 1999,
-    "bytes": 46664,
+    "bytes": 46980,
     "texture": 256
    },
    "clothes": [
@@ -198,16 +211,18 @@
    "description": "Office worker in a charcoal two-piece suit, white shirt and maroon tie",
    "height_m": 1.798,
    "hip_height_m": 0.9695,
+   "stride_scale": 0.996,
+   "ground_offset_m": 0.012,
    "lod0": {
     "file": "npc_man_business_suit.glb",
     "tris": 7770,
-    "bytes": 125804,
+    "bytes": 126192,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_business_suit_lod1.glb",
-    "tris": 1999,
-    "bytes": 47932,
+    "tris": 1998,
+    "bytes": 47872,
     "texture": 256
    },
    "clothes": [
@@ -229,16 +244,18 @@
    "description": "Elderly man in brown jacket, grey trousers and flat cap, grey stubble",
    "height_m": 1.739,
    "hip_height_m": 0.9421,
+   "stride_scale": 0.968,
+   "ground_offset_m": 0.007,
    "lod0": {
     "file": "npc_man_elder_flatcap.glb",
     "tris": 8671,
-    "bytes": 166084,
+    "bytes": 164352,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_elder_flatcap_lod1.glb",
-    "tris": 2000,
-    "bytes": 53620,
+    "tris": 1999,
+    "bytes": 52996,
     "texture": 256
    },
    "clothes": [
@@ -262,16 +279,18 @@
    "description": "Youth / kombi tout in grey hooded sweat jacket, dark jeans and white sneakers",
    "height_m": 1.617,
    "hip_height_m": 0.8589,
+   "stride_scale": 0.883,
+   "ground_offset_m": 0.02,
    "lod0": {
     "file": "npc_man_hoodie.glb",
     "tris": 9798,
-    "bytes": 226020,
+    "bytes": 220392,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_hoodie_lod1.glb",
     "tris": 2000,
-    "bytes": 72484,
+    "bytes": 70812,
     "texture": 256
    },
    "clothes": [
@@ -296,6 +315,8 @@
    "description": "Worker in navy overalls over a grey t-shirt, work boots",
    "height_m": 1.682,
    "hip_height_m": 0.8948,
+   "stride_scale": 0.92,
+   "ground_offset_m": 0.033,
    "lod0": {
     "file": "npc_man_overalls.glb",
     "tris": 7772,
@@ -327,16 +348,18 @@
    "description": "ZRP police officer: light blue-grey shirt, navy trousers and cap, black boots",
    "height_m": 1.791,
    "hip_height_m": 0.9657,
+   "stride_scale": 0.993,
+   "ground_offset_m": 0.035,
    "lod0": {
     "file": "npc_man_police_zrp.glb",
-    "tris": 9796,
-    "bytes": 160120,
+    "tris": 9797,
+    "bytes": 162924,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_police_zrp_lod1.glb",
     "tris": 2000,
-    "bytes": 55060,
+    "bytes": 56084,
     "texture": 256
    },
    "clothes": [
@@ -360,16 +383,18 @@
    "description": "Man in yellow polo shirt, khaki chinos and brown shoes",
    "height_m": 1.791,
    "hip_height_m": 0.9592,
+   "stride_scale": 0.986,
+   "ground_offset_m": 0.013,
    "lod0": {
     "file": "npc_man_polo_chinos.glb",
-    "tris": 9797,
-    "bytes": 221004,
+    "tris": 9798,
+    "bytes": 220524,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_polo_chinos_lod1.glb",
     "tris": 1999,
-    "bytes": 57164,
+    "bytes": 57504,
     "texture": 256
    },
    "clothes": [
@@ -392,16 +417,18 @@
    "description": "Private security guard: blue-grey shirt, navy trousers, navy patrol cap, boots",
    "height_m": 1.743,
    "hip_height_m": 0.9331,
+   "stride_scale": 0.959,
+   "ground_offset_m": 0.034,
    "lod0": {
     "file": "npc_man_security_guard.glb",
-    "tris": 9797,
-    "bytes": 153580,
+    "tris": 9796,
+    "bytes": 154268,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_security_guard_lod1.glb",
     "tris": 2000,
-    "bytes": 53932,
+    "bytes": 54344,
     "texture": 256
    },
    "clothes": [
@@ -425,16 +452,18 @@
    "description": "Clerk in light blue shirt, navy tie and grey trousers",
    "height_m": 1.656,
    "hip_height_m": 0.8799,
+   "stride_scale": 0.904,
+   "ground_offset_m": 0.011,
    "lod0": {
     "file": "npc_man_shirt_tie.glb",
     "tris": 9797,
-    "bytes": 156164,
+    "bytes": 156648,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_shirt_tie_lod1.glb",
-    "tris": 1999,
-    "bytes": 52496,
+    "tris": 2000,
+    "bytes": 52968,
     "texture": 256
    },
    "clothes": [
@@ -458,16 +487,18 @@
    "description": "Young man in red t-shirt, jeans and black baseball cap",
    "height_m": 1.67,
    "hip_height_m": 0.8913,
+   "stride_scale": 0.916,
+   "ground_offset_m": 0.023,
    "lod0": {
     "file": "npc_man_tshirt_jeans_cap.glb",
-    "tris": 9794,
-    "bytes": 195580,
+    "tris": 9798,
+    "bytes": 196020,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_man_tshirt_jeans_cap_lod1.glb",
-    "tris": 1999,
-    "bytes": 51868,
+    "tris": 2000,
+    "bytes": 52252,
     "texture": 256
    },
    "clothes": [
@@ -491,16 +522,18 @@
    "description": "Apostolic church member: white long dress and white headscarf, barefoot",
    "height_m": 1.656,
    "hip_height_m": 0.8592,
+   "stride_scale": 0.883,
+   "ground_offset_m": 0.008,
    "lod0": {
     "file": "npc_woman_apostolic.glb",
     "tris": 7234,
-    "bytes": 115064,
+    "bytes": 115168,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_apostolic_lod1.glb",
     "tris": 2000,
-    "bytes": 46412,
+    "bytes": 46292,
     "texture": 256
    },
    "clothes": [
@@ -522,16 +555,18 @@
    "description": "Woman in a cream tucked top and black pencil skirt with a red dhuku (head wrap)",
    "height_m": 1.59,
    "hip_height_m": 0.8272,
+   "stride_scale": 0.85,
+   "ground_offset_m": 0.02,
    "lod0": {
     "file": "npc_woman_blouse_skirt.glb",
     "tris": 9949,
-    "bytes": 178028,
+    "bytes": 173948,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_blouse_skirt_lod1.glb",
-    "tris": 2000,
-    "bytes": 53664,
+    "tris": 1999,
+    "bytes": 53284,
     "texture": 256
    },
    "clothes": [
@@ -554,16 +589,18 @@
    "description": "Woman in a teal t-shirt and black trousers, hair in a bun under a black wrap",
    "height_m": 1.506,
    "hip_height_m": 0.793,
+   "stride_scale": 0.815,
+   "ground_offset_m": 0.022,
    "lod0": {
     "file": "npc_woman_casual_tee.glb",
     "tris": 9970,
-    "bytes": 160132,
+    "bytes": 159188,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_casual_tee_lod1.glb",
-    "tris": 1999,
-    "bytes": 50924,
+    "tris": 2000,
+    "bytes": 50716,
     "texture": 256
    },
    "clothes": [
@@ -586,16 +623,18 @@
    "description": "Woman in a bright blue knee-length shift dress, braids / cornrows",
    "height_m": 1.473,
    "hip_height_m": 0.7819,
+   "stride_scale": 0.804,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_dress_bright.glb",
     "tris": 7771,
-    "bytes": 125080,
+    "bytes": 121160,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_dress_bright_lod1.glb",
     "tris": 1999,
-    "bytes": 47864,
+    "bytes": 47224,
     "texture": 256
    },
    "clothes": [
@@ -617,16 +656,18 @@
    "description": "Elderly woman in a cardigan, long skirt and headscarf",
    "height_m": 1.593,
    "hip_height_m": 0.8255,
+   "stride_scale": 0.848,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_elder.glb",
     "tris": 10015,
-    "bytes": 146680,
+    "bytes": 149132,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_elder_lod1.glb",
     "tris": 2000,
-    "bytes": 50820,
+    "bytes": 51016,
     "texture": 256
    },
    "clothes": [
@@ -650,16 +691,18 @@
    "description": "Young woman in a pink top and tight jeans with an afro puff",
    "height_m": 1.481,
    "hip_height_m": 0.796,
+   "stride_scale": 0.818,
+   "ground_offset_m": 0.022,
    "lod0": {
     "file": "npc_woman_jeans_top.glb",
-    "tris": 9797,
-    "bytes": 231852,
+    "tris": 9796,
+    "bytes": 231016,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_jeans_top_lod1.glb",
     "tris": 2000,
-    "bytes": 70744,
+    "bytes": 70708,
     "texture": 256
    },
    "clothes": [
@@ -682,16 +725,18 @@
    "description": "Office worker in a navy skirt suit, black flats, relaxed bob",
    "height_m": 1.555,
    "hip_height_m": 0.8192,
+   "stride_scale": 0.842,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_office_suit.glb",
     "tris": 9371,
-    "bytes": 164748,
+    "bytes": 163032,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_office_suit_lod1.glb",
     "tris": 2000,
-    "bytes": 54576,
+    "bytes": 54608,
     "texture": 256
    },
    "clothes": [
@@ -714,16 +759,18 @@
    "description": "Street vendor: orange t-shirt, wax-print wrap skirt, blue gingham apron, orange-print dhuku",
    "height_m": 1.576,
    "hip_height_m": 0.8255,
+   "stride_scale": 0.848,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_vendor_apron.glb",
-    "tris": 9967,
-    "bytes": 406416,
+    "tris": 9966,
+    "bytes": 403516,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_vendor_apron_lod1.glb",
     "tris": 2000,
-    "bytes": 76224,
+    "bytes": 75864,
     "texture": 256
    },
    "clothes": [
@@ -748,16 +795,18 @@
    "description": "Market woman in a zambia wrap cloth (wax print) over a t-shirt, yellow-print dhuku",
    "height_m": 1.642,
    "hip_height_m": 0.8511,
+   "stride_scale": 0.875,
+   "ground_offset_m": 0.022,
    "lod0": {
     "file": "npc_woman_zambia_wrap.glb",
     "tris": 9988,
-    "bytes": 361088,
+    "bytes": 351344,
     "texture": 1024
    },
    "lod1": {
     "file": "npc_woman_zambia_wrap_lod1.glb",
-    "tris": 2000,
-    "bytes": 67904,
+    "tris": 1999,
+    "bytes": 67240,
     "texture": 256
    },
    "clothes": [

@@ -404,7 +404,7 @@ def outward(co, nr, segs):
     return out
 
 
-def resolve_layers(obj, arm, layer, margin=0.005, reach=0.06, body_reach=0.06, match_weights=True):
+def resolve_layers(obj, arm, layer, margin=0.005, reach=0.06, body_reach=0.06, body_move=0.015, match_weights=True):
     """Layered clothes on a single (joined, decimated) mesh: `layer` (V,) is each vertex's stacking
     rank (-1 = ignore, e.g. eyes; body 0; garments by LAYER_Z). Every vertex of an inner layer that
     pokes through an outer layer, or lies less than `margin` under it, is pulled back under it along
@@ -422,6 +422,8 @@ def resolve_layers(obj, arm, layer, margin=0.005, reach=0.06, body_reach=0.06, m
     segs = bone_segments(arm)
     vbone = nearest_bone(co, segs)
     related = bone_related(arm)
+    bnames = [b.name for b in arm.data.bones]
+    hipset = {bnames.index(b) for b in ('pelvis', 'spine_01', 'thigh_l', 'thigh_r') if b in bnames}
     moved = 0
     cover_face = np.full(n, -1, np.int64)
     cover_loc = np.zeros((n, 3))
@@ -471,10 +473,18 @@ def resolve_layers(obj, arm, layer, margin=0.005, reach=0.06, body_reach=0.06, m
                     new = p + no * (-margin - sd)
                     sd = -margin
                 # covered: under the outer surface, straight below it. The outermost cover wins.
-                if cover_face[i] < 0 and sd < 0 and (dist < 1e-4 or abs(sd) > 0.7 * dist):
+                # Only around the hips, where striding legs pull layers apart (thighs through skirts,
+                # waistbands through shirt hems); shoulders keep MakeHuman's weights (re-skinning the
+                # armpit to the shirt's torso makes the body poke out there instead).
+                if cover_face[i] < 0 and sd < 0 and (dist < 1e-4 or abs(sd) > 0.7 * dist) \
+                        and vbone[i] in hipset and fbone[fi] in hipset:
                     cover_face[i] = pidx[fi]
                     cover_loc[i] = np.array(loc)
-            if new is not None:
+            # the body only ever gets tucked in a little (bigger moves distort armpits and crotches
+            # and poke out elsewhere once animated); garments may be pulled in further
+            if new is not None and layer[i] == 0 and vbone[i] not in hipset:
+                new = None   # body: only around the hips (skirts, waistbands); elsewhere MakeHuman's fit is kept
+            if new is not None and (new - Vector(co[i])).length <= (rch if layer[i] > 0 else body_move):
                 co[i] = np.array(new)
                 moved += 1
     me.vertices.foreach_set('co', co.ravel()); me.update()
@@ -484,7 +494,7 @@ def resolve_layers(obj, arm, layer, margin=0.005, reach=0.06, body_reach=0.06, m
     return moved
 
 
-def match_cover_weights(obj, cover_face, cover_loc, pv, rings=3):
+def match_cover_weights(obj, cover_face, cover_loc, pv, rings=2):
     """Skin every covered inner-layer vertex like the outer surface right above it, so the layers
     deform together and a thigh cannot swing out through a pencil skirt, or trousers through a
     polo hem, while walking. Blended in over `rings` edge rings from the uncovered border."""

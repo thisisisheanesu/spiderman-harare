@@ -29,7 +29,7 @@ BPY=/path/to/python-with-bpy VEH_NODE=/dir/with/node_modules tools/vehicles/buil
 | `liveries.py` | Decal atlases: kombi (stripe, ZUPCO, slogan banners, route cards, cargo), taxi, police, bus, truck and pickup cargo. |
 | `optimize.mjs` | glTF-Transform pass: material fix-ups (alpha modes, night emissive in extras), WebP 1024 px (LOD1: 256 px), meshopt, `manifest.json`. |
 | `render.py` | Cycles preview camera rig (3/4 front, left side, 3/4 rear, front). |
-| `verify/` | three.js check page plus a Playwright runner (GLTFLoader + MeshoptDecoder + RoomEnvironment). It writes screenshots and `stats.json`. |
+| `verify/` | three.js check page plus a Playwright runner (GLTFLoader + MeshoptDecoder + RoomEnvironment). It writes screenshots and `stats.json`. `verify/shots_previews.json` holds the shots behind `previews/threejs_*.jpg`: `node verify/verify.mjs public/models/vehicles OUT verify/shots_previews.json`. |
 
 ## How a body is described
 
@@ -44,3 +44,25 @@ side glass, and segments 7-8 between the cowl and the header are the windscreen.
 The UVs of the body shell have a fixed layout: the right side, left side and both end caps each have their
 own island. Door lines, handles, fuel doors and grime are painted into `<name>_paint.png` in that UV space,
 with a derived normal map, so LOD0 and LOD1 share the same textures.
+
+## Conventions that the review established (keep them when editing)
+
+- **Winding.** The glTF materials are single-sided, so every face must point outwards; three.js culls the
+  back faces. Cycles renders both sides and will not show a flipped face, so check with a three.js
+  back-face overlay: `DoubleSide`, with `!gl_FrontFacing` painted magenta. In `vkit.wheel_mesh` the ring angle
+  runs counter-clockwise seen from +x. A quad stepping (angle, then along the profile) therefore faces +x
+  on a flat ring and inwards on a tread. That is why the tyre grid is built with `flip=True` and the rim face,
+  lip and barrel are not flipped.
+- **Decals (`Projector.patch`).** Points are projected along `d` and offset towards the viewer. A few large
+  triangles between projected points can dip under a curved or faceted panel. With `conform=True` (the
+  default for LOD0 through `Ctx.patch`), the patch is sampled against the body. It is re-meshed finer, up
+  to twice, but only if that gains more than 3 mm, and is then lifted by at most 2 x `offset` until it clears
+  the panel by min(40 % of `offset`, 1.5 mm). Lamps and plates (`flat > 0`) are exempt. Set
+  `VEH_DEBUG_CONFORM=1` to log every patch that needed it.
+- **Stacked flat panes.** `flat=1` alone flattens each patch against its own front-most point.
+  Several panes (backing, sticker, glass) must share one `flat_ref` (a body point) to keep their spacing:
+  see the kombi rear window in `specs/kombi.py`.
+- **Paint detail** is drawn at `PaintCanvas.SS` = 4 x the texture size and downsampled, because PIL lines
+  are not anti-aliased. Widths and radii passed to `line`, `rect` and `handle` stay in final-texture pixels.
+- **Atlases** (livery, plate, lamps) are set to CLAMP_TO_EDGE in `optimize.mjs`. Only the tyre normal map
+  repeats.

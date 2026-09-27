@@ -54,7 +54,10 @@ if (mode === 'suits') {
     }
     return doc.createTexture(t.getName() || 'tex').setImage(img).setMimeType(t.getMimeType()).setURI('');
   };
+  // same geometry, same sidedness: the masked head has a few welded slits, so the suit must not
+  // be back-face culled in one variant and not the other
   const m = doc.createMaterial('suit_symbiote')
+    .setDoubleSided(classic.getDoubleSided())
     .setBaseColorFactor(symSrc.getBaseColorFactor())
     .setMetallicFactor(symSrc.getMetallicFactor())
     .setRoughnessFactor(symSrc.getRoughnessFactor())

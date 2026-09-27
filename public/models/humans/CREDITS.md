@@ -20,15 +20,14 @@ The asset name matches the MakeHuman asset repository entry. CC BY assets need t
 |---|---|---|---|---|---|---|
 | afro01 | hair | makehuman_system | CC0 | [makehuman_system_assets](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html) | http://www.makehumancommunity.org | woman_jeans_top |
 | bob02 | hair | makehuman_system | CC0 | [makehuman_system_assets](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html) | http://www.makehumancommunity.org | woman_office_suit |
-| cortu_jeans_shorts | clothes | Cortu | CC0 | [pants01](https://static.makehumancommunity.org/assets/assetpacks/pants01.html) | http://www.makehumancommunity.org/node/2800 | boy_primary_school |
-| culturalibre_sneakers | clothes | culturalibre | CC-BY | [shoes02](https://static.makehumancommunity.org/assets/assetpacks/shoes02.html) | http://www.makehumancommunity.org/node/2555 | man_hoodie, woman_jeans_top |
-| elvs_crude_t-shirt_male | clothes | Elvaerwyn | CC0 | [shirts01](https://static.makehumancommunity.org/assets/assetpacks/shirts01.html) | http://www.makehumancommunity.org/node/1416 | boy_primary_school, man_tshirt_jeans_cap |
+| culturalibre_sneakers | clothes | culturalibre | CC-BY | [shoes02](https://static.makehumancommunity.org/assets/assetpacks/shoes02.html) | http://www.makehumancommunity.org/node/2555 (derived from "brown-sneakers-e6c51d2e77d945d1a0efbca530fb4b5b" by yanix, CC BY 4.0 (checked via the Sketchfab API, 2026-09-27): https://sketchfab.com/3d-models/brown-sneakers-e6c51d2e77d945d1a0efbca530fb4b5b) | man_hoodie, woman_jeans_top |
+| elvs_crude_t-shirt_male | clothes | Elvaerwyn | CC0 | [shirts01](https://static.makehumancommunity.org/assets/assetpacks/shirts01.html) | http://www.makehumancommunity.org/node/1416 | man_tshirt_jeans_cap |
 | elvs_gored_midi_skirt | clothes | Elvaerwyn | CC-BY | [skirts02](https://static.makehumancommunity.org/assets/assetpacks/skirts02.html) | http://www.makehumancommunity.org/node/2576 | girl_high_school |
 | elvs_hooded_sweat_jacket1 | clothes | Elvaerwyn | CC-BY | [shirts02](https://static.makehumancommunity.org/assets/assetpacks/shirts02.html) | http://www.makehumancommunity.org/node/1450 | man_hoodie |
 | elvs_ladies_apron | clothes | Elvaerwyn | CC-BY | [dress02](https://static.makehumancommunity.org/assets/assetpacks/dress02.html) | http://www.makehumancommunity.org/node/1446 | woman_vendor_apron |
 | elvs_male_shirt_tie_tucked1 | clothes | Elvaerwyn | CC-BY | [shirts02](https://static.makehumancommunity.org/assets/assetpacks/shirts02.html) | http://www.makehumancommunity.org/node/1799 | boy_high_school, man_shirt_tie |
-| elvs_male_shirt_untucked_bd1 | clothes | Elvaerwyn | CC-BY | [shirts02](https://static.makehumancommunity.org/assets/assetpacks/shirts02.html) | http://www.makehumancommunity.org/node/1800 | man_police_zrp, man_security_guard |
-| elvs_male_trouser | clothes | Elvaerwyn | CC-BY | [pants02](https://static.makehumancommunity.org/assets/assetpacks/pants02.html) | http://www.makehumancommunity.org/node/1796 | boy_high_school, man_police_zrp, man_security_guard, man_shirt_tie, woman_casual_tee |
+| elvs_male_shirt_untucked_bd1 | clothes | Elvaerwyn | CC-BY | [shirts02](https://static.makehumancommunity.org/assets/assetpacks/shirts02.html) | http://www.makehumancommunity.org/node/1800 | boy_primary_school, man_police_zrp, man_security_guard |
+| elvs_male_trouser | clothes | Elvaerwyn | CC-BY | [pants02](https://static.makehumancommunity.org/assets/assetpacks/pants02.html) | http://www.makehumancommunity.org/node/1796 | boy_high_school, boy_primary_school, man_police_zrp, man_security_guard, man_shirt_tie, woman_casual_tee |
 | elvs_pencil_skirt | clothes | Elvaerwyn | CC-BY | [skirts02](https://static.makehumancommunity.org/assets/assetpacks/skirts02.html) | http://www.makehumancommunity.org/node/2581 | woman_blouse_skirt |
 | janexx_old_female_sweater | clothes | janexx | CC-BY | [shirts02](https://static.makehumancommunity.org/assets/assetpacks/shirts02.html) | http://www.makehumancommunity.org/node/2767 | woman_elder |
 | joepal_crude_t-shirt_female | clothes | Joel Palmius | CC0 | [shirts01](https://static.makehumancommunity.org/assets/assetpacks/shirts01.html) | http://www.makehumancommunity.org/node/894 | woman_casual_tee, woman_vendor_apron, woman_zambia_wrap |
@@ -78,6 +77,7 @@ The asset name matches the MakeHuman asset repository entry. CC BY assets need t
 - "punkduck_female_tight_jeans" by punkduck, licensed CC BY (the MakeHuman asset repository CC-BY option, CC BY 4.0: https://creativecommons.org/licenses/by/4.0/), MakeHuman community asset repository. Recoloured, decimated and baked into a texture atlas.
 - "punkduck_male_classic_jeans" by punkduck, licensed CC BY (the MakeHuman asset repository CC-BY option, CC BY 4.0: https://creativecommons.org/licenses/by/4.0/), MakeHuman community asset repository. Recoloured, decimated and baked into a texture atlas.
 - "punkduck_v_neck_top" by punkduck, licensed CC BY (the MakeHuman asset repository CC-BY option, CC BY 4.0: https://creativecommons.org/licenses/by/4.0/), MakeHuman community asset repository. Recoloured, decimated and baked into a texture atlas.
+- "culturalibre_sneakers" is derived from "brown-sneakers-e6c51d2e77d945d1a0efbca530fb4b5b" by yanix (https://sketchfab.com/3d-models/brown-sneakers-e6c51d2e77d945d1a0efbca530fb4b5b), CC BY 4.0 (checked via the Sketchfab API, 2026-09-27). Credit yanix as well.
 
 ## Animation (CC0)
 

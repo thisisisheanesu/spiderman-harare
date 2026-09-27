@@ -1,0 +1,128 @@
+[
+ {
+  "name": "all_front34",
+  "models": [
+   "hatch_fit",
+   "sedan_corolla",
+   "taxi",
+   "sedan_mercedes",
+   "wagon_wish",
+   "suv_landcruiser",
+   "police_landcruiser",
+   "pickup_hilux",
+   "kombi",
+   "truck_isuzu",
+   "bus_zupco"
+  ],
+  "view": "front34",
+  "cols": 4,
+  "width": 1800,
+  "height": 1000
+ },
+ {
+  "name": "all_rear34",
+  "models": [
+   "hatch_fit",
+   "sedan_corolla",
+   "taxi",
+   "sedan_mercedes",
+   "wagon_wish",
+   "suv_landcruiser",
+   "police_landcruiser",
+   "pickup_hilux",
+   "kombi",
+   "truck_isuzu",
+   "bus_zupco"
+  ],
+  "view": "rear34",
+  "cols": 4,
+  "width": 1800,
+  "height": 1000
+ },
+ {
+  "name": "all_lod1",
+  "models": [
+   "hatch_fit",
+   "sedan_corolla",
+   "taxi",
+   "sedan_mercedes",
+   "wagon_wish",
+   "suv_landcruiser",
+   "police_landcruiser",
+   "pickup_hilux",
+   "kombi",
+   "truck_isuzu",
+   "bus_zupco"
+  ],
+  "view": "front34",
+  "cols": 4,
+  "lod": 1,
+  "width": 1800,
+  "height": 1000
+ },
+ {
+  "name": "all_night",
+  "models": [
+   "hatch_fit",
+   "sedan_corolla",
+   "taxi",
+   "sedan_mercedes",
+   "wagon_wish",
+   "suv_landcruiser",
+   "police_landcruiser",
+   "pickup_hilux",
+   "kombi",
+   "truck_isuzu",
+   "bus_zupco"
+  ],
+  "view": "front34",
+  "cols": 4,
+  "night": 1,
+  "width": 1800,
+  "height": 1000
+ },
+ {
+  "name": "all_top",
+  "models": [
+   "hatch_fit",
+   "sedan_corolla",
+   "taxi",
+   "sedan_mercedes",
+   "wagon_wish",
+   "suv_landcruiser",
+   "police_landcruiser",
+   "pickup_hilux",
+   "kombi",
+   "truck_isuzu",
+   "bus_zupco"
+  ],
+  "view": "high",
+  "cols": 4,
+  "width": 1800,
+  "height": 1000
+ },
+ {
+  "name": "kombi_toggles",
+  "models": [
+   "kombi",
+   "kombi",
+   "kombi"
+  ],
+  "view": "front34",
+  "cols": 3,
+  "width": 1400,
+  "height": 700,
+  "toggles": "roof_rack,livery_zupco,banner_3,route_2"
+ },
+ {
+  "name": "hilux_toggles",
+  "models": [
+   "pickup_hilux"
+  ],
+  "view": "rear34",
+  "width": 900,
+  "height": 600,
+  "zoom": 0.7,
+  "toggles": "cargo,sports_bar"
+ }
+]

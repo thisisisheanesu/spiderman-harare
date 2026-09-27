@@ -62,32 +62,32 @@
     "dest_0": {
      "group": "dest",
      "default_visible": true,
-     "tris": 240
+     "tris": 600
     },
     "dest_1": {
      "group": "dest",
      "default_visible": false,
-     "tris": 240
+     "tris": 600
     },
     "dest_2": {
      "group": "dest",
      "default_visible": false,
-     "tris": 240
+     "tris": 600
     },
     "dest_3": {
      "group": "dest",
      "default_visible": false,
-     "tris": 240
+     "tris": 600
     },
     "dest_4": {
      "group": "dest",
      "default_visible": false,
-     "tris": 240
+     "tris": 600
     },
     "dest_5": {
      "group": "dest",
      "default_visible": false,
-     "tris": 240
+     "tris": 600
     },
     "livery_stripes": {
      "group": "livery_stripes",
@@ -97,17 +97,68 @@
    },
    "lod0": {
     "file": "bus_zupco.glb",
-    "bytes": 244560,
-    "tris_total_all_nodes": 23402,
-    "tris_body": 13202,
-    "tris_default_view": 22202
+    "bytes": 259192,
+    "tris_total_all_nodes": 27990,
+    "tris_body": 15510,
+    "tris_default_view": 24990,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.48,
+      0,
+      -5.759
+     ],
+     "max": [
+      1.48,
+      3.467,
+      5.773
+     ]
+    }
    },
    "lod1": {
     "file": "bus_zupco_lod1.glb",
-    "bytes": 85712,
-    "tris_total_all_nodes": 3786,
+    "bytes": 91128,
+    "tris_total_all_nodes": 4026,
     "tris_body": 2530,
-    "tris_default_view": 3396
+    "tris_default_view": 3636,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.255,
+      0,
+      -5.754
+     ],
+     "max": [
+      1.255,
+      3.46,
+      5.772
+     ]
+    }
    }
   },
   "hatch_fit": {
@@ -177,17 +228,66 @@
    "toggles": {},
    "lod0": {
     "file": "hatch_fit.glb",
-    "bytes": 136720,
-    "tris_total_all_nodes": 13629,
-    "tris_body": 8677,
-    "tris_default_view": 13629
+    "bytes": 142412,
+    "tris_total_all_nodes": 14686,
+    "tris_body": 9614,
+    "tris_default_view": 14686,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.955,
+      0,
+      -1.956
+     ],
+     "max": [
+      0.955,
+      1.525,
+      1.95
+     ]
+    }
    },
    "lod1": {
     "file": "hatch_fit_lod1.glb",
-    "bytes": 50748,
+    "bytes": 50156,
     "tris_total_all_nodes": 1964,
     "tris_body": 1308,
-    "tris_default_view": 1964
+    "tris_default_view": 1964,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.848,
+      0,
+      -1.956
+     ],
+     "max": [
+      0.848,
+      1.525,
+      1.95
+     ]
+    }
    }
   },
   "kombi": {
@@ -255,32 +355,32 @@
     "banner_0": {
      "group": "banner",
      "default_visible": true,
-     "tris": 138
+     "tris": 380
     },
     "banner_1": {
      "group": "banner",
      "default_visible": false,
-     "tris": 138
+     "tris": 380
     },
     "banner_2": {
      "group": "banner",
      "default_visible": false,
-     "tris": 138
+     "tris": 380
     },
     "banner_3": {
      "group": "banner",
      "default_visible": false,
-     "tris": 138
+     "tris": 380
     },
     "banner_4": {
      "group": "banner",
      "default_visible": false,
-     "tris": 138
+     "tris": 380
     },
     "banner_5": {
      "group": "banner",
      "default_visible": false,
-     "tris": 138
+     "tris": 380
     },
     "livery_stripe": {
      "group": "livery_stripe",
@@ -290,7 +390,7 @@
     "livery_zupco": {
      "group": "livery_zupco",
      "default_visible": false,
-     "tris": 198
+     "tris": 990
     },
     "roof_rack": {
      "group": "roof_rack",
@@ -340,17 +440,69 @@
    },
    "lod0": {
     "file": "kombi.glb",
-    "bytes": 232376,
-    "tris_total_all_nodes": 17296,
-    "tris_body": 9762,
-    "tris_default_view": 15500
+    "bytes": 246012,
+    "tris_total_all_nodes": 20916,
+    "tris_body": 11018,
+    "tris_default_view": 17118,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.045,
+      0,
+      -2.348
+     ],
+     "max": [
+      1.045,
+      2.26,
+      2.398
+     ]
+    }
    },
    "lod1": {
     "file": "kombi_lod1.glb",
-    "bytes": 93512,
+    "bytes": 92484,
     "tris_total_all_nodes": 3012,
     "tris_body": 1512,
-    "tris_default_view": 2228
+    "tris_default_view": 2228,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.845,
+      0,
+      -2.348
+     ],
+     "max": [
+      0.845,
+      2.26,
+      2.398
+     ]
+    }
    }
   },
   "pickup_hilux": {
@@ -429,17 +581,69 @@
    },
    "lod0": {
     "file": "pickup_hilux.glb",
-    "bytes": 162488,
-    "tris_total_all_nodes": 16636,
-    "tris_body": 10564,
-    "tris_default_view": 16268
+    "bytes": 165032,
+    "tris_total_all_nodes": 17255,
+    "tris_body": 11063,
+    "tris_default_view": 16887,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.03,
+      0,
+      -2.654
+     ],
+     "max": [
+      1.03,
+      1.792,
+      2.83
+     ]
+    }
    },
    "lod1": {
     "file": "pickup_hilux_lod1.glb",
-    "bytes": 67440,
+    "bytes": 66872,
     "tris_total_all_nodes": 2622,
     "tris_body": 1758,
-    "tris_default_view": 2414
+    "tris_default_view": 2414,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.949,
+      0,
+      -2.649
+     ],
+     "max": [
+      0.949,
+      1.79,
+      2.73
+     ]
+    }
    }
   },
   "police_landcruiser": {
@@ -502,17 +706,73 @@
    "toggles": {},
    "lod0": {
     "file": "police_landcruiser.glb",
-    "bytes": 181820,
-    "tris_total_all_nodes": 17143,
-    "tris_body": 11439,
-    "tris_default_view": 17143
+    "bytes": 185052,
+    "tris_total_all_nodes": 17923,
+    "tris_body": 12099,
+    "tris_default_view": 17923,
+    "materials": [
+     "beacon_blue",
+     "beacon_red",
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.12,
+      0,
+      -2.605
+     ],
+     "max": [
+      1.12,
+      2.02,
+      2.498
+     ]
+    }
    },
    "lod1": {
     "file": "police_landcruiser_lod1.glb",
-    "bytes": 69036,
+    "bytes": 68716,
     "tris_total_all_nodes": 2541,
     "tris_body": 1885,
-    "tris_default_view": 2541
+    "tris_default_view": 2541,
+    "materials": [
+     "beacon_blue",
+     "beacon_red",
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.015,
+      0,
+      -2.605
+     ],
+     "max": [
+      1.015,
+      2.019,
+      2.495
+     ]
+    }
    }
   },
   "sedan_corolla": {
@@ -579,17 +839,66 @@
    "toggles": {},
    "lod0": {
     "file": "sedan_corolla.glb",
-    "bytes": 142476,
-    "tris_total_all_nodes": 14749,
-    "tris_body": 9085,
-    "tris_default_view": 14749
+    "bytes": 145244,
+    "tris_total_all_nodes": 15433,
+    "tris_body": 9649,
+    "tris_default_view": 15433,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.955,
+      0,
+      -2.208
+     ],
+     "max": [
+      0.955,
+      1.46,
+      2.22
+     ]
+    }
    },
    "lod1": {
     "file": "sedan_corolla_lod1.glb",
-    "bytes": 50608,
-    "tris_total_all_nodes": 1945,
-    "tris_body": 1289,
-    "tris_default_view": 1945
+    "bytes": 50024,
+    "tris_total_all_nodes": 1942,
+    "tris_body": 1286,
+    "tris_default_view": 1942,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.848,
+      0,
+      -2.203
+     ],
+     "max": [
+      0.848,
+      1.46,
+      2.208
+     ]
+    }
    }
   },
   "sedan_mercedes": {
@@ -653,17 +962,67 @@
    "toggles": {},
    "lod0": {
     "file": "sedan_mercedes.glb",
-    "bytes": 145180,
-    "tris_total_all_nodes": 15064,
+    "bytes": 144756,
+    "tris_total_all_nodes": 15184,
     "tris_body": 9560,
-    "tris_default_view": 15064
+    "tris_default_view": 15184,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1,
+      0,
+      -2.3
+     ],
+     "max": [
+      1,
+      1.447,
+      2.292
+     ]
+    }
    },
    "lod1": {
     "file": "sedan_mercedes_lod1.glb",
-    "bytes": 52740,
+    "bytes": 52176,
     "tris_total_all_nodes": 2030,
     "tris_body": 1374,
-    "tris_default_view": 2030
+    "tris_default_view": 2030,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.885,
+      0,
+      -2.296
+     ],
+     "max": [
+      0.885,
+      1.446,
+      2.304
+     ]
+    }
    }
   },
   "suv_landcruiser": {
@@ -728,17 +1087,67 @@
    "toggles": {},
    "lod0": {
     "file": "suv_landcruiser.glb",
-    "bytes": 153264,
-    "tris_total_all_nodes": 16311,
-    "tris_body": 10607,
-    "tris_default_view": 16311
+    "bytes": 153788,
+    "tris_total_all_nodes": 16633,
+    "tris_body": 10809,
+    "tris_default_view": 16633,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.12,
+      0,
+      -2.501
+     ],
+     "max": [
+      1.12,
+      1.901,
+      2.498
+     ]
+    }
    },
    "lod1": {
     "file": "suv_landcruiser_lod1.glb",
-    "bytes": 54852,
+    "bytes": 54280,
     "tris_total_all_nodes": 2237,
     "tris_body": 1581,
-    "tris_default_view": 2237
+    "tris_default_view": 2237,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.015,
+      0,
+      -2.499
+     ],
+     "max": [
+      1.015,
+      1.855,
+      2.495
+     ]
+    }
    }
   },
   "taxi": {
@@ -802,17 +1211,68 @@
    "toggles": {},
    "lod0": {
     "file": "taxi.glb",
-    "bytes": 166612,
-    "tris_total_all_nodes": 14975,
-    "tris_body": 9311,
-    "tris_default_view": 14975
+    "bytes": 169568,
+    "tris_total_all_nodes": 15659,
+    "tris_body": 9875,
+    "tris_default_view": 15659,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.955,
+      0,
+      -2.208
+     ],
+     "max": [
+      0.955,
+      1.625,
+      2.22
+     ]
+    }
    },
    "lod1": {
     "file": "taxi_lod1.glb",
-    "bytes": 62944,
-    "tris_total_all_nodes": 2017,
-    "tris_body": 1361,
-    "tris_default_view": 2017
+    "bytes": 62348,
+    "tris_total_all_nodes": 2014,
+    "tris_body": 1358,
+    "tris_default_view": 2014,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.851,
+      0,
+      -2.203
+     ],
+     "max": [
+      0.851,
+      1.624,
+      2.208
+     ]
+    }
    }
   },
   "truck_isuzu": {
@@ -877,17 +1337,68 @@
    "toggles": {},
    "lod0": {
     "file": "truck_isuzu.glb",
-    "bytes": 156728,
-    "tris_total_all_nodes": 12326,
-    "tris_body": 4966,
-    "tris_default_view": 12326
+    "bytes": 162788,
+    "tris_total_all_nodes": 13470,
+    "tris_body": 5990,
+    "tris_default_view": 13470,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.268,
+      0,
+      -3.523
+     ],
+     "max": [
+      1.268,
+      3.005,
+      3.501
+     ]
+    }
    },
    "lod1": {
     "file": "truck_isuzu_lod1.glb",
-    "bytes": 55584,
-    "tris_total_all_nodes": 1680,
+    "bytes": 60948,
+    "tris_total_all_nodes": 1920,
     "tris_body": 1024,
-    "tris_default_view": 1680
+    "tris_default_view": 1920,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "livery",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -1.1,
+      0,
+      -3.52
+     ],
+     "max": [
+      1.1,
+      3,
+      3.501
+     ]
+    }
    }
   },
   "wagon_wish": {
@@ -952,17 +1463,66 @@
    "toggles": {},
    "lod0": {
     "file": "wagon_wish.glb",
-    "bytes": 147000,
-    "tris_total_all_nodes": 15324,
-    "tris_body": 9620,
-    "tris_default_view": 15324
+    "bytes": 152160,
+    "tris_total_all_nodes": 16351,
+    "tris_body": 10527,
+    "tris_default_view": 16351,
+    "materials": [
+     "chrome",
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.955,
+      0,
+      -2.29
+     ],
+     "max": [
+      0.955,
+      1.6,
+      2.28
+     ]
+    }
    },
    "lod1": {
     "file": "wagon_wish_lod1.glb",
-    "bytes": 52288,
+    "bytes": 51656,
     "tris_total_all_nodes": 2080,
     "tris_body": 1424,
-    "tris_default_view": 2080
+    "tris_default_view": 2080,
+    "materials": [
+     "glass",
+     "indicator",
+     "interior",
+     "light_front",
+     "light_rear",
+     "paint",
+     "plate",
+     "rim",
+     "trim",
+     "tyre"
+    ],
+    "bbox_m": {
+     "min": [
+      -0.848,
+      0,
+      -2.283
+     ],
+     "max": [
+      0.848,
+      1.59,
+      2.28
+     ]
+    }
    }
   }
  }

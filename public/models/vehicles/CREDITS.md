@@ -25,6 +25,7 @@ so no third-party mesh, photo or texture is embedded. You can rebuild them with
 | Font | Used for | Licence | Source |
 |---|---|---|---|
 | DejaVu Sans Bold / Condensed Bold / Sans Mono Bold | plates, slogans, route cards, ZUPCO/POLICE/TAXI lettering, LED displays | Bitstream Vera licence + public-domain changes (free, permissive) | https://dejavu-fonts.github.io/ (Debian `fonts-dejavu-core`) |
+| Liberation Sans Narrow Bold (only if installed on the build machine; the shipped textures were made without it and fall back to DejaVu Sans Bold) | plates / narrow lettering (`textures.narrow_bold`) | SIL Open Font License 1.1 | https://github.com/liberationfonts/liberation-fonts |
 
 ## Tools (build time only; nothing of theirs is embedded)
 

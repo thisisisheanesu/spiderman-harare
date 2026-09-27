@@ -15,6 +15,13 @@ for f in glob.glob(os.path.join(sys.argv[2], '**', '*.json'), recursive=True):
             packs[k] = pack
 
 PACK_URL = 'https://static.makehumancommunity.org/assets/assetpacks/{}.html'
+# Some community assets are derivatives of third-party models (pack metadata: original_author /
+# original_source). Their upstream licence is not in the pack metadata, so it is recorded here after
+# checking the source page; the upstream author must be credited too.
+UPSTREAM_LICENCE = {
+    'https://sketchfab.com/3d-models/brown-sneakers-e6c51d2e77d945d1a0efbca530fb4b5b':
+        'CC BY 4.0 (checked via the Sketchfab API, 2026-09-27)',
+}
 used = {}
 for vid, v in sorted(info.items()):
     names = list(v['clothes']) + [v['skin'][0], 'low-poly']
@@ -24,12 +31,20 @@ for vid, v in sorted(info.items()):
         used.setdefault(n, []).append(vid)
 
 rows = []
+upstream = []
 for n, vids in sorted(used.items()):
     m = meta.get(n, {})
     pack = packs.get(n, 'makehuman_system_assets')
     lic = m.get('license', 'CC0')
     author = m.get('author', 'makehuman_system') or 'makehuman_system'
     src = m.get('source', '') or ''
+    osrc = (m.get('original_source') or '').strip()
+    if m.get('original_author') or osrc:
+        ulic = UPSTREAM_LICENCE.get(osrc)
+        if not ulic:
+            raise SystemExit(f'{n}: derived from {osrc!r}, record its licence in UPSTREAM_LICENCE first')
+        src += f" (derived from \"{osrc.rstrip('/').split('/')[-1]}\" by {m.get('original_author')}, {ulic}: {osrc})"
+        upstream.append((n, m.get('original_author'), osrc, ulic))
     rows.append((n, m.get('type', ''), author, lic, pack, src, vids))
 
 out = []
@@ -53,6 +68,8 @@ cc_by = sorted(set((a, n) for n, t, a, l, p, s, v in rows if 'BY' in l.upper()))
 out.append('\n### CC BY attribution summary\n')
 for a, n in cc_by:
     out.append(f'- "{n}" by {a}, licensed CC BY (the MakeHuman asset repository CC-BY option, CC BY 4.0: https://creativecommons.org/licenses/by/4.0/), MakeHuman community asset repository. Recoloured, decimated and baked into a texture atlas.')
+for n, oa, osrc, ulic in upstream:
+    out.append(f'- "{n}" is derived from "{osrc.rstrip("/").split("/")[-1]}" by {oa} ({osrc}), {ulic}. Credit {oa} as well.')
 out.append('\n## Animation (CC0)\n')
 out.append('- **Universal Animation Library** (Standard) and **Universal Animation Library 2** (Standard) by **Quaternius** (animations with Gonzalo Furnier), **CC0 1.0**. Sources: https://quaternius.itch.io/universal-animation-library and https://quaternius.itch.io/universal-animation-library-2 (free "name your own price" downloads). The clips were retargeted onto the MakeHuman `game_engine` skeleton. The procedural clips (wave, point, cheer, phone_film, idle_look, idle_relaxed, walk_slow, walk_female, turn_left/right, flee_run, hang, swing, zip, skydive, dive, climb, carry_on_head, web_shoot, talk_2) are original work layered on top of those clips and are released as CC0.\n')
 out.append('## Spider-Man suits\n')

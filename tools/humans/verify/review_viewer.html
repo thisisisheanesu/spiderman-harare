@@ -1,0 +1,151 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>review humans</title>
+<style>html,body{margin:0;background:#777;font:12px sans-serif}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./three/build/three.module.js","three/addons/":"./three/examples/jsm/"}}</script>
+</head><body>
+<script type="module">
+// Review viewer (three.js r186): PMREM RoomEnvironment + shadowed sun + ground plane.
+// mode=sheet (default): contact sheet. models=a.glb,b.glb  clips=walk,run (omit = rest pose)  times=4 | tlist=0.1,0.6
+//   views=front,q,side,back,qb,ql,left  cell=300 cellH=300 dist=5 camY lookY  focus=<bone> camDY  variant=symbiote  plain=1
+// mode=stats: per model x clip, skinned-vertex min/max y, bone world positions per frame, loop-pop angle -> window.__stats
+//   (vstep=N samples every Nth vertex). Used to measure ground_offsets.json and stride speeds.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+const P = new URLSearchParams(location.search);
+const log = (...a) => { console.log(...a); (window.__log ||= []).push(a.join(' ')); };
+window.onerror = (m) => { log('ERR', m); window.__done = true; };
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const load = (u) => new Promise((res, rej) => loader.load(u, res, undefined, rej));
+const mode = P.get('mode') || 'sheet';
+
+function clipFor(clip, s) {
+  if (Math.abs(s - 1) < 1e-3) return clip;
+  const c = clip.clone();
+  for (const t of c.tracks) if (t.name.endsWith('.position')) for (let i = 0; i < t.values.length; i++) t.values[i] *= s;
+  return c;
+}
+async function loadChar(u, variant) {
+  const g = await load(u);
+  const root = g.scene;
+  let hip = null;
+  root.traverse(o => { if (o.userData && o.userData.hipHeight) hip = o.userData.hipHeight; if (o.isMesh) { o.frustumCulled = false; o.castShadow = true; } });
+  if (variant) {
+    const idx = g.parser.json.materials.findIndex(m => m.name === 'suit_' + variant);
+    const mat = await g.parser.getDependency('material', idx);
+    root.traverse(o => { if (o.isSkinnedMesh) o.material = mat; });
+  }
+  const rest = []; root.traverse(o => { if (o.isBone) rest.push([o, o.position.clone(), o.quaternion.clone(), o.scale.clone()]); });
+  if (P.get('plain')) root.traverse(o => { if (o.isMesh) o.material = new THREE.MeshStandardMaterial({ color: 0xb0b0b0, roughness: 0.6 }); });
+  return { g, root, hip, rest, mixer: new THREE.AnimationMixer(root), name: u.split('/').pop() };
+}
+
+(async () => {
+  const animsUrl = P.get('anims') || 'pub/anims/humans_anims.glb';
+  const anim = await load(animsUrl);
+  let refHip = 0.973; anim.scene.traverse(o => { if (o.userData && o.userData.hipHeight) refHip = o.userData.hipHeight; });
+  const CL = Object.fromEntries(anim.animations.map(c => [c.name, c]));
+  const models = (P.get('models') || 'pub/humans/spiderman.glb').split(',');
+  const chars = [];
+  for (const m of models) chars.push(await loadChar(m, P.get('variant')));
+
+  if (mode === 'stats') {
+    // numeric checks per model x clip
+    const clipNames = (P.get('clips') || Object.keys(CL).join(',')).split(',');
+    const out = [];
+    const v = new THREE.Vector3();
+    for (const ch of chars) {
+      const sm = []; ch.root.traverse(o => { if (o.isSkinnedMesh) sm.push(o); });
+      const bones = {}; ch.root.traverse(o => { if (o.isBone) bones[o.name] = o; });
+      const step = +(P.get('vstep') || 7);
+      for (const cn of clipNames) {
+        const src = CL[cn]; if (!src) { out.push({ m: ch.name, clip: cn, missing: true }); continue; }
+        ch.mixer.stopAllAction(); ch.mixer.uncacheRoot(ch.root);
+        const act = ch.mixer.clipAction(clipFor(src, (ch.hip || refHip) / refHip)); act.play();
+        const N = Math.max(8, Math.round(src.duration * 30));
+        const rec = { m: ch.name, clip: cn, dur: +src.duration.toFixed(3), minY: 1e9, maxY: -1e9, frames: [] };
+        const feet = ['ball_l', 'ball_r', 'foot_l', 'foot_r', 'hand_l', 'hand_r', 'head', 'pelvis'];
+        for (let f = 0; f <= N; f++) {
+          act.time = src.duration * f / N; ch.mixer.update(0); ch.root.updateMatrixWorld(true);
+          let mn = 1e9, mx = -1e9;
+          for (const s of sm) {
+            const pos = s.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i += step) { s.getVertexPosition(i, v); v.applyMatrix4(s.matrixWorld); if (v.y < mn) mn = v.y; if (v.y > mx) mx = v.y; }
+          }
+          const fr = { t: +act.time.toFixed(3), minY: +mn.toFixed(3), maxY: +mx.toFixed(3) };
+          for (const b of feet) if (bones[b]) { bones[b].getWorldPosition(v); fr[b] = [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)]; }
+          rec.frames.push(fr); rec.minY = Math.min(rec.minY, mn); rec.maxY = Math.max(rec.maxY, mx);
+        }
+        // loop pop: compare bone quaternions first vs last frame
+        const q0 = {}; act.time = 0; ch.mixer.update(0);
+        for (const b in bones) q0[b] = bones[b].quaternion.clone();
+        const p0 = bones.pelvis.position.clone();
+        act.time = src.duration - 1e-4; ch.mixer.update(0);
+        let worst = 0, worstB = '';
+        for (const b in bones) { const a = 2 * Math.acos(Math.min(1, Math.abs(q0[b].dot(bones[b].quaternion)))) * 180 / Math.PI; if (a > worst) { worst = a; worstB = b; } }
+        rec.loopPopDeg = +worst.toFixed(2); rec.loopPopBone = worstB; rec.loopPopPelvis = +p0.distanceTo(bones.pelvis.position).toFixed(4);
+        out.push(rec);
+      }
+    }
+    window.__stats = out; window.__done = true; log('stats done', out.length); return;
+  }
+
+  // ---------- sheet
+  const clipNames = (P.get('clips') || 'none').split(',');
+  const nT = +(P.get('times') || 1);
+  const views = (P.get('views') || 'front,q,side,back').split(',');
+  const cell = +(P.get('cell') || 300);
+  const cellH = +(P.get('cellH') || cell);
+  const cells = [];
+  for (let r = 0; r < clipNames.length; r++) for (let ci = 0; ci < chars.length; ci++) for (let ti = 0; ti < nT; ti++) for (const vw of views) cells.push({ r, ci, ti, v: vw });
+  const perRow = +(P.get('perRow') || Math.min(cells.length, nT * views.length * chars.length));
+  const nRows = Math.ceil(cells.length / perRow);
+  const W = perRow * cell, H = nRows * cellH;
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(1); renderer.setSize(W, H); renderer.setScissorTest(true);
+  renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = +(P.get('exp') || 1.0);
+  renderer.shadowMap.enabled = P.get('shadow') !== '0'; renderer.shadowMap.type = THREE.PCFShadowMap;
+  document.body.appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const pm = new THREE.PMREMGenerator(renderer);
+  scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = +(P.get('env') || 0.6);
+  scene.background = new THREE.Color(0xb4c8dc);
+  const sun = new THREE.DirectionalLight(0xfff4e0, +(P.get('sun') || 2.6)); sun.position.set(3, 6, -4); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -3, right: 3, top: 3, bottom: -3, near: 0.5, far: 20 }); sun.shadow.bias = -0.0005; sun.shadow.normalBias = 0.02;
+  scene.add(sun);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x9c8f7c, roughness: 0.95 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; if (P.get('ground') !== '0') scene.add(ground);
+  const grid = new THREE.GridHelper(10, 20, 0x444444, 0x666666); grid.position.y = 0.001; if (P.get('ground') !== '0') scene.add(grid);
+  const cam = new THREE.PerspectiveCamera(+(P.get('fov') || 30), cell / cellH, 0.05, 80);
+  for (const c of chars) scene.add(c.root);
+  const dist = +(P.get('dist') || 5), focus = P.get('focus');
+  const v = new THREE.Vector3();
+  cells.forEach((cl, k) => {
+    const ch = chars[cl.ci];
+    for (const c of chars) c.root.visible = false;
+    ch.root.visible = true;
+    ch.mixer.stopAllAction();
+    const cn = clipNames[cl.r];
+    if (CL[cn]) {
+      const src = CL[cn];
+      const act = ch.mixer.clipAction(clipFor(src, (ch.hip || refHip) / refHip)); act.play();
+      act.time = src.duration * (P.get('tlist') ? +P.get('tlist').split(',')[cl.ti] : cl.ti / nT); ch.mixer.update(0);
+    } else { for (const [b, p, q, sc] of ch.rest) { b.position.copy(p); b.quaternion.copy(q); b.scale.copy(sc); } }
+    ch.root.updateMatrixWorld(true);
+    let ctr, lookY;
+    if (focus) { const b = ch.root.getObjectByName(focus); b.getWorldPosition(v); ctr = v.clone(); lookY = ctr.y; }
+    else { const box = new THREE.Box3().setFromObject(ch.root, true); ctr = box.getCenter(new THREE.Vector3()); lookY = +(P.get('lookY') || ctr.y); }
+    const ang = { front: 0, q: 40, side: 90, back: 180, left: -90, qb: 140, ql: -40 }[cl.v] * Math.PI / 180;
+    const camY = focus ? ctr.y + +(P.get('camDY') || 0) : +(P.get('camY') || lookY);
+    cam.position.set(ctr.x + Math.sin(ang) * dist, camY, ctr.z - Math.cos(ang) * dist);
+    cam.lookAt(ctr.x, lookY, ctr.z);
+    const col = k % perRow, row = Math.floor(k / perRow);
+    const px = col * cell, py = H - (row + 1) * cellH;
+    renderer.setViewport(px, py, cell, cellH); renderer.setScissor(px, py, cell, cellH);
+    renderer.render(scene, cam);
+  });
+  window.__done = true; log('done');
+})().catch(e => { log('ERR', e.stack || e); window.__done = true; });
+</script></body></html>

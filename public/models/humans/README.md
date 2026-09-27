@@ -7,13 +7,13 @@ Licences are in [CREDITS.md](CREDITS.md): all CC0, apart from some CC BY clothes
 | file | contents | size |
 |---|---|---|
 | `spiderman.glb` | Spider-Man, 1.79 m, 22,999 tris, one skinned mesh `spiderman_body`, materials `suit_classic` (default) and `suit_symbiote` (KHR_materials_variants: `classic` / `symbiote`) | 1.06 MB |
-| `npc_<id>.glb` (23 of them) | NPC LOD0, 7-10k tris, one material `npc_<id>` with a 1024² WebP atlas | 112-397 KB each |
+| `npc_<id>.glb` (23 of them) | NPC LOD0, 7-10k tris, one material `npc_<id>` with a 1024² WebP atlas | 112-394 KB each |
 | `npc_<id>_lod1.glb` | NPC LOD1, about 2,000 tris, same skeleton, 256² atlas | 45-75 KB each |
 | `../anims/humans_anims.glb` | the shared skeleton (`humans_anim_rig`) and 65 animation clips, no mesh | 1.19 MB |
-| `humans_manifest.json` | machine-readable variant list: files, tris, sizes, heights, hip heights, roles, recommended LOD distances | |
+| `humans_manifest.json` | machine-readable variant list: files, tris, sizes, heights, hip heights, `stride_scale`, `ground_offset_m`, roles, recommended LOD distances | |
 | `../anims/humans_anims.json` | machine-readable clip list: duration, loop, speed, root motion, notes | |
 
-Total: 6.3 MB for humans + 1.2 MB for animations. The NPCs come to 5.3 MB, which is within the 10 MB budget. Everything is compressed with
+Total: 6.5 MB for humans + 1.2 MB for animations. The NPCs come to 5.4 MB, which is within the 10 MB budget. Everything is compressed with
 EXT_meshopt_compression + KHR_mesh_quantization + EXT_texture_webp, so it needs `GLTFLoader.setMeshoptDecoder(MeshoptDecoder)`.
 
 ## Conventions
@@ -69,21 +69,36 @@ export function clipFor(name, hipHeight) {
 }
 
 // one NPC instance (load each variant's glb once, then clone it)
+const manifest = await (await fetch('/models/humans/humans_manifest.json')).json();
+const variant = manifest.npcs.find((v) => v.id === 'woman_zambia_wrap');   // stride_scale, ground_offset_m, LOD files
 const tpl = await loader.loadAsync('/models/humans/npc_woman_zambia_wrap.glb');
 const npc = SkeletonUtils.clone(tpl.scene);                       // clones the bones too (skinned)
 let hip = REF_HIP; npc.traverse((o) => { if (o.userData.hipHeight) hip = o.userData.hipHeight; if (o.isSkinnedMesh) o.frustumCulled = false; });
 const mixer = new THREE.AnimationMixer(npc);
-mixer.clipAction(clipFor('walk_female', hip)).play();
-// match the stride: speed_mps from humans_anims.json (walk 1.05 m/s): action.timeScale = actualSpeed / 1.05
+const walk = mixer.clipAction(clipFor('walk_female', hip)).play();
+
+// Stride matching. speed_mps in humans_anims.json is the ground speed on the reference rig (Spider-Man,
+// hip 0.973 m). A smaller character covers proportionally less ground per cycle, so scale it by
+// stride_scale = hipHeight / REF_HIP (also in humans_manifest.json): walk on a 1.21 m girl = 1.05 x 0.66 = 0.69 m/s.
+const strideScale = hip / REF_HIP;
+walk.timeScale = actualSpeed / (1.05 * strideScale);          // actualSpeed: your NPC's m/s; 1.05 = speed_mps of 'walk_female'
+
+// Ground contact. The clips' pelvis height makes shoe soles sink 1-3.5 cm into the floor (boots most), so lift
+// each character by its measured ground_offset_m from humans_manifest.json (Spider-Man 0.011, police 0.035).
+npc.position.y = groundY + variant.ground_offset_m;         // groundY: pavement height under the NPC
 ```
 
 Notes:
 - **Frustum culling.** Skinned bounds are the bind pose, so a raised arm (hang, cheer) can pop at screen edges. Either set
   `frustumCulled = false` on the few near characters, or grow `geometry.boundingSphere.radius` by about 0.6 m.
 - **Crossfades.** Every clip keys every bone, so `action.crossFadeTo(next, 0.2)` never leaks the A-pose.
-- **Locomotion is in place.** No clip moves the character forward, so move the object at `speed_mps × timeScale`. One-shot clips that
+- **Never call `skeleton.pose()` / `SkinnedMesh.pose()`.** The meshes use KHR_mesh_quantization, so the dequantisation
+  transform is folded into the inverse bind matrices. `pose()` rebuilds the bones from those matrices: the mesh still draws in
+  its bind shape, but the bones (and anything attached to `hand_r`, `head`...) end up about 1 m away from it. To reset a
+  character, `mixer.stopAllAction()` and restore the bone transforms you saved after loading, or clone the template again.
+- **Locomotion is in place.** No clip moves the character forward, so move the object at `speed_mps × stride_scale × timeScale`. One-shot clips that
   travel in the original library (roll, slide, climb_up, hit_knockback, death) are in place too. Their original root travel is
-  given as `root_motion_m` so you can move the object while they play.
+  given as `root_motion_m` (reference rig; multiply by `stride_scale` for NPCs) so you can move the object while they play.
 - **Many NPCs.** Share the `AnimationClip` objects (via `clipFor`). Update far mixers at 10-15 Hz. Use LOD1 beyond the LOD distance
   (same skeleton, so the same mixer and actions keep working: swap `visible` on two meshes bound to one skeleton, or load both files and
   drive them with one mixer each). Recommended distances: **desktop LOD0 < 22 m, LOD1 22-90 m, cull beyond; phones LOD0 < 12 m, LOD1 12-55 m**.
@@ -130,31 +145,37 @@ Colours come from `src/data/streetlife.js` `PEDESTRIAN_STYLES`. Every variant is
 palette's `skinTones`). Hair is painted on the scalp (crop, shaved, cornrows) or uses opaque hair meshes (bob, afro). Head wraps (dhuku)
 are custom geometry with printed fabric. Wax-print wrap skirts are procedural. Heights run from 1.21 m (primary-school girl) to 1.86 m.
 
+Clothes are layered in a fixed order (`LAYER_Z` in `tools/humans/npc_variants.py`: shoes < tucked tops < bottoms < untucked
+tops < hair < jackets / sweaters < apron < hats). After decimation `resolve_layers()` pulls every inner-layer vertex that pokes
+through an outer layer back under it, and around the hips re-skins the covered inner vertices like the garment above them, so
+thighs do not swing out through skirts and waistbands stay under shirt hems while walking. The primary-school uniform (short
+sleeves, shorts to above the knee) is cut from full garments with a planar cut (`cut` in the variant spec).
+
 | id | gender | roles | description | height m | LOD0 tris / KB | LOD1 tris / KB |
 |---|---|---|---|---|---|---|
-| `boy_high_school` | male | school_kid | High school boy: white shirt, maroon tie, grey trousers, black shoes | 1.65 | 9798 / 151 | 1999 / 51 |
-| `boy_primary_school` | male | school_kid | Primary school boy: khaki shirt and shorts, brown socks, black shoes | 1.33 | 7738 / 123 | 1999 / 47 |
+| `boy_high_school` | male | school_kid | High school boy: white shirt, maroon tie, grey trousers, black shoes | 1.65 | 9798 / 151 | 1999 / 52 |
+| `boy_primary_school` | male | school_kid | Primary school boy: short-sleeved khaki shirt, khaki shorts to above the knee, brown socks, black shoes | 1.33 | 9549 / 153 | 2000 / 54 |
 | `girl_high_school` | female | school_kid | High school girl: white top, navy skirt, white socks, black shoes, cornrows | 1.44 | 9798 / 146 | 1999 / 52 |
-| `girl_primary_school` | female | school_kid | Primary school girl: light blue dress, white socks, black shoes, cornrows | 1.21 | 7771 / 136 | 1999 / 50 |
-| `man_apostolic` | male | apostolic | Apostolic church member: white knee-length robe, shaved head, full beard, barefoot | 1.86 | 7071 / 117 | 1999 / 46 |
-| `man_business_suit` | male | office_man, street_preacher | Office worker in a charcoal two-piece suit, white shirt and maroon tie | 1.80 | 7770 / 123 | 1999 / 47 |
-| `man_elder_flatcap` | male | elder | Elderly man in brown jacket, grey trousers and flat cap, grey stubble | 1.74 | 8671 / 162 | 2000 / 52 |
-| `man_hoodie` | male | youth, hwindi | Youth / kombi tout in grey hooded sweat jacket, dark jeans and white sneakers | 1.62 | 9798 / 221 | 2000 / 71 |
+| `girl_primary_school` | female | school_kid | Primary school girl: light blue dress, white socks, black shoes, cornrows | 1.21 | 7771 / 133 | 1999 / 49 |
+| `man_apostolic` | male | apostolic | Apostolic church member: white knee-length robe, shaved head, full beard, barefoot | 1.86 | 7071 / 119 | 1999 / 46 |
+| `man_business_suit` | male | office_man, street_preacher | Office worker in a charcoal two-piece suit, white shirt and maroon tie | 1.80 | 7770 / 123 | 1998 / 47 |
+| `man_elder_flatcap` | male | elder | Elderly man in brown jacket, grey trousers and flat cap, grey stubble | 1.74 | 8671 / 160 | 1999 / 52 |
+| `man_hoodie` | male | youth, hwindi | Youth / kombi tout in grey hooded sweat jacket, dark jeans and white sneakers | 1.62 | 9798 / 215 | 2000 / 69 |
 | `man_overalls` | male | handcart_pusher, worker, car_washer | Worker in navy overalls over a grey t-shirt, work boots | 1.68 | 7772 / 130 | 2000 / 48 |
-| `man_police_zrp` | male | police | ZRP police officer: light blue-grey shirt, navy trousers and cap, black boots | 1.79 | 9796 / 156 | 2000 / 54 |
-| `man_polo_chinos` | male | casual_man | Man in yellow polo shirt, khaki chinos and brown shoes | 1.79 | 9797 / 216 | 1999 / 56 |
-| `man_security_guard` | male | security_guard | Private security guard: blue-grey shirt, navy trousers, navy patrol cap, boots | 1.74 | 9797 / 150 | 2000 / 53 |
-| `man_shirt_tie` | male | office_man | Clerk in light blue shirt, navy tie and grey trousers | 1.66 | 9797 / 153 | 1999 / 51 |
-| `man_tshirt_jeans_cap` | male | casual_man, youth | Young man in red t-shirt, jeans and black baseball cap | 1.67 | 9794 / 191 | 1999 / 51 |
+| `man_police_zrp` | male | police | ZRP police officer: light blue-grey shirt, navy trousers and cap, black boots | 1.79 | 9797 / 159 | 2000 / 55 |
+| `man_polo_chinos` | male | casual_man | Man in yellow polo shirt, khaki chinos and brown shoes | 1.79 | 9798 / 215 | 1999 / 56 |
+| `man_security_guard` | male | security_guard | Private security guard: blue-grey shirt, navy trousers, navy patrol cap, boots | 1.74 | 9796 / 151 | 2000 / 53 |
+| `man_shirt_tie` | male | office_man | Clerk in light blue shirt, navy tie and grey trousers | 1.66 | 9797 / 153 | 2000 / 52 |
+| `man_tshirt_jeans_cap` | male | casual_man, youth | Young man in red t-shirt, jeans and black baseball cap | 1.67 | 9798 / 191 | 2000 / 51 |
 | `woman_apostolic` | female | apostolic | Apostolic church member: white long dress and white headscarf, barefoot | 1.66 | 7234 / 112 | 2000 / 45 |
-| `woman_blouse_skirt` | female | casual_woman, office_woman | Woman in a cream tucked top and black pencil skirt with a red dhuku (head wrap) | 1.59 | 9949 / 174 | 2000 / 52 |
-| `woman_casual_tee` | female | casual_woman | Woman in a teal t-shirt and black trousers, hair in a bun under a black wrap | 1.51 | 9970 / 156 | 1999 / 50 |
-| `woman_dress_bright` | female | casual_woman | Woman in a bright blue knee-length shift dress, braids / cornrows | 1.47 | 7771 / 122 | 1999 / 47 |
-| `woman_elder` | female | elder | Elderly woman in a cardigan, long skirt and headscarf | 1.59 | 10015 / 143 | 2000 / 50 |
-| `woman_jeans_top` | female | youth, casual_woman | Young woman in a pink top and tight jeans with an afro puff | 1.48 | 9797 / 226 | 2000 / 69 |
-| `woman_office_suit` | female | office_woman | Office worker in a navy skirt suit, black flats, relaxed bob | 1.55 | 9371 / 161 | 2000 / 53 |
-| `woman_vendor_apron` | female | vendor, market_woman | Street vendor: orange t-shirt, wax-print wrap skirt, blue gingham apron, orange-print dhuku | 1.58 | 9967 / 397 | 2000 / 74 |
-| `woman_zambia_wrap` | female | market_woman, vendor | Market woman in a zambia wrap cloth (wax print) over a t-shirt, yellow-print dhuku | 1.64 | 9988 / 353 | 2000 / 66 |
+| `woman_blouse_skirt` | female | casual_woman, office_woman | Woman in a cream tucked top and black pencil skirt with a red dhuku (head wrap) | 1.59 | 9949 / 170 | 1999 / 52 |
+| `woman_casual_tee` | female | casual_woman | Woman in a teal t-shirt and black trousers, hair in a bun under a black wrap | 1.51 | 9970 / 155 | 2000 / 50 |
+| `woman_dress_bright` | female | casual_woman | Woman in a bright blue knee-length shift dress, braids / cornrows | 1.47 | 7771 / 118 | 1999 / 46 |
+| `woman_elder` | female | elder | Elderly woman in a cardigan, long skirt and headscarf | 1.59 | 10015 / 146 | 2000 / 50 |
+| `woman_jeans_top` | female | youth, casual_woman | Young woman in a pink top and tight jeans with an afro puff | 1.48 | 9796 / 226 | 2000 / 69 |
+| `woman_office_suit` | female | office_woman | Office worker in a navy skirt suit, black flats, relaxed bob | 1.55 | 9371 / 159 | 2000 / 53 |
+| `woman_vendor_apron` | female | vendor, market_woman | Street vendor: orange t-shirt, wax-print wrap skirt, blue gingham apron, orange-print dhuku | 1.58 | 9966 / 394 | 2000 / 74 |
+| `woman_zambia_wrap` | female | market_woman, vendor | Market woman in a zambia wrap cloth (wax print) over a t-shirt, yellow-print dhuku | 1.64 | 9988 / 343 | 1999 / 66 |
 
 Archetype mapping to `PEDESTRIAN_STYLES.archetypes`: office_man → man_business_suit / man_shirt_tie; office_woman → woman_office_suit /
 woman_blouse_skirt; casual_man → man_tshirt_jeans_cap / man_polo_chinos; casual_woman → woman_dress_bright / woman_casual_tee /
@@ -169,6 +190,8 @@ Good NPC clips: `idle_relaxed`, `idle_look`, `idle_arms_folded`, `talk`, `talk_2
 `point`, `wave`, `cheer`, `call_out`, `sit_idle`, `walk`, `walk_female`, `walk_slow` (elders), `carry_on_head` (market women),
 `flee_run`, `turn_left`/`turn_right`, `drive` (kombi and car drivers), `push` (handcart), `hit_*`, `death`, `get_up`.
 Long skirts deform heavily in `run` and `flee_run`, so give market women and elders a faster `walk` rather than a run.
+The NPC materials are double-sided on purpose (open sleeves, hems and skirts show their inside), which also makes the
+`scale.x = -1` mirroring trick safe.
 
 ## Animation clips (`../anims/humans_anims.glb`, 30 fps)
 
@@ -251,6 +274,16 @@ AnimationMixer. There was no T-pose leak, no tearing and the scale and orientati
 (`spiderman_classic_turnaround.jpg`, `spiderman_symbiote_turnaround.jpg`, `spiderman_clips.jpg`, `npc_lineup.jpg`,
 `npc_gestures.jpg`, `npc_lod0_vs_lod1.jpg`). The viewer is `tools/humans/verify/viewer.html` and the screenshot script is `tools/humans/verify/shot.mjs`.
 
+Independent review (PMREM environment, shadowed sun, ground plane, close-ups, walking frames and numeric checks with
+`tools/humans/verify/review_viewer.html` + `review_shot.mjs`): all loop clips close to within 1 degree, the planted foot moves at the
+documented `speed_mps` (x `stride_scale`), no clip or file is missing. The review rebuilt the NPCs to remove garment interpenetration
+(shirts through trousers, legs through skirts, sweater hems), blotchy recolours (hoodie, sweaters) and the underwear-like school shorts,
+fixed an intermittent Blender crash in the atlas packer, made both Spider-Man suits double-sided (the welded mask has a few slits) and
+credited the upstream author of the CC BY sneakers. Review sheets: `tools/humans/previews/review_npc_front.jpg`,
+`review_npc_back.jpg`, `review_npc_walk.jpg`, `review_before_after.jpg`.
+
 Known limitations: there are no twist bones, so the forearms candy-wrap a little in extreme twists. The procedural clips (wave, point, climb, swing...) are keyframed,
-not captured. Clothes are skinned, not simulated, so long skirts clip the legs a little in wide strides. The NPC faces are 1K-atlas quality, which is fine
+not captured. Clothes are skinned, not simulated, so long skirts clip the legs a little in wide strides and running. Spider-Man's suit
+still shows the MakeHuman toes (a boot-shaped foot needs a remeshed foot, not a smoothing pass). A few tiny specks of the tucked top
+show through the pencil skirt's waistband (`woman_blouse_skirt`) and polo / trouser layers touch at the hem in mid-stride. The NPC faces are 1K-atlas quality, which is fine
 from 2 m but not for cut-scene close-ups.
