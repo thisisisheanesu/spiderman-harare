@@ -22,21 +22,28 @@ with "GitHub Actions" as the source.
 
 | Action | Keyboard / mouse | Gamepad | Touch |
 |---|---|---|---|
-| Move | WASD / arrows | Left stick | Left joystick |
+| Run | WASD / arrows | Left stick | Left joystick |
+| Walk | Hold Alt, or switch CapsLock on | Push the stick lightly | Push the joystick lightly |
 | Look | Mouse (click to capture) | Right stick | Drag on the right half |
 | Jump / wall-run | Space | A | Jump |
-| Web-swing (hold) | Left click or Shift | RT | Swing |
+| Parkour sprint (on the ground: vaults, runs up walls) | Hold Shift or left click | Hold RT | Hold Swing |
+| Web-launch into a swing | Space while sprinting (or Shift standing still) | A while sprinting | Jump while holding Swing |
+| Web-swing (in the air) | Hold Shift or left click | Hold RT | Hold Swing |
 | Web-zip to a point | E / Q / right click | LB / RB / LT | Zip |
 | Dive | C | B | Dive |
 | Switch suit (classic / symbiote) | F | Y | Suit |
-| Map (waypoints) | M | Back | Tap the minimap |
+| Map (waypoints, search shops and places) | M (then / to search) | Back | Tap the minimap |
 | Time of day | T | — | Pause menu |
 | Camera distance | V | — | — |
 | Help / pause | H / Esc or P | — / Start | Pause button |
 
+The swing button does two jobs, as in Marvel's Spider-Man: held on the ground it is a parkour sprint, and it
+swings once you are in the air. Jump mid-sprint and the web goes out as you leave the ground; keep holding to swing
+on. The touch button reads **Sprint** on the ground and **Swing** in the air.
+
 A five-step guided tour (dive off the Reserve Bank, swing down Samora Machel Avenue, land in Africa Unity Square,
 walk First Street Mall, perch on Joina City) runs on first play; replay or hide it in Pause → Settings. If the page
-can't capture the mouse (some embedded views), drag with the mouse to look and hold Shift to swing.
+can't capture the mouse (some embedded views), drag with the mouse to look and hold Shift to sprint and swing.
 
 URL flags for testing: `?quality=low|medium|high`, `?time=17.5`, `?spawn=x,y,z` (metres from Africa Unity Square),
 `?autostart=1`, `?mute=1`.

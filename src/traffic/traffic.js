@@ -482,7 +482,7 @@ export class Traffic {
       const hR = this.groundAt(_b.x, _b.z);
       const grade = (hF - hR) / Math.max(1, v.wheelbase);
       slope = Math.atan(grade);
-      y = hF - (v.length / 2 - v.frontAxle) * grade;
+      y = hF - (v.model.front - v.frontAxle) * grade;
     }
     v.slope = slope;
     v.position.set((_a.x + _b.x) / 2 - fx * mid + fz * lat, y, (_a.z + _b.z) / 2 - fz * mid - fx * lat);

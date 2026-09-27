@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { makeRng, hashString } from '../core/rng.js';
+import { makeRng } from '../core/rng.js';
 import { cleanRing, orientedBox, pointInRing, edgeNormals } from './polygon.js';
-import { isMajor, KERB_HEIGHT } from './streetMetrics.js';
+import { isMajor, KERB_HEIGHT, sidewalkWidth } from './streetMetrics.js';
 import { adUV } from './signs.js';
 import { tint } from './palette.js';
 import { makeCanvas } from './atlas.js';
@@ -536,9 +536,9 @@ export function buildProps(ctx) {
       local(x, z, rot, lx, lz, tmp);
       const r = PROP_META[name].base * s;
       if (ly === 0 && !clear(tmp.x, tmp.z, r, 0.3)) return false;
-      const y = heightAt(tmp.x, tmp.z) + (world.roofHeightAt?.(tmp.x, tmp.z) > 0.5 ? 0 : 0) + ly;
-      if (ly === 0) place(name, tmp.x, y + groundLift(tmp.x, tmp.z), tmp.z, rot + turn, s);
-      else set.add(name, tmp.x, y + groundLift(tmp.x, tmp.z), tmp.z, rot + turn, s, 0);
+      const y = pavementY(tmp.x, tmp.z) + ly;
+      if (ly === 0) place(name, tmp.x, y, tmp.z, rot + turn, s);
+      else set.add(name, tmp.x, y, tmp.z, rot + turn, s, 0);
       return true;
     };
     const crates = (lx, lz, n) => {
@@ -576,9 +576,12 @@ export function buildProps(ctx) {
     }
   }
 
-  // Pavement height at (x, z) above the street (kerb) where there is a sidewalk, else 0.
-  function groundLift(x, z) {
-    return offRoad(x, z, 3) ? 0 : KERB_HEIGHT;
+  // Ground height at (x, z): raised by the kerb on a road's pavement strip, street level elsewhere
+  // (malls, squares, ranks, forecourts).
+  function pavementY(x, z) {
+    const nr = world.nearestRoad(x, z, 12);
+    const d = nr ? nr.dist - nr.road.w / 2 : -1;
+    return heightAt(x, z) + (d > 0 && d < sidewalkWidth(nr.road) + 0.05 ? KERB_HEIGHT : 0);
   }
 
   // Bus stops along the main roads outside the rank areas: a shelter at the kerb every ~400 m.
@@ -758,7 +761,7 @@ export function buildProps(ctx) {
           const x = s.x + s.nx * 1.1 + s.ax * sg * (s.w / 2 + 0.2);
           const z = s.z + s.nz * 1.1 + s.az * sg * (s.w / 2 + 0.2);
           if (clear(x, z, 0.9, 0.6)) {
-            const y = heightAt(x, z) + groundLift(x, z);
+            const y = pavementY(x, z);
             place('planter_concrete', x, y, z, Math.atan2(s.nx, s.nz));
             set.add(r2() < 0.5 ? 'plant_aloe_pot' : 'plant_leafy_pot', x, y + 0.12, z, r2() * 6.28, 1.1, 0);
           }
@@ -769,7 +772,7 @@ export function buildProps(ctx) {
         for (let k = -2; k <= 2; k++) {
           const x = s.x + s.nx * ((s.off ?? 3) + 1.5) + s.ax * k * 1.4;
           const z = s.z + s.nz * ((s.off ?? 3) + 1.5) + s.az * k * 1.4;
-          if (clear(x, z, 0.2, 0.3)) place('bollard_painted', x, heightAt(x, z), z, r2() * 6.28);
+          if (clear(x, z, 0.2, 0.3)) place('bollard_painted', x, pavementY(x, z), z, r2() * 6.28);
         }
         continue;
       }
@@ -818,4 +821,3 @@ export function buildProps(ctx) {
   return result;
 }
 
-export { hashString };
