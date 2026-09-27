@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { synthesizeSfx } from './synth.js';
 import { VoiceBank } from './voices.js';
-import { Ambience } from './ambience.js';
+import { Ambience, glide } from './ambience.js';
+import { ExtrasBank } from './extras.js';
 
 // Audio system (game.audio).
 //
@@ -11,16 +12,27 @@ import { Ambience } from './ambience.js';
 //
 // Public API:
 //   unlock()                                   resume the context from a user gesture (retried on later gestures)
-//   playVoice(clipId, position|null, {volume, onEnd}) -> {stop(), duration, setPosition(v)} | null
-//   voiceClips({kind, gender, voice})          manifest clips matching every given field
+//   playVoice(clipId, position|null, {volume, rate, delay, onEnd}) -> {stop(), duration, clip, setPosition(v)} | null
+//        rate = playbackRate (0.5..2; e.g. 0.94..1.06 so NPCs sharing a FLEURS speaker sound distinct);
+//        duration is in seconds of wall time (clip.dur / rate); delay = seconds on the audio clock before it
+//        starts (0..10; e.g. a repeated call that must keep its rhythm however slowly frames run)
+//   voiceClips({kind, gender, voice})          FLEURS clips matching every given field (array = any of)
+//   extraClips({kind, lang, gender, id})       audio/extras.json greetings clips (kind 'greet'|'exclaim'|'call',
+//        text/sn = Shona, en); [] until the manifest has loaded after unlock (see extrasReady)
+//   extrasReady                                Promise -> extras clip list ([] when extras.json is absent)
+//   playExtra(clipId, position|null, {volume, rate, delay, onEnd}) -> handle like playVoice | null
+//        (null until the greetings sprite is decoded; on the voices bus, positional like playVoice)
 //   playSfx(name, position|null, {volume, pitch}) -> {stop()} | null
 //        'thwip' 'zip' 'whoosh' 'land' 'landHard' 'step' 'horn' 'kombiHoot' 'ui' (all synthesized)
-//   setAmbience('crowd'|'traffic', level 0..1)
+//   setAmbience('crowd'|'traffic', level 0..1)  (the real street recordings follow the player's location
+//        by themselves, see ambience.js)
 //   setMasterVolume(v), setBusVolume('voices'|'sfx'|'ambience', v), muted (get/set)
+//   voicesActive                               voices / extras playing now (the beds dip under them)
 // Nothing throws while the context is suspended: sounds are simply skipped (play* return null).
 
 const MAX_PER_SFX = 5;
 const MAX_HEAR_DIST = 260; // m: positional sounds further than this are not started
+const DUCK_DIST = 30; // m: voices closer than this make the ambience beds dip
 const GESTURES = ['pointerdown', 'pointerup', 'touchend', 'keydown', 'click'];
 
 export class AudioManager {
@@ -54,6 +66,9 @@ export class AudioManager {
     this.sfx = synthesizeSfx(ctx);
     this.active = {};
     this.voiceBank = new VoiceBank(game.voices, this.low ? 16000 : 24000);
+    this.extras = new ExtrasBank(this.low ? 16000 : 24000);
+    this.extrasReady = this.extras.ready;
+    this._speaking = new Set(); // {until} (audio clock) of voices near the listener
     this.ambience = new Ambience(this);
     this._camPos = new THREE.Vector3();
     this._started = false;
@@ -116,10 +131,14 @@ export class AudioManager {
     this._started = true;
     this.ambience.start();
     const m = this.game.voices;
-    if (m) {
-      this.voiceBank.load(this.ctx);
-      if (m.ambient?.crowd) this.ambience.loadCrowd(m.ambient.crowd, m.ambientLoop?.crowd, this.low ? 22050 : 0);
-    }
+    const voices = m ? this.voiceBank.load(this.ctx) : Promise.resolve();
+    if (m?.ambient?.crowd) this.ambience.loadCrowd(m.ambient.crowd, m.ambientLoop?.crowd, this.low ? 22050 : 0);
+    // Extras (street recordings + greetings) after the FLEURS voices, so the first lines come first.
+    this.extras.loadManifest().then(async () => {
+      await voices;
+      await this.extras.loadSprite(this.ctx);
+      await this.ambience.loadStreet(this.extras.ambience, this.low ? 16000 : 24000, this.low);
+    }).catch((err) => console.warn('[audio] extras failed:', err));
   }
 
   get muted() {
@@ -145,7 +164,7 @@ export class AudioManager {
 
   _applyVolumes(immediate) {
     const now = this.ctx.currentTime;
-    const set = (param, v) => (immediate ? (param.value = v) : param.setTargetAtTime(v, now, 0.05));
+    const set = (param, v) => (immediate ? (param.value = v) : glide(param, v, now, 0.05));
     set(this.master.gain, this._muted ? 0 : this.volumes.master);
     const { voices, sfx, ambience } = this.volumes;
     set(this.buses.voices.gain, voices * this._duck);
@@ -162,12 +181,48 @@ export class AudioManager {
     return this.voiceBank.filter(filter);
   }
 
-  playVoice(clipId, position = null, { volume = 1, onEnd } = {}) {
+  extraClips(filter) {
+    return this.extras.filter(filter);
+  }
+
+  playVoice(clipId, position = null, opts = {}) {
     const clip = this.voiceBank.clip(clipId);
-    const buffer = clip && this.voiceBank.buffer(clip.sprite);
-    if (!buffer) return null;
-    const handle = this.playBuffer(buffer, position, { volume, bus: 'voices', offset: clip.start, duration: clip.dur, ref: 4, rolloff: 1, onEnd });
-    if (handle) handle.duration = clip.dur;
+    return this._playClip(clip, clip && this.voiceBank.buffer(clip.sprite), position, opts);
+  }
+
+  playExtra(clipId, position = null, opts = {}) {
+    const clip = this.extras.clip(clipId);
+    if (clip && !this.extras.buffer && this._started) this.extras.loadSprite(this.ctx);
+    return this._playClip(clip, clip && this.extras.buffer, position, opts);
+  }
+
+  // Voices / extras playing near the listener right now (the ambience beds dip under them).
+  // Timed on the audio clock as well as the 'ended' event, so a lost event can't leave the beds ducked.
+  get voicesActive() {
+    const now = this.ctx.currentTime;
+    for (const v of this._speaking) if (v.until <= now) this._speaking.delete(v);
+    return this._speaking.size;
+  }
+
+  // A clip from a decoded sprite on the voices bus.
+  _playClip(clip, buffer, position, { volume = 1, rate = 1, delay = 0, onEnd } = {}) {
+    if (!clip || !buffer) return null;
+    const r = Number.isFinite(rate) ? Math.min(2, Math.max(0.5, rate)) : 1;
+    const wait = delay > 0 ? Math.min(10, delay) : 0; // (NaN > 0 is false)
+    const speaking = { until: Infinity };
+    const end = () => {
+      this._speaking.delete(speaking);
+      onEnd?.();
+    };
+    const handle = this.playBuffer(buffer, position, { volume, bus: 'voices', rate: r, offset: clip.start, duration: clip.dur, delay: wait, ref: 4, rolloff: 1, onEnd: end });
+    if (!handle) return null;
+    // playBuffer left the camera position in _camPos for positional sounds.
+    if (!position || this._camPos.distanceTo(position) < DUCK_DIST) {
+      speaking.until = this.ctx.currentTime + wait + clip.dur / r + 0.1;
+      this._speaking.add(speaking);
+    }
+    handle.duration = clip.dur / r;
+    handle.clip = clip;
     return handle;
   }
 
@@ -188,7 +243,7 @@ export class AudioManager {
   }
 
   // Shared player for buffers: optional world position (PannerNode), bus routing and cleanup.
-  playBuffer(buffer, position, { volume = 1, bus = 'sfx', rate = 1, offset = 0, duration, ref = 4, rolloff = 1, onEnd } = {}) {
+  playBuffer(buffer, position, { volume = 1, bus = 'sfx', rate = 1, offset = 0, duration, delay = 0, ref = 4, rolloff = 1, onEnd } = {}) {
     const ctx = this.ctx;
     if (ctx.state !== 'running') return null;
     if (position) {
@@ -224,7 +279,7 @@ export class AudioManager {
       panner?.disconnect();
       onEnd?.();
     };
-    src.start(0, offset, duration);
+    src.start(delay > 0 ? ctx.currentTime + delay : 0, offset, duration);
     return {
       stop() {
         try {

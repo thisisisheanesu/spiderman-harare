@@ -8,6 +8,7 @@ import { VoiceDirector } from './voices.js';
 import { Bubbles } from './bubbles.js';
 import { Social } from './social.js';
 import { Flashes } from './flashes.js';
+import { streetVoices } from './streetVoices.js';
 
 // Pedestrians of Harare CBD: pavements, crossings, First Street Mall, the parks and the kombi ranks,
 // with vendors at their stalls and people who speak with real Zimbabwean (Shona) voices.
@@ -16,8 +17,11 @@ import { Flashes } from './flashes.js';
 //   list                 active people [{position: Vector3, heading, gender: 'female'|'male', state, name, role}]
 //                        state: 'walk' | 'wait' (at a kerb) | 'cross' | 'idle' | 'chat' | 'vendor' | 'react' | 'flee'
 //   npcsNear(x, z, r)    people within r metres (new array)
+//   crossers             people out on a carriageway this frame (crossing, or fleeing across it), each
+//                        with crossRoad = index of the road being crossed (traffic brakes for them)
 //   walkways             the pedestrian network (walkways.js)
-// Emits 'npc:speak' {npc, clip, text}; drives audio.playVoice / setAmbience('crowd') and hud.showSubtitle.
+// Emits 'npc:speak' {npc, clip, text}; drives audio.playVoice / playExtra (real recorded greetings and
+// calls, streetVoices.js) / setAmbience('crowd') and hud.showSubtitle.
 
 const LOD = {
   low: { near: 26, far: 115, blob: 40 },
@@ -28,15 +32,21 @@ const LOD = {
 export class Npcs {
   constructor() {
     this.list = [];
+    this.crossers = [];
   }
 
   async init(game) {
     this.game = game;
-    this.walkways = new Walkways(game.world, game.data);
+    // Ground height from the city (the Kopje hill), looked up live in case the city swaps it.
+    this.walkways = new Walkways(game.world, game.data, (x, z) => game.city?.heightAt?.(x, z) ?? 0);
     await this.walkways.build(() => new Promise((r) => setTimeout(r, 0)));
     this.vendors = new Vendors(game, this.walkways);
     this.vendors.build();
     this.crowd = new Crowd(game, this.walkways, this.vendors.obstacles);
+    this.crossers = this.crowd.crossers;
+    this._cityObstacles = 0;
+    this._takeCityObstacles();
+    this.street = streetVoices(game);
     this.voices = new VoiceDirector(game);
     this.bubbles = new Bubbles(game);
     this.population = new Population(game, this.walkways, this.vendors, this.crowd, this.voices);
@@ -59,6 +69,15 @@ export class Npcs {
     this._near = [];
     this.ambience = 0;
     this._ambT = 0;
+  }
+
+  // The city's street furniture ({x, z, r}: poles, trees, benches) for walkers to steer around; picked
+  // up whenever the list grows (the city may fill it after we start).
+  _takeCityObstacles() {
+    const obs = this.game.city?.obstacles;
+    if (!Array.isArray(obs) || obs.length <= this._cityObstacles) return;
+    this.crowd.addObstacles(this._cityObstacles ? obs.slice(this._cityObstacles) : obs);
+    this._cityObstacles = obs.length;
   }
 
   npcsNear(x, z, r) {
@@ -87,6 +106,8 @@ export class Npcs {
     ctx.traffic = game.traffic;
 
     game.camera.updateMatrixWorld();
+    if ((game.frame & 31) === 0) this._takeCityObstacles();
+    this.street.update();
     this.population.update(dt, ctx);
     this.crowd.rebuildHash(this.list);
     this.crowd.update(dt, ctx);

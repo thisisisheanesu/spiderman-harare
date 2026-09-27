@@ -78,9 +78,15 @@ export class Vehicle {
     this.steer = 0;
     this.pitch = 0;
     this.roll = 0;
+    // Road grade under the wheels (rad, nose up +): the Kopje climb; 0 on the flat CBD.
+    this.slope = 0;
     this.latPrev = 0;
     this.honkCd = 0;
     this.honkIn = -1;
     this.callT = 0;
+    // Hwindi's recorded destination call (extras clip id), his voice rate and the bubble shown with it.
+    this.dest = null;
+    this.voiceRate = 0;
+    this.voiceCall = null;
   }
 }

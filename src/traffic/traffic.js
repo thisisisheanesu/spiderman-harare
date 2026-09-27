@@ -10,6 +10,7 @@ import { buildStickerAtlas } from './vehicleMaterial.js';
 import { VehicleRenderer } from './vehicleRenderer.js';
 import { SpeechBubbles } from './bubbles.js';
 import { KombiLife } from './kombi.js';
+import { streetVoices } from '../npc/streetVoices.js';
 
 // Harare traffic: Honda Fits, Corollas, Hiluxes, Land Cruisers, ZUPCO buses and swarms of kombis
 // driving on the LEFT through the real road graph, stopping at robots, loading at ranks.
@@ -21,7 +22,11 @@ import { KombiLife } from './kombi.js';
 //   vehiclesNear(x, z, r)    vehicles whose footprint reaches within r of (x, z)
 //   signalAt(node, fromNode) 'green' | 'amber' | 'red' | null for traffic entering `node` from `fromNode`
 //   honk(vehicle)            hoot (rate-limited); returns true if it sounded
-// Emits audio through game.audio.playSfx('horn' | 'kombiHoot', pos) and setAmbience('traffic', level).
+// Emits audio through game.audio.playSfx('horn' | 'kombiHoot', pos), playExtra (hwindi destination
+// calls, via src/npc/streetVoices.js) and setAmbience('traffic', level).
+// Vehicles brake for Spider-Man standing in the road and, anywhere in the simulated area, for the
+// pedestrians game.npcs.crossers reports out on a carriageway (per-lane occupancy, see _markCrossers).
+// On the Kopje (Skipper Hoste Drive) they drive on game.city.heightAt and pitch with the slope.
 
 const SPAWN_RADIUS = 400;
 const DESPAWN_RADIUS = 460;
@@ -29,9 +34,18 @@ const HIDDEN_SPAWN = 250;
 const TELEPORT = 300;
 const OBSTACLE_RANGE = 110;
 const PLAYER_RANGE = 60;
+// The city lays the carriageway this far above the Kopje's bare hillside (terrain.js roadHeightAt).
+const ROAD_LIFT = 0.12;
+// Crossing pedestrians: how far ahead along its route a vehicle looks for a blocked lane (m), and how
+// far beside a lane's edge a crosser already counts (more when walking toward it).
+const CROSS_LOOK = 45;
+const CROSS_REACH = 0.9;
+const CROSS_REACH_APPROACH = 2.6;
 
 const _a = { x: 0, z: 0, dx: 0, dz: 0 };
 const _b = { x: 0, z: 0, dx: 0, dz: 0 };
+const _c = { x: 0, z: 0, dx: 0, dz: 0 };
+const _proj = { s: 0, d2: 0 };
 
 const DENSITY = TRAFFIC?.densityByHour;
 const DENSITY_HOURS = DENSITY ? Object.keys(DENSITY).map(Number).sort((a, b) => a - b) : [];
@@ -100,9 +114,49 @@ export class Traffic {
     );
     this.models = this.renderer.models;
     this.bubbles = new SpeechBubbles(game.scene, 3);
+    this.voices = streetVoices(game);
+    this._prepareGround(game);
+    this._prepareCrossings();
     this.kombis = new KombiLife(this);
     this.kombis.setup(maxParked);
     game.events?.on('player:land', (e) => this._onLand(e));
+  }
+
+  // Road surface height: 0 except on the Kopje, where the carriageway lies ROAD_LIFT above the hill.
+  // Lanes and connectors that touch the hill are flagged so only vehicles on them sample it.
+  _prepareGround(game) {
+    const city = game.city;
+    this.groundAt = (x, z) => {
+      const h = city?.heightAt?.(x, z) ?? 0;
+      return h > 0.05 ? h + ROAD_LIFT : 0;
+    };
+    const p = { x: 0, z: 0, dx: 0, dz: 0 };
+    for (const path of [...this.graph.lanes, ...this.graph.connectors]) {
+      path.hill = false;
+      for (let s = 0; s <= path.length + 4.9 && !path.hill; s += 5) {
+        path.sample(Math.min(s, path.length), p);
+        if (this.groundAt(p.x, p.z) > 0) path.hill = true;
+      }
+    }
+  }
+
+  // Per-lane occupancy for crossing pedestrians: lanes by road, each lane's half width, the connectors
+  // leading into it, and the blocked stretch markers (reset every frame).
+  _prepareCrossings() {
+    this.lanesByRoad = new Map();
+    for (const lane of this.graph.lanes) {
+      if (!this.lanesByRoad.has(lane.roadIndex)) this.lanesByRoad.set(lane.roadIndex, []);
+      this.lanesByRoad.get(lane.roadIndex).push(lane);
+      const n = lane.siblings.length;
+      lane.halfW = lane.road.w / (lane.road.oneway ? n : 2 * n) / 2;
+      lane.ins = [];
+    }
+    for (const c of this.graph.connectors) c.to.ins.push(c);
+    for (const path of [...this.graph.lanes, ...this.graph.connectors]) {
+      path.blockLo = Infinity;
+      path.blockHi = -Infinity;
+    }
+    this._marked = [];
   }
 
   update(dt, game) {
@@ -182,7 +236,7 @@ export class Traffic {
     if (this.rng() > slot.weight) return;
     const d = Math.hypot(slot.x - f.x, slot.z - f.z);
     if (d > SPAWN_RADIUS || d < 15) return;
-    if (!initial && d < HIDDEN_SPAWN && this.renderer.inView(slot.x, 1, slot.z, 7)) return;
+    if (!initial && d < HIDDEN_SPAWN && this.renderer.inView(slot.x, 1 + this.groundAt(slot.x, slot.z), slot.z, 7)) return;
     const lane = slot.lane;
     for (const u of lane.vehicles) if (Math.abs(u.s - slot.s) < 16) return;
     const def = this.mix.pickType(this.rng, this.kombis.nearRank(slot.x, slot.z) ? 2.5 : 1);
@@ -202,7 +256,7 @@ export class Traffic {
       const v = vs[i];
       const d = Math.hypot(v.position.x - this.focus.x, v.position.z - this.focus.z);
       // Gridlock breaker: a vehicle that has not moved for a long time is quietly recycled.
-      const stuck = v.stuck > 130 || (v.stuck > 70 && (d > 90 || !this.renderer.inView(v.position.x, 1, v.position.z, v.length)));
+      const stuck = v.stuck > 130 || (v.stuck > 70 && (d > 90 || !this.renderer.inView(v.position.x, v.position.y + 1, v.position.z, v.length)));
       if (d > DESPAWN_RADIUS || stuck) this._remove(v);
     }
   }
@@ -231,11 +285,16 @@ export class Traffic {
   // Brake for Spider-Man standing in the road and for pedestrians crossing in front.
   _obstacles(dt, game) {
     const pl = game.player;
-    const onRoad = !!pl && pl.state === 'ground' && pl.position.y < 1;
     const px = this.focus.x;
     const pz = this.focus.z;
+    const onRoad = !!pl && pl.state === 'ground' && pl.position.y - this.groundAt(px, pz) < 1;
     const npcs = game.npcs;
-    const npcQuery = typeof npcs?.npcsNear === 'function';
+    // Crossing pedestrians as per-lane occupancy: every vehicle sees them, at any distance, for the cost
+    // of a few comparisons each. Without that list (older / placeholder npcs) nearby vehicles query
+    // npcsNear instead.
+    const crossers = Array.isArray(npcs?.crossers) ? npcs.crossers : null;
+    if (crossers) this._markCrossers(crossers);
+    const npcQuery = !crossers && typeof npcs?.npcsNear === 'function';
     const frame = game.frame || 0;
     for (const v of this.sim.vehicles) {
       v.obstacleGap = Infinity;
@@ -243,6 +302,13 @@ export class Traffic {
       const dx = v.position.x - px;
       const dz = v.position.z - pz;
       const d2 = dx * dx + dz * dz;
+      if (crossers) {
+        const g = this._crossGap(v);
+        if (g < Infinity) {
+          v.obstacleGap = Math.max(0, g);
+          v.blockedBy = 2;
+        }
+      }
       if (d2 > OBSTACLE_RANGE * OBSTACLE_RANGE) {
         v.npcGap = Infinity;
         continue;
@@ -257,7 +323,7 @@ export class Traffic {
         const rz = pz - frontZ;
         const along = rx * fx + rz * fz;
         const lat = rx * fz - rz * fx;
-        if (along > -1 && along < 35 && Math.abs(lat) < half + 0.8) {
+        if (along > -1 && along < 35 && Math.abs(lat) < half + 0.8 && Math.max(0, along - 1.2) < v.obstacleGap) {
           v.obstacleGap = Math.max(0, along - 1.2);
           v.blockedBy = 1;
         }
@@ -280,6 +346,78 @@ export class Traffic {
         v.blockedBy = 2;
       }
     }
+  }
+
+  // Marks, on every lane of the road each crosser is crossing, the arc length where they are (or are
+  // about to be) in it; a crosser just beyond a lane's end (in the junction mouth) marks the connectors
+  // into / out of it instead.
+  _markCrossers(list) {
+    for (const p of this._marked) {
+      p.blockLo = Infinity;
+      p.blockHi = -Infinity;
+    }
+    this._marked.length = 0;
+    for (let i = 0; i < list.length; i++) {
+      const a = list[i];
+      if (!(a.id > 0) || !(a.crossRoad >= 0)) continue;
+      const lanes = this.lanesByRoad.get(a.crossRoad);
+      if (!lanes) continue;
+      for (let k = 0; k < lanes.length; k++) this._markLane(lanes[k], a);
+    }
+  }
+
+  _markLane(lane, a) {
+    const x = a.position.x;
+    const z = a.position.z;
+    lane.project(x, z, _proj);
+    const s = _proj.s;
+    const inside = s > 0.01 && s < lane.length - 0.01;
+    lane.sample(inside ? s : s <= 0.01 ? 0 : lane.length, _c);
+    const rx = x - _c.x;
+    const rz = z - _c.z;
+    const lat = rx * _c.dz - rz * _c.dx;
+    // Walking toward the lane's centreline: they will be in it by the time a car gets there.
+    const toward = lat * (a.vx * _c.dz - a.vz * _c.dx) < -0.05;
+    const reach = lane.halfW + (toward ? CROSS_REACH_APPROACH : CROSS_REACH);
+    if (Math.abs(lat) > reach) return;
+    if (inside) {
+      this._mark(lane, s);
+      return;
+    }
+    const along = rx * _c.dx + rz * _c.dz;
+    if (s <= 0.01) {
+      if (along < -12) return;
+      for (const c of lane.ins) this._mark(c, Math.max(0, c.length + Math.min(0, along)));
+      this._mark(lane, 0);
+    } else {
+      if (along > 12) return;
+      for (const c of lane.out) this._mark(c, Math.min(c.length, Math.max(0, along)));
+    }
+  }
+
+  _mark(path, s) {
+    if (path.blockLo === Infinity && path.blockHi === -Infinity) this._marked.push(path);
+    if (s < path.blockLo) path.blockLo = s;
+    if (s > path.blockHi) path.blockHi = s;
+  }
+
+  // Distance from the front bumper to the nearest crossing pedestrian ahead on v's route (minus a
+  // margin), or Infinity.
+  _crossGap(v) {
+    const p = v.path;
+    if (!p) return Infinity;
+    const min = v.s - 0.5;
+    const b = p.blockLo >= min ? p.blockLo : p.blockHi >= min ? p.blockHi : Infinity;
+    if (b < Infinity) return b - v.s - 1.2;
+    let dist = p.length - v.s;
+    if (dist > CROSS_LOOK) return Infinity;
+    const next = p.isLane ? v.next : p.to;
+    if (!next) return Infinity;
+    if (next.blockLo < Infinity) return dist + next.blockLo - 1.2;
+    dist += next.length;
+    if (!p.isLane || dist > CROSS_LOOK) return Infinity;
+    const lane = next.to;
+    return lane && lane.blockLo < Infinity ? dist + lane.blockLo - 1.2 : Infinity;
   }
 
   _drivers(dt) {
@@ -324,7 +462,18 @@ export class Traffic {
     let heading = Math.atan2(-fx, -fz);
     if (dt > 0) heading += Math.atan2((lat - v.latPrev) / dt, Math.max(v.speed, 3)) * 0.8;
     v.latPrev = lat;
-    v.position.set((_a.x + _b.x) / 2 - fx * mid + fz * lat, 0, (_a.z + _b.z) / 2 - fz * mid - fx * lat);
+    // On the Kopje: wheels on the road surface under each axle, body pitched along the slope.
+    let y = 0;
+    let slope = 0;
+    if (v.path?.hill || v.prev?.hill || v.prev2?.hill) {
+      const hF = this.groundAt(_a.x, _a.z);
+      const hR = this.groundAt(_b.x, _b.z);
+      const grade = (hF - hR) / Math.max(1, v.wheelbase);
+      slope = Math.atan(grade);
+      y = hF - (v.length / 2 - v.frontAxle) * grade;
+    }
+    v.slope = slope;
+    v.position.set((_a.x + _b.x) / 2 - fx * mid + fz * lat, y, (_a.z + _b.z) / 2 - fz * mid - fx * lat);
     if (dt > 0) {
       const rate = wrapAngle(heading - v.heading) / dt;
       const k = Math.min(1, dt * 6);

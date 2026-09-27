@@ -1,11 +1,18 @@
 import { pointInPoly, polyArea } from '../core/geo.js';
 import { Vehicle } from './vehicle.js';
+import { gloss, shout } from '../npc/streetVoices.js';
 
 // Kombi culture: rank stops on the kerbside lanes next to every rank (moving kombis pull in there to
 // load), rows of parked kombis filling the rank yards with their hwindi touting outside, and the calls
-// themselves — a speech bubble plus a hoot when the player is within earshot.
+// themselves — a speech bubble plus a hoot when the player is within earshot. Close by, a hwindi often
+// calls his kombi's destination out loud with a real recorded Shona phrase ("KuMarondera!"), twice,
+// from the door (streetVoices.js); the bubble then shows exactly that, otherwise the text-only calls.
+// A kombi has one destination: its text calls name the same place as its recorded calls (v.call).
 
 const CALL_RANGE = 40;
+const VOICE_RANGE = 30; // m: recorded destination calls
+const VOICE_CHANCE = 0.6;
+const VOICED_SHARE = 0.6; // kombis whose hwindi calls a recorded destination (decided at the first call)
 const RANK_KERB_RANGE = 120;
 const BAY_W = 3.2;
 const BAY_DEPTH = 6.5;
@@ -13,7 +20,8 @@ const BAY_AISLE = 8;
 // Points of a parked kombi's footprint (metres forward, metres left) that must lie in the yard.
 const BAY_PROBES = [[0, 0], [2.3, 0.8], [2.3, -0.8], [-2.3, 0.8], [-2.3, -0.8]];
 const PARKED_RANGE = 460;
-const LOAD_KINDS = new Set(['seats', 'board', 'fare', 'cant', 'dest']);
+// Loading calls besides the kombi's own destination (v.call; another route's name would contradict it).
+const LOAD_KINDS = new Set(['seats', 'board', 'fare', 'cant']);
 
 // Minimum-area oriented bounding box of a ring, long axis = (ux, uz).
 function orientedBox(pts) {
@@ -75,7 +83,7 @@ export class KombiLife {
       this.ranks.push({ name: r.name, x: r.x, z: r.z });
     }
     this.loadCalls = mix.calls.filter((c) => LOAD_KINDS.has(c.kind));
-    this.driveCalls = mix.calls.filter((c) => c.kind === 'dest' || c.kind === 'depart');
+    this.driveCalls = mix.calls.filter((c) => c.kind === 'depart');
     const kombiDef = mix.types.find((t) => t.type === 'kombi');
 
     const yards = [];
@@ -94,7 +102,7 @@ export class KombiLife {
         const v = new Vehicle();
         mix.dress(v, kombiDef, rng, models);
         v.parked = true;
-        v.position.set(spot.x, 0, spot.z);
+        v.position.set(spot.x, this.traffic.groundAt?.(spot.x, spot.z) ?? 0, spot.z);
         v.heading = spot.heading;
         v.odo = rng() * 10;
         v.hwindi = rng() < 0.6;
@@ -230,12 +238,65 @@ export class KombiLife {
       }
       v.callT = rng.range(7, 16);
       this._cd = rng.range(1.8, 3.2);
+      if (v.voiced === undefined) this._chooseVoice(v, rng);
+      if (v.voiced && dx * dx + dz * dz < VOICE_RANGE * VOICE_RANGE && rng() < VOICE_CHANCE) {
+        const life = this._voiceCall(v);
+        if (life) {
+          bubbles.show(v, v.voiceCall, life);
+          if (!v.parked && rng() < 0.3) this.traffic.honk(v);
+          continue;
+        }
+      }
       const loading = v.parked || v.dwell > 0;
       const pool = loading ? this.loadCalls : this.driveCalls;
-      const call = rng() < 0.45 || !pool.length ? v.call : rng.pick(pool);
+      const call = rng() < (loading ? 0.45 : 0.7) || !pool.length ? v.call : rng.pick(pool);
       if (!call) continue;
       bubbles.show(v, call);
       if (!v.parked || rng() < 0.35) this.traffic.honk(v);
     }
+  }
+
+  // Once per kombi, at its first call once the recordings are loaded: its hwindi either calls a recorded
+  // destination (which then replaces its route for the text-only calls too) or keeps his town route and
+  // text-only calls. Undecided (undefined) until the street voices are ready.
+  _chooseVoice(v, rng) {
+    const sv = this.traffic.voices;
+    if (!sv?.ready) return;
+    v.voiced = false;
+    if (rng() >= VOICED_SHARE) return;
+    const id = sv.assignDestination();
+    const clip = id && sv.clip(id);
+    if (!clip) return;
+    const call = shout(clip.text);
+    v.dest = id;
+    v.voiceCall = { id, text: `${call} ${call}`, en: shout(gloss(clip.en)), kind: 'dest' };
+    v.call = v.voiceCall;
+    v.voiced = true;
+  }
+
+  // The hwindi calls this kombi's destination (a real recording, twice, from the open door). Returns
+  // how long the bubble should stay up, or 0 if nothing was played.
+  _voiceCall(v) {
+    const sv = this.traffic.voices;
+    if (!sv?.canSpeak('hwindi')) return 0;
+    const clip = v.dest && sv.clip(v.dest);
+    if (!clip || clip.id === sv.lastId) return 0;
+    // His own voice (stable per kombi, 0.94..1.06), raised a little for the call.
+    if (!v.voiceRate) v.voiceRate = 0.94 + ((v.id * 0.6180339887) % 1) * 0.12;
+    const dur = sv.doubleCall(clip, (out) => this.doorPosition(v, out), { rate: v.voiceRate * 1.04, volume: 1.15 });
+    if (!dur) return 0;
+    return dur + 0.9;
+  }
+
+  // World position of the kombi's sliding door at head height (false once the vehicle is gone).
+  doorPosition(v, out) {
+    if (!v.parked && !v.path) return false;
+    const d = v.model?.door;
+    const lx = d ? d.x : -v.width / 2;
+    const lz = d ? d.z : 0;
+    const c = Math.cos(v.heading);
+    const s = Math.sin(v.heading);
+    out.set(v.position.x + lx * c + lz * s, v.position.y + 1.55, v.position.z - lx * s + lz * c);
+    return true;
   }
 }

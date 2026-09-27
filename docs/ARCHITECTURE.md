@@ -74,6 +74,9 @@ Reference research (produced alongside the code):
   from Google FLEURS (sn_zw, CC BY 4.0). Clip schema:
   `{id, sprite:'f'|'m', start, dur, kind:'line'|'bark', gender:'female'|'male', voice, sn, en}`;
   `sprites` maps sprite key → relative URL.
+- `public/audio/extras.json` (+ `street/*.mp3`, `CREDITS-extra.md`): four 60 s seamless street-ambience loops recorded in
+  Zimbabwe (`ambience[]` with `use` 'market'|'rank'|'street'|'park') and a sprite of 32 spoken Shona greetings / calls
+  (`clips[]`, one male voice, FSI Shona course 1965, public domain). Read through `audio.extraClips` / `playExtra`.
 
 ## Game & systems (`src/core/game.js`, wired in `src/main.js`)
 
@@ -113,7 +116,13 @@ whose `wallNormal` is the horizontal push) and returns an object from a ring of 
 **city**: `group` (Object3D), `update(dt)` (LOD / night lights), `setNight(t)` (0..1 night factor; called by sky),
 `sidewalkPaths` [{pts:[x,z,…], width, road (index into data.roads), side (+1 left / -1 right of a→b)}],
 `heightAt(x, z)` (visual + physical ground height: 0 except on the Kopje hill), `crossingNodes` (Set of road-node indices
-with zebra crossings / stop lines).
+with zebra crossings / stop lines), `obstacles` [{x, z, r}] (street-level solids for pedestrian avoidance: lamp posts,
+street trees and palms, benches, bins, bollards, planters, rank-shelter posts and benches, verandah posts, billboard legs,
+colonnade columns, the Nehanda statue and the Africa Unity Square fountain), `obstaclesNear(x, z, r)` (those whose circle
+reaches within r), `anchorsNear(x, z, r)` → [{x, y, z}] web anchors within r (horizontal) for swinging where nothing is
+tall: crowns of trees ≥ 7 m and streetlight pole tops (9–10 m). Both queries use grids built once at load and return one
+shared array that the next call overwrites (copy what you keep; no allocation per call). Synthetic volumes (the Rainbow
+Towers hotel tower, id -7; Monomotapa's thickened slab) are registered with `world.addBuilding`.
 
 **player**: `position` (feet, Vector3), `velocity`, `state` ('ground'|'air'|'swing'|'zip'|'wall'|'perch'|'dive'),
 `heading` (rad, 0 = facing north/-z, CCW positive, i.e. forward = (-sin h, 0, -cos h)), `object`, `suit`,
@@ -124,23 +133,37 @@ with zebra crossings / stop lines).
 `shake(amount)`, `fovKick(amount)`, `preset` ('close'|'far', V toggles), `snap()` (jump to the target pose).
 
 **traffic**: `vehicles` [{position: Vector3, heading (rad, same convention), speed, type:'kombi'|'hatch'|'sedan'|'pickup'|'suv'|'bus'|…,
-length, width, height, parked}] (position = body centre at road level; roof at position.y + height; parked rank kombis
+length, width, height, parked, slope}] (position = body centre at road level — on the Kopje `position.y` follows the road
+surface and `slope` is the pitch along the road in rad, 0 elsewhere; roof at position.y + height; parked rank kombis
 included), `vehiclesNear(x, z, r)` (any vehicle whose footprint reaches within r), `signalAt(nodeIndex, fromNodeIndex?)`
 → 'green'|'amber'|'red'|null (without fromNodeIndex: the main road's state), `honk(vehicle)`.
 
 **npcs**: `list` [{position, heading, gender:'female'|'male', state, name, role}] (state ∈ walk wait cross idle chat vendor
-react flee), `npcsNear(x, z, r)`.
+react flee), `npcsNear(x, z, r)`, `crossers` (refreshed every frame: the people out on a carriageway, each with
+`crossRoad` = index into data.roads and velocity `vx, vz`; traffic brakes for them lane by lane).
 
-**audio**: `unlock()`, `playVoice(clipId, position|null, {volume, onEnd}) → {stop(), duration, setPosition(v)}|null`, `setBusVolume('voices'|'sfx'|'ambience', v)`,
-`voiceClips(filter)` (manifest clips), `playSfx(name, position|null, {volume, pitch})` where name ∈
+**audio**: `unlock()`, `playVoice(clipId, position|null, {volume, rate, delay, onEnd}) → {stop(), duration, clip, setPosition(v)}|null`
+(`rate` = playbackRate, clamped 0.5..2, e.g. a stable 0.94..1.06 per NPC so people sharing a FLEURS speaker sound distinct;
+`duration` is wall-clock seconds = clip.dur / rate; `delay` = seconds on the audio clock before it starts, ≤ 10, for a
+repeat that must keep its rhythm however slowly frames run), `setBusVolume('voices'|'sfx'|'ambience', v)`,
+`voiceClips(filter)` (FLEURS clips; every given field must match, an array value matches any of its entries),
+`extraClips(filter)` (greetings from `audio/extras.json`: `{id, start, dur, kind:'greet'|'exclaim'|'call', lang:'sn', text, sn (= text), en, gender:'male', bank:'extras'}`;
+`[]` until the manifest is fetched after unlock — `extrasReady` is a Promise of the clip list, `[]` if the file is absent),
+`playExtra(clipId, position|null, {volume, rate, delay, onEnd})` → same handle as playVoice, or null until the greetings sprite is
+decoded (voices bus, positional like playVoice), `voicesActive` (voices / extras playing within 30 m; the beds dip under them),
+`playSfx(name, position|null, {volume, pitch})` where name ∈
 `'thwip' 'zip' 'whoosh' 'land' 'landHard' 'horn' 'kombiHoot' 'step' 'ui'`, `setAmbience(key, level 0..1)` with
 key ∈ `'crowd'` (set by npcs from local crowd density; plays the real Shona chatter bed) and `'traffic'` (set by
-traffic from nearby vehicle count), `setMasterVolume(v)`, `muted`.
+traffic from nearby vehicle count), `setMasterVolume(v)`, `muted`. The four real street recordings in `extras.json`
+(`rank`, `market`, `park`, `street`) need no calls: `ambience.js` blends them from the player's position
+(`src/audio/zones.js`: ranks, markets / First Street Mall / vendor clusters, parks, CBD), time of day and height.
 
 **hud**: `showSubtitle({speaker, sn, en, ms})`, `toast(text, ms)`, `setObjective(text|null)`, `bigMapOpen` (bool),
 `waypoint` ({x, z, label}|null), `setWaypoint(x, z)`, `clearWaypoint()`, `openOverlay('map'|'pause'|'help')`, `closeOverlay()`,
 `settings` (persisted user settings), `inputMode` ('mouse'|'touch'|'gamepad').
-Pause / help / map overlays are HUD-owned and call `game.setPaused(bool)`.
+Pause / help / map overlays are HUD-owned and call `game.setPaused(bool)`. `npc:speak` events are subtitled only for
+clip kind 'line' (deduped against `showSubtitle`); 'bark' / 'greet' / 'exclaim' / 'call' clips are left to the NPC's
+speech bubble unless the event carries `subtitle: true`.
 
 ### Street cross-sections — `src/world/streetMetrics.js` (core)
 

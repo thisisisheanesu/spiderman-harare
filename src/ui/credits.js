@@ -1,10 +1,13 @@
 import { el } from './dom.js';
 
-// Credits page for the pause menu. Static attributions + public/audio/CREDITS.md (voice sources),
+// Credits page for the pause menu. Static attributions + public/audio/CREDITS.md (FLEURS voice
+// sources) + public/audio/CREDITS-extra.md (street ambience recordings and the FSI Shona greetings),
 // rendered from a small Markdown subset with DOM nodes (no innerHTML).
 
 export function creditsPage(game) {
   const audioBox = el('div', 'credits-audio');
+  const extraBox = el('div', 'credits-audio');
+  let extraSection = null;
   const page = el('div', 'credits', null, [
     section('Spider-Man: Harare', [
       para('Fan project — not affiliated with, endorsed or sponsored by Marvel, Sony or Insomniac Games. Spider-Man is a trademark of Marvel.'),
@@ -22,11 +25,20 @@ export function creditsPage(game) {
       ),
       audioBox,
     ]),
+    (extraSection = section('Street sounds & greetings', [
+      para(
+        'Street ambience recorded in Zimbabwe by KevZim (Freesound, CC0) and radio continental drift / Claudia Wegener (radio aporee ::: maps, CC BY-SA 3.0). Spoken Shona greetings from the FSI Shona Basic Course tapes (U.S. Foreign Service Institute, 1965, public domain), voice of Matthew Mataranyika.',
+      ),
+      extraBox,
+    ])),
     section('Built with', [
       para('Three.js and three-mesh-bvh (MIT), bundled with Vite. Buildings, streets, sky and every sound effect are generated in the browser.'),
     ]),
   ]);
-  if (game.voices) loadAudioCredits(audioBox);
+  if (game.voices) loadAudioCredits(audioBox, 'audio/CREDITS.md');
+  // Only credit the street recordings when this build ships them.
+  extraSection.hidden = true;
+  loadAudioCredits(extraBox, 'audio/CREDITS-extra.md').then((ok) => (extraSection.hidden = !ok));
   return page;
 }
 
@@ -38,14 +50,16 @@ function para(text) {
   return el('p', null, { text });
 }
 
-async function loadAudioCredits(box) {
+async function loadAudioCredits(box, url) {
   try {
-    const res = await fetch('audio/CREDITS.md');
+    const res = await fetch(url);
     const type = res.headers.get('content-type') || '';
-    if (!res.ok || type.includes('html')) return;
+    if (!res.ok || type.includes('html')) return false;
     box.replaceChildren(...renderMarkdown(await res.text()));
+    return true;
   } catch {
     /* credits file not shipped: the static attribution above still applies */
+    return false;
   }
 }
 
@@ -91,7 +105,7 @@ function renderMarkdown(src) {
       flush();
       if (row.every((c) => /^:?-+:?$/.test(c))) continue;
       const cell = table ? 'td' : 'th';
-      if (!table) out.push((table = el('table')));
+      if (!table) out.push(el('div', 'credits-table', null, [(table = el('table'))]));
       table.append(el('tr', null, null, row.map((c) => el(cell, null, null, inline(c)))));
     } else if (!line) {
       flush();

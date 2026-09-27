@@ -1,11 +1,15 @@
 import * as THREE from 'three';
+import { streetVoices } from './streetVoices.js';
 
 // Voice director for the real Shona recordings (Google FLEURS, see public/audio/CREDITS.md).
 // Clips come from the manifest in game.voices: 'line' = full sentence with Shona + English text,
 // 'bark' = short fragment used for exclamations. Each speaking NPC is bound to one FLEURS speaker
-// ('voice' id) of their own gender for as long as they live, and no two live NPCs share a speaker.
-// At most two voices play at once; a clip is not heard again for a few minutes, or until the gender's
-// pool is used up.
+// ('voice' id) of their own gender for as long as they live, and no two live NPCs share a speaker. A man
+// who has said a recorded street phrase carries voice 'fsi' (social.js) and gets no FLEURS clips.
+// At most two voices play at once (three counting the recorded street phrases of streetVoices.js); a
+// clip is not heard again for a few minutes, or until the gender's pool is used up. Each person speaks
+// at their own stable playback rate (agent.voiceRate, 0.94..1.06), so two people who share a FLEURS
+// speaker still sound different.
 
 const MAX_VOICES = 2;
 const LINE_RANGE = 15; // m: ambient lines only play when people are this close
@@ -32,6 +36,7 @@ export class VoiceDirector {
     this.lastStart = -1e9;
     this.nextLine = 4;
     this._head = new THREE.Vector3();
+    this.street = streetVoices(game);
   }
 
   get available() {
@@ -51,7 +56,7 @@ export class VoiceDirector {
   busy() {
     const t = this.game.time;
     this.active = this.active.filter((v) => v.until > t && v.agent.id === v.id);
-    return this.active.length >= MAX_VOICES || t - this.lastStart < MIN_GAP;
+    return this.active.length >= MAX_VOICES || t - this.lastStart < MIN_GAP || this.street.voiceCount() >= MAX_VOICES + 1;
   }
 
   // Choose a clip of `kind` for this agent, binding a speaker to them on first use.
@@ -89,12 +94,15 @@ export class VoiceDirector {
     const t = game.time;
     this.played.set(clip.id, t);
     const head = this._head.set(agent.position.x, agent.position.y + 1.6 * agent.look.scale, agent.position.z);
-    const handle = game.audio?.playVoice?.(clip.id, head.clone(), { volume: clip.kind === 'line' ? 1 : 0.9 });
-    const dur = handle?.duration || clip.dur;
+    const rate = agent.voiceRate || 1;
+    const handle = game.audio?.playVoice?.(clip.id, head.clone(), { volume: clip.kind === 'line' ? 1 : 0.9, rate });
+    // Wall-clock length at this rate.
+    const dur = handle?.duration ?? clip.dur / rate;
     agent.talkUntil = t + dur;
     agent.lastSpoke = t;
     this.lastStart = t;
     this.active.push({ agent, id: agent.id, until: t + dur, handle });
+    if (handle) this.street.noteVoice(t + dur);
     const speaker = agent.role || agent.name || 'Passer-by';
     if (clip.kind === 'line') {
       game.hud?.showSubtitle?.({ speaker, sn: clip.sn, en: clip.en, ms: dur * 1000 + 1500 });

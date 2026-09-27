@@ -1,8 +1,11 @@
 import * as STREETLIFE from '../data/streetlife.js';
+import { streetVoices, greetingPart, gloss, shout, GREETINGS as GREET_CLIPS, ELDER_GREETINGS, REACT_AWE, REACT_FEAR, REACT_SWING, BANANAS } from './streetVoices.js';
 
 // How the street responds to Spider-Man and to itself: reactions to landings and low swings (look,
 // point, cheer, film on a phone, cower, run), greetings as he walks past, vendors' and touts' calls,
 // and the odd overheard remark. Bubbles carry the Shona text with a small English gloss.
+// Men also say some of it out loud with the real recorded Shona phrases (streetVoices.js: one male
+// voice, so women keep text-only bubbles and their FLEURS barks); a bubble always shows what is heard.
 
 const REACTIONS = STREETLIFE.REACTIONS?.length ? STREETLIFE.REACTIONS : [{ sn: 'Hezvo!', en: 'There it is!' }, { sn: 'Maiwe!', en: 'Oh my!' }];
 const SCARY = /Ndatya|Zvinotyisa|Chenjera|Mhanya|Yowe|Mwari wangu|Maiwe|Mira!|Eish/;
@@ -14,6 +17,10 @@ const GREETINGS = SAYINGS.filter((s) => GREETING.test(s.en));
 const REMARKS = SAYINGS.filter((s) => !GREETING.test(s.en) && !/^(I'm fine|Yes|Yeah|No\.)/.test(s.en));
 const HWINDI = STREETLIFE.HWINDI_CALLS?.length ? STREETLIFE.HWINDI_CALLS : [{ text: 'Town! Town!', en: 'To the city centre!' }];
 const AIRBORNE = new Set(['air', 'swing', 'zip', 'dive', 'wall']);
+// Speaker id of the recorded street phrases (one man, streetVoices.js), kept in agent.voice like a FLEURS
+// speaker id: a person keeps the one voice he was first heard with (VoiceDirector finds no FLEURS clips
+// for this id, and a man bound to a FLEURS speaker gets no street phrases).
+const FSI_VOICE = 'fsi';
 
 function pick(list) {
   return list[Math.floor(Math.random() * list.length)];
@@ -36,7 +43,91 @@ export class Social {
     this.remarkAt = 0;
     this.landAt = -10;
     this.lastBubble = 0;
+    this.sv = streetVoices(game);
     game.events.on('player:land', (e) => this.onLand(e));
+  }
+
+  // --- Real recorded phrases (male speakers only) -------------------------------------------------
+
+  _male(a) {
+    return a.gender === 'male' && !a.look.child && (!a.voice || a.voice === FSI_VOICE);
+  }
+
+  // Mouth position of an agent for as long as they live (the clip follows them).
+  _mouth(a) {
+    const id = a.id;
+    return (v) => {
+      if (a.id !== id) return false;
+      v.set(a.position.x, a.position.y + 1.6 * a.look.scale, a.position.z);
+      return true;
+    };
+  }
+
+  // Play `clip` from agent a with its bubble (the clip's own words), subtitle and talking animation.
+  _speakClip(a, clip, purpose, kind, { rate = a.voiceRate || 1, volume = 1, text, en } = {}) {
+    const h = this.sv.play(clip, this._mouth(a), { rate, volume, purpose });
+    if (!h) return 0;
+    a.voice = FSI_VOICE;
+    return this._showClip(a, clip, h.duration ?? clip.dur / rate, kind, text, en);
+  }
+
+  _showClip(a, clip, dur, kind, text, en) {
+    const t = this.game.time;
+    const sn = text || clip.text || clip.sn;
+    const gl = en ?? gloss(clip.en);
+    this._say(a, sn, gl, Math.max(2200, dur * 1000 + 1100), kind);
+    a.talkUntil = t + dur;
+    a.lastSpoke = t;
+    this.game.events.emit('npc:speak', { npc: a, clip: { id: clip.id, kind: clip.kind, sn, en: gl, dur }, text: sn });
+    return dur;
+  }
+
+  // A reaction clip `delay` s from now (when the agent turns to look); the bubble shows its words, or
+  // `line` (text only) if it cannot be played by then.
+  _reactClip(a, pairs, line, delay) {
+    if (!this._male(a) || !this.sv.canSpeak('react', delay)) return false;
+    this.sv.reserve('react', delay);
+    const id = a.id;
+    this.sv.later(delay, () => {
+      if (a.id !== id) return;
+      const clip = this._male(a) && this.sv.choose(pairs); // (he may have been given a FLEURS voice meanwhile)
+      if (!clip || !this._speakClip(a, clip, 'react', 'react')) this._say(a, line.sn, line.en, 2400, 'react');
+    });
+    return true;
+  }
+
+  // Greeting for Spider-Man walking past, by time of day.
+  _greetClip(a) {
+    if (!this._male(a) || !this.sv.canSpeak('greet')) return false;
+    const part = greetingPart(this.pop.hour ?? 12);
+    // No recorded "Manheru" (good evening): half the evening greetings stay text-only.
+    if (part === 'evening' && Math.random() < 0.5) return false;
+    let ids = GREET_CLIPS[part];
+    if (a.look.archetype === 'elder' && ELDER_GREETINGS[part]) ids = ids.concat(ELDER_GREETINGS[part]);
+    const clip = this.sv.choose(ids);
+    return !!clip && this._speakClip(a, clip, 'greet', 'say') > 0;
+  }
+
+  // "Ndiri kutengesa mahobo" (I'm selling bananas) from a man selling fruit.
+  _vendorClip(a) {
+    if (!this._male(a) || a.stall?.type !== 'fruit_veg' || !this.sv.canSpeak('vendor')) return false;
+    const clip = this.sv.choose([BANANAS]);
+    return !!clip && this._speakClip(a, clip, 'vendor', 'call') > 0;
+  }
+
+  // A hwindi calling his destination twice ("KuMarondera! KuMarondera!"), rising a little.
+  _hwindiClip(a) {
+    if (!this._male(a) || !this.sv.canSpeak('hwindi')) return false;
+    if (!a.dest) a.dest = this.sv.assignDestination();
+    const clip = a.dest && this.sv.clip(a.dest);
+    if (!clip || clip.id === this.sv.lastId) return false;
+    const rate = (a.voiceRate || 1) * 1.04;
+    const dur = this.sv.doubleCall(clip, this._mouth(a), { rate, volume: 1.1 });
+    if (!dur) return false;
+    a.voice = FSI_VOICE;
+    const call = shout(clip.text);
+    this._showClip(a, clip, dur, 'call', `${call} ${call}`, shout(gloss(clip.en)));
+    return true;
   }
 
   // Everyone around a landing turns to look; a hard landing close by scatters people.
@@ -57,6 +148,7 @@ export class Social {
     list.sort((p, q) => p.d - q.d);
     let bubbles = 0;
     let barked = false;
+    let clipped = false;
     for (const { a, d } of list) {
       if (!hard && t < (a.reactCool || 0)) continue;
       const notice = d < 9 ? 1 : 1 - (d - 9) / (R - 9);
@@ -81,8 +173,14 @@ export class Social {
       }
       if (bubbles < 3 && (bubbles === 0 || Math.random() < 0.5)) {
         const line = pick(scared ? FEAR : AWE);
-        this._say(a, line.sn, line.en, 2400, 'react', delay);
         bubbles++;
+        // One man says it out loud with a real recording (the bubble then shows his words)...
+        if (!clipped && this._reactClip(a, scared ? REACT_FEAR : REACT_AWE, line, delay)) {
+          clipped = true;
+          continue;
+        }
+        this._say(a, line.sn, line.en, 2400, 'react', delay);
+        // ...and one other person's exclamation is voiced from FLEURS.
         if (!barked) barked = this.voices.bark(a, line);
       }
     }
@@ -118,8 +216,10 @@ export class Social {
           this.crowd.startReaction(a, this._excitedType(a), 2.2 + Math.random() * 2.5, Math.random() * 0.3);
           if (!said && t - this.lastBubble > 2.5) {
             const line = pick(AWE);
-            this._say(a, line.sn, line.en, 2200, 'react');
-            if (Math.random() < 0.4) this.voices.bark(a, line);
+            if (!(Math.random() < 0.35 && this._reactClip(a, REACT_SWING, line, 0.25))) {
+              this._say(a, line.sn, line.en, 2200, 'react');
+              if (Math.random() < 0.4) this.voices.bark(a, line);
+            }
             this.lastBubble = t;
             said = true;
           }
@@ -137,10 +237,12 @@ export class Social {
         if (fx * (ctx.px - a.position.x) + fz * (ctx.pz - a.position.z) < 0.2) continue;
         a.nextGreet = t + 40;
         if (Math.random() > 0.55) continue;
-        const part = daypart(this.pop.hour ?? 12);
-        const pool = GREETINGS.filter((g) => !g.timeOfDay || g.timeOfDay === part);
-        const g = pick(pool.length ? pool : SAYINGS);
-        this._say(a, g.sn, g.en, 2200, 'say');
+        if (!this._greetClip(a)) {
+          const part = daypart(this.pop.hour ?? 12);
+          const pool = GREETINGS.filter((g) => !g.timeOfDay || g.timeOfDay === part);
+          const g = pick(pool.length ? pool : SAYINGS);
+          this._say(a, g.sn, g.en, 2200, 'say');
+        }
         if (!a.stall?.sit) this.crowd.startReaction(a, 'wave', 1.6, 0);
         this.greetAt = t + 2.2;
         break;
@@ -149,10 +251,25 @@ export class Social {
     // Calls from vendors and touts, overheard remarks.
     if (this.bubbles.activeCount() >= 6) return;
     for (const a of this.pop.list) {
-      if (t < a.nextBubble || a.state === 'react') continue;
+      if (a.state === 'react') continue;
       const d2 = (a.position.x - ctx.px) ** 2 + (a.position.z - ctx.pz) ** 2;
+      // A man selling fruit calls out when Spider-Man comes close.
+      if (a.kind === 'vendor' && d2 < 12 * 12 && t > a.nextCall && a.gender === 'male' && a.stall?.type === 'fruit_veg') {
+        if (this._vendorClip(a)) {
+          a.nextCall = t + 30 + Math.random() * 25;
+          a.nextBubble = Math.max(a.nextBubble, t + 8);
+          return;
+        }
+        a.nextCall = t + 2 + Math.random() * 2; // someone else was talking: try again shortly
+      }
+      if (t < a.nextBubble) continue;
       if (a.kind === 'hwindi' && d2 < 35 * 35) {
         a.nextBubble = t + 4 + Math.random() * 6;
+        if (d2 < 30 * 30 && Math.random() < 0.5 && this._hwindiClip(a)) {
+          a.timer = 3.5;
+          a.nextBubble += 3;
+          return;
+        }
         const call = this._hwindiCall(a);
         this._say(a, call.text, call.en, 2300, 'call');
         a.timer = 2.5;

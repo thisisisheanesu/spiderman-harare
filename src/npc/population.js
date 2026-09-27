@@ -266,7 +266,7 @@ export class Population {
     const dx = x - cam.x;
     const dz = z - cam.z;
     if (dx * dx + dz * dz > 75 * 75) return false;
-    return this.frustum.containsPoint(this._v.set(x, 1, z));
+    return this.frustum.containsPoint(this._v.set(x, 1 + this.walk.hill(x, z, true), z));
   }
 
   _spawnWalker(ctx, anywhere) {
@@ -300,11 +300,11 @@ export class Population {
     const e = W.edges[ei];
     const s = rng.range(0.5, e.len - 0.5);
     const p = W.pointOn(e, s, e.side * e.spread, this._p);
-    if ((!anywhere && this._inView(p.x, p.z)) || this.crowd.near(p.x, p.z, 1.2, this._tmp).length || !W.free(p.x, p.z)) return null;
+    if ((!anywhere && this._inView(p.x, p.z)) || this.crowd.near(p.x, p.z, 1.2, this._tmp).length || !W.free(p.x, p.z) || this.crowd.obstacleAt(p.x, p.z, 0.35)) return null;
     const look = makeLook(rng, pickArchetype(rng, { hour: this.hour }));
     const a = this._alloc(look, 'idle');
     if (!a) return null;
-    a.position.set(p.x, W.nodes[e.a].y, p.z);
+    a.position.set(p.x, W.nodes[e.a].y + W.hill(p.x, p.z, true), p.z);
     a.heading = Math.atan2(e.side * e.uz, -e.side * e.ux);
     a.home = { x: p.x, z: p.z, heading: a.heading, edge: ei };
     a.timer = this.game.time + (look.stationary ? rng.range(60, 180) : rng.range(15, 60));
@@ -350,7 +350,7 @@ export class Population {
       const r = rng.range(0.52, 0.68);
       const x = cx + Math.cos(ang) * r;
       const z = cz + Math.sin(ang) * r;
-      if (W.free(x, z) && W.free(x + 0.25, z) && W.free(x - 0.25, z) && W.free(x, z + 0.25) && W.free(x, z - 0.25)) spots.push([x, z]);
+      if (W.free(x, z) && W.free(x + 0.25, z) && W.free(x - 0.25, z) && W.free(x, z + 0.25) && W.free(x, z - 0.25) && !this.crowd.obstacleAt(x, z, 0.3)) spots.push([x, z]);
     }
     if (spots.length < 2) return 0;
     const group = { x: cx, z: cz, members: [], speaker: 0, switchAt: 0, until: this.game.time + rng.range(25, 90), edge: ei };
@@ -360,7 +360,7 @@ export class Population {
       const arch = rng() < 0.6 ? theme : pickArchetype(rng, { hour: this.hour });
       const a = this._alloc(makeLook(rng, arch), 'group');
       if (!a) break;
-      a.position.set(x, y, z);
+      a.position.set(x, y + W.hill(x, z, true), z);
       a.heading = headingOf(cx - x, cz - z);
       a.home = { x, z, heading: a.heading };
       a.group = group;

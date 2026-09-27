@@ -67,7 +67,7 @@ export class SpeechBubbles {
       sprite.visible = false;
       sprite.renderOrder = 5;
       scene.add(sprite);
-      this.pool.push({ sprite, vehicle: null, age: 0 });
+      this.pool.push({ sprite, vehicle: null, age: 0, life: LIFE });
     }
   }
 
@@ -77,7 +77,8 @@ export class SpeechBubbles {
     return n;
   }
 
-  show(vehicle, call) {
+  // Shows call {text, en} over the vehicle for `life` seconds (default LIFE).
+  show(vehicle, call, life = LIFE) {
     let slot = this.pool.find((b) => !b.vehicle);
     if (!slot) slot = this.pool.reduce((a, b) => (b.age > a.age ? b : a));
     const key = call.text;
@@ -86,6 +87,7 @@ export class SpeechBubbles {
     slot.sprite.material.needsUpdate = true;
     slot.vehicle = vehicle;
     slot.age = 0;
+    slot.life = Math.max(LIFE, life);
     slot.sprite.visible = true;
   }
 
@@ -102,7 +104,7 @@ export class SpeechBubbles {
       const v = b.vehicle;
       if (!v) continue;
       b.age += dt;
-      if (b.age > LIFE) {
+      if (b.age > b.life) {
         b.vehicle = null;
         b.sprite.visible = false;
         continue;
@@ -111,12 +113,12 @@ export class SpeechBubbles {
       // Above the door side of the kombi (left of the heading).
       const lx = -Math.cos(v.heading);
       const lz = Math.sin(v.heading);
-      s.position.set(v.position.x + lx * 1.2, v.height + 0.5, v.position.z + lz * 1.2);
+      s.position.set(v.position.x + lx * 1.2, v.position.y + v.height + 0.5, v.position.z + lz * 1.2);
       const dist = camera.position.distanceTo(s.position);
       const pop = Math.min(1, b.age / 0.18);
       const scale = (0.75 + 0.25 * pop) * Math.max(1, dist / 16);
       s.scale.set(3.4 * scale, 1.33 * scale, 1);
-      s.material.opacity = Math.min(pop, (LIFE - b.age) / 0.5, 1);
+      s.material.opacity = Math.min(pop, (b.life - b.age) / 0.5, 1);
     }
   }
 }

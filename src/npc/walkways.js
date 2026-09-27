@@ -19,6 +19,8 @@ const MAX_EDGE = 16;
 const BODY = 0.3; // clearance kept from walls and kerbs
 
 const PATH_CLASSES = { pedestrian: 4.5, footway: 1.1, path: 0.5, steps: 0.4 };
+// The city lays roads, pavements and paths this far above the Kopje's bare ground (terrain.js).
+const PAVED_LIFT = 0.12;
 
 function gridKey(gx, gz) {
   return gx * 100003 + gz;
@@ -73,8 +75,8 @@ class Carriageways {
     return -1;
   }
 
-  // Surface height at (x, z): raised pavement beside a road that has one, else the flat ground.
-  groundY(x, z) {
+  // Surface at (x, z): 2 = raised pavement beside a road that has one, 1 = carriageway, 0 = open ground.
+  surfaceAt(x, z) {
     const arr = this.grid.get(gridKey(Math.floor(x / CELL), Math.floor(z / CELL)));
     if (!arr) return 0;
     let kerb = false;
@@ -84,10 +86,10 @@ class Carriageways {
       const i = arr[k + 1];
       const c = closestOnSegment(x, z, p[i], p[i + 1], p[i + 2], p[i + 3]);
       const d = Math.sqrt(c.d2);
-      if (d < r.w / 2) return 0;
+      if (d < r.w / 2) return 1;
       if (d < r.w / 2 + sidewalkWidth(r)) kerb = true;
     }
-    return kerb ? KERB_HEIGHT : 0;
+    return kerb ? 2 : 0;
   }
 }
 
@@ -139,9 +141,11 @@ function sampleAt(pl, t, out) {
 }
 
 export class Walkways {
-  constructor(world, data) {
+  // heightAt(x, z): the city's ground height (0 except on the Kopje hill).
+  constructor(world, data, heightAt) {
     this.world = world;
     this.data = data;
+    this.heightAt = heightAt || (() => 0);
     this.roads = data.roads;
     this.carriage = new Carriageways(data.roads);
     this.nodes = []; // {x, z, y, edges: [edge index]}
@@ -167,8 +171,17 @@ export class Walkways {
     this._finish();
   }
 
+  // Walking surface height at (x, z): pavement kerb, road or ground, on the Kopje where it rises.
   groundY(x, z) {
-    return this.carriage.groundY(x, z);
+    const s = this.carriage.surfaceAt(x, z);
+    return (s === 2 ? KERB_HEIGHT : 0) + this.hill(x, z, s > 0);
+  }
+
+  // Height of the Kopje under (x, z) (0 off the hill); `paved` for the road / pavement / path surfaces
+  // the city lays a little above the bare hillside.
+  hill(x, z, paved) {
+    const h = this.heightAt(x, z);
+    return h > 0.05 ? h + (paved ? PAVED_LIFT : 0) : 0;
   }
 
   free(x, z) {

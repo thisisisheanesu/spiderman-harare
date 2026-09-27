@@ -19,6 +19,8 @@ const TEXT_INTERVAL = 0.2; // s between DOM text refreshes (~5 Hz)
 const HINT_SECONDS = 20;
 const WAYPOINT_REACHED = 25; // m
 const LOCK_HINT_MS = 5000;
+// npc:speak clip kinds that appear as speech bubbles, not subtitles (FLEURS barks, extras greetings).
+const BUBBLE_KINDS = new Set(['bark', 'greet', 'exclaim', 'call']);
 
 // HUD system (game.hud): minimap, compass, location readout, subtitles / toasts / objective,
 // big map, pause menu, help and touch controls. Owns every overlay and pauses the game while one
@@ -263,14 +265,15 @@ export class Hud {
     const street = world.streetNameAt(p.x, p.z);
     const area = this.places.areaAt(p.x, p.z);
     const near = this.places.nearest(p.x, p.z, 350);
-    const title = street || area || near?.name || 'Harare CBD';
+    const district = this.places.district(p.x, p.z);
+    const title = street || area || near?.name || district;
     const roof = world.buildingAt(p.x, p.z);
     const roofName = roof && p.y > roof.h - 3 ? this.places.nameOf(roof) : '';
     let detail = '';
     if (roofName) detail = `atop ${roofName}`;
     else if (area && area !== title) detail = `in ${area}`;
     else if (near && near.name !== title) detail = `near ${near.name}`;
-    else if (title !== 'Harare CBD') detail = 'Harare CBD';
+    else if (title !== district) detail = district;
     return { street: title, detail };
   }
 
@@ -308,9 +311,13 @@ export class Hud {
     this.hint.replaceChildren(...controlsHint(mode));
   }
 
+  // Full 'line' clips get a subtitle (deduped against the one the voice director shows itself).
+  // Short exclamations / greetings / calls are shown in the NPC's speech bubble instead, unless the
+  // event asks for a subtitle ({subtitle: true}).
   _npcSpoke(e) {
     const clip = e?.clip;
-    const sn = clip?.sn || '';
+    if (BUBBLE_KINDS.has(clip?.kind) && !e?.subtitle) return;
+    const sn = clip?.sn || (clip?.lang === 'sn' ? clip?.text : '') || '';
     const en = clip?.en || e?.text || '';
     if (!sn && !en) return;
     const role = e?.npc?.role || e?.npc?.name || '';

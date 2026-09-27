@@ -64,8 +64,14 @@ export class VoiceBank {
   }
 
   // voiceClips({kind, gender, voice}) — every given field must match.
-  filter(filter = {}) {
-    const keys = Object.keys(filter).filter((k) => filter[k] !== undefined && filter[k] !== null);
-    return this.clips.filter((c) => keys.every((k) => c[k] === filter[k]));
+  filter(filter) {
+    return matchClips(this.clips, filter);
   }
+}
+
+// Clips matching every given field of `filter`; an array value matches any of its entries
+// ({kind: ['greet', 'exclaim']}). Undefined / null fields are ignored.
+export function matchClips(clips, filter = {}) {
+  const keys = Object.keys(filter || {}).filter((k) => filter[k] !== undefined && filter[k] !== null);
+  return clips.filter((c) => keys.every((k) => (Array.isArray(filter[k]) ? filter[k].includes(c[k]) : c[k] === filter[k])));
 }

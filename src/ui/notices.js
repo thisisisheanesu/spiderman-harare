@@ -2,6 +2,8 @@ import { el, setText } from './dom.js';
 
 const FADE_MS = 280;
 const MAX_QUEUE = 3;
+const READ_TAIL_MS = 1500; // reading time a subtitle keeps after its line ends (voices.js: dur + 1.5 s) ...
+const MIN_LEFT_MS = 600; // ... which it gives up, down to this, when the next line is already waiting
 
 // Subtitles (bottom centre, queued), toasts (under the compass) and the objective panel.
 export class Notices {
@@ -26,7 +28,13 @@ export class Notices {
     const item = { speaker, sn, en, ms: ms || Math.min(7000, Math.max(2600, 1400 + len * 55)) };
     this.queue.push(item);
     if (this.queue.length > MAX_QUEUE) this.queue.shift();
-    if (!this.current) this._next();
+    const c = this.current;
+    if (!c) this._next();
+    else if (!c.trimmed) {
+      // Someone else has started talking: don't hold their subtitle back for the reading tail.
+      c.trimmed = true;
+      c.left = Math.min(c.left, Math.max(MIN_LEFT_MS, c.left - READ_TAIL_MS));
+    }
   }
 
   _next() {

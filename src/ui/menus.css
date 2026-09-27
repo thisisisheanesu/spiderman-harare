@@ -335,11 +335,22 @@
   color: #fff;
 }
 
+/* Wide tables (the street-recordings list) scroll sideways instead of crushing their columns. */
+.credits-table {
+  margin: 4px 0 12px;
+  overflow-x: auto;
+  touch-action: pan-x pan-y;
+}
+
 .credits table {
   width: 100%;
-  margin: 4px 0 12px;
   border-collapse: collapse;
   font: 400 12.5px/1.45 var(--font);
+}
+
+.credits table:has(th:nth-child(5)) {
+  min-width: 560px;
+  overflow-wrap: break-word;
 }
 
 .credits th,

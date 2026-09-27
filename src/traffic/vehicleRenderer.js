@@ -16,6 +16,7 @@ const _local = new THREE.Matrix4();
 const _rot = new THREE.Matrix4();
 const _out = new THREE.Matrix4();
 const _euler = new THREE.Euler(0, 0, 0, 'YXZ');
+const _eulerC = new THREE.Euler(0, 0, 0, 'YXZ');
 const _scale = new THREE.Vector3();
 const _sphere = new THREE.Sphere();
 
@@ -183,9 +184,14 @@ export class VehicleRenderer {
     const i = mesh.count;
     if (i >= spec.capacity) return;
     mesh.count = i + 1;
-    _chassis.makeRotationY(v.heading).setPosition(p.x, ROAD_Y, p.z);
-    _euler.set(v.pitch, v.heading, v.roll);
-    _body.makeRotationFromEuler(_euler).setPosition(p.x, ROAD_Y, p.z);
+    // Chassis (wheels, shadow, hwindi) follows the road, pitched along the Kopje's slope; the body adds
+    // its own pitch and roll on the suspension.
+    const slope = v.slope || 0;
+    const y = p.y + ROAD_Y;
+    if (slope) _chassis.makeRotationFromEuler(_eulerC.set(slope, v.heading, 0)).setPosition(p.x, y, p.z);
+    else _chassis.makeRotationY(v.heading).setPosition(p.x, y, p.z);
+    _euler.set(slope + v.pitch, v.heading, v.roll);
+    _body.makeRotationFromEuler(_euler).setPosition(p.x, y, p.z);
     mesh.setMatrixAt(i, _body);
     mesh.setColorAt(i, v.color);
     const st = spec.state.array;

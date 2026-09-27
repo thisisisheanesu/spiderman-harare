@@ -46,6 +46,12 @@ const ARMS = {
   bag: [0.05, 0.14, 0.12],
 };
 
+// Stable playback rate for a person's voice, 0.94..1.06, from their (seeded) look.
+function voiceRateOf(look) {
+  const k = Math.sin((look.build + 1.3) * 7919.13 + look.scale * 1047.29 + look.speed * 357.11) * 43758.5453;
+  return 0.94 + 0.12 * (k - Math.floor(k));
+}
+
 function setArm(arm, pose, w = 1) {
   arm[0] = pose[0];
   arm[1] = pose[1];
@@ -115,9 +121,13 @@ export class Agent {
     this.resume = null;
     this.talkUntil = 0;
     this.voice = null;
+    this.voiceRate = voiceRateOf(look);
+    this.dest = null; // hwindi: the destination clip he calls
     this.nextBubble = 0;
     this.nextGreet = 0;
+    this.nextCall = 0;
     this.lastSpoke = -1e9;
+    this.crossRoad = -1; // out on a carriageway: index of the road being crossed
     this.vx = 0;
     this.vz = 0;
     const p = this.pose;
@@ -143,9 +153,19 @@ export class Crowd {
     this._armR = new Float32Array(4);
     this._armL = new Float32Array(4);
     this._near = [];
-    // Static obstacles (stalls) in a coarse grid; each is filed under every cell within look-ahead.
+    // People out on a carriageway (crossing or fleeing across it), refreshed every frame for traffic.
+    this.crossers = [];
+    // Static obstacles in a coarse grid; each is filed under every cell within look-ahead. Stalls
+    // (stall: true) are packed away at night; the city's street furniture stays.
     this.obGrid = new Map();
-    for (const o of obstacles) {
+    for (const o of obstacles) o.stall = true;
+    this.addObstacles(obstacles);
+  }
+
+  // Obstacles [{x, z, r}] walkers steer around (stalls, and the city's poles, trees and benches).
+  addObstacles(list) {
+    for (const o of list) {
+      if (!(o && Number.isFinite(o.x + o.z) && o.r > 0)) continue;
       const reach = o.r + LOOK + 0.5;
       for (let gx = Math.floor((o.x - reach) / 8); gx <= Math.floor((o.x + reach) / 8); gx++) {
         for (let gz = Math.floor((o.z - reach) / 8); gz <= Math.floor((o.z + reach) / 8); gz++) {
@@ -155,6 +175,18 @@ export class Crowd {
         }
       }
     }
+  }
+
+  // Is (x, z) within `pad` of an obstacle (spawn check)?
+  obstacleAt(x, z, pad) {
+    const cells = this.obGrid.get(this._cellKey(Math.floor(x / 8), Math.floor(z / 8)));
+    if (!cells) return false;
+    for (const o of cells) {
+      if (o.stall && !this.obstaclesOn) continue;
+      const r = o.r + pad;
+      if ((o.x - x) ** 2 + (o.z - z) ** 2 < r * r) return true;
+    }
+    return false;
   }
 
   _cellKey(gx, gz) {
@@ -243,11 +275,15 @@ export class Crowd {
     const uz = a.fwd ? e.uz : -e.uz;
     a.position.x = start.x + ux * a.s + uz * a.lat;
     a.position.z = start.z + uz * a.s - ux * a.lat;
-    a.position.y = W.heightOn(e, a.fwd ? a.s : e.len - a.s);
+    // Kerb / road level, lifted onto the Kopje where Skipper Hoste Drive climbs it.
+    a.position.y = W.heightOn(e, a.fwd ? a.s : e.len - a.s) + W.hill(a.position.x, a.position.z, true);
   }
 
   update(dt, ctx) {
     const list = this.agents;
+    const edges = this.walk.edges;
+    const crossers = this.crossers;
+    crossers.length = 0;
     for (let i = 0; i < list.length; i++) {
       const a = list[i];
       switch (a.state) {
@@ -266,6 +302,14 @@ export class Crowd {
           this._stand(a, dt, ctx);
       }
       this._animate(a, dt, ctx);
+      a.crossRoad = -1;
+      if ((a.state === 'cross' || a.state === 'flee') && a.edge >= 0) {
+        const e = edges[a.edge];
+        if (e.kind === CROSS && e.road >= 0) {
+          a.crossRoad = e.road;
+          crossers.push(a);
+        }
+      }
     }
   }
 
@@ -371,9 +415,10 @@ export class Crowd {
       oncoming = b.vx * ux + b.vz * uz < -0.3;
       staticBlock = b.vx * b.vx + b.vz * b.vz < 0.04;
     }
-    const cells = this.obstaclesOn && this.obGrid.get(this._cellKey(Math.floor(x / 8), Math.floor(z / 8)));
+    const cells = this.obGrid.get(this._cellKey(Math.floor(x / 8), Math.floor(z / 8)));
     if (cells) {
       for (const o of cells) {
+        if (o.stall && !this.obstaclesOn) continue;
         const rx = o.x - x;
         const rz = o.z - z;
         const ahead = rx * ux + rz * uz;

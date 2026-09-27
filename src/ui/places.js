@@ -10,6 +10,7 @@ import { lonLatToXZ, polyArea, polyCentroid, pointInPoly } from '../core/geo.js'
 // Landmark records carry `label: true|false` (false = podium / annex parts that get no marker).
 //
 // Place: {key, name, x, z, kind: 'landmark'|'park'|'place', distant} (distant = outside the map: compass only)
+// district(x, z): 'Harare CBD' | 'Harare' (fallback label for the location readout)
 // Rank:  {name, label, x, z}
 
 const OVERRIDES =
@@ -34,6 +35,7 @@ const AREA_KINDS = new Set(['park', 'golf', 'rank', 'platform', 'school', 'hospi
 const MERGE_DIST = 60;
 const RANK_MERGE_DIST = 80;
 const DISTANT_MARGIN = 300; // m outside the map bounds
+const CBD_MARGIN = 60; // m around the tall core blocks that still count as "Harare CBD"
 
 // "Meikles Hotel (Hyatt Regency Harare The Meikles)" -> "Meikles Hotel"
 const shortName = (name) => name.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
@@ -69,6 +71,13 @@ export class Places {
     }
     this._addKnownBuildings(data);
     for (const r of data.ranks || []) this._addRank(r.name, r.x, r.z);
+    this.cbd = coreBounds(data.buildings);
+  }
+
+  // 'Harare CBD' inside the downtown grid (the tall core blocks), 'Harare' out in the Avenues / suburbs.
+  district(x, z) {
+    const c = this.cbd;
+    return !c || (x > c.minX && x < c.maxX && z > c.minZ && z < c.maxZ) ? 'Harare CBD' : 'Harare';
   }
 
   _add(p) {
@@ -176,4 +185,26 @@ export class Places {
     }
     return '';
   }
+}
+
+// Bounds of the buildings flagged as the dense CBD core (1st..99th percentile, so a stray outlier
+// does not stretch them), or null when the map has no core flags.
+function coreBounds(buildings = []) {
+  const xs = [];
+  const zs = [];
+  for (const b of buildings) {
+    if (!b.core) continue;
+    xs.push(b.cx ?? b.fp[0]);
+    zs.push(b.cz ?? b.fp[1]);
+  }
+  if (xs.length < 20) return null;
+  xs.sort((a, b) => a - b);
+  zs.sort((a, b) => a - b);
+  const q = (arr, f) => arr[Math.min(arr.length - 1, Math.floor(arr.length * f))];
+  return {
+    minX: q(xs, 0.01) - CBD_MARGIN,
+    maxX: q(xs, 0.99) + CBD_MARGIN,
+    minZ: q(zs, 0.01) - CBD_MARGIN,
+    maxZ: q(zs, 0.99) + CBD_MARGIN,
+  };
 }

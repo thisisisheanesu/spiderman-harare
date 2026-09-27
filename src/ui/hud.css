@@ -439,6 +439,28 @@
   }
 }
 
+/* Short screens (landscape phones): a long spoken line must not cover the middle of the street. */
+@media (max-height: 520px) {
+  .subs .sub {
+    padding: 6px 12px 8px;
+  }
+
+  .sub-speaker {
+    margin-bottom: 4px;
+  }
+
+  .sub-sn {
+    font-size: 14px;
+    line-height: 1.28;
+  }
+
+  .sub-en {
+    margin-top: 2px;
+    font-size: 11.5px;
+    line-height: 1.28;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hud,
   .hud * {

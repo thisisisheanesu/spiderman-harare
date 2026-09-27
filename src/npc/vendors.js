@@ -149,7 +149,8 @@ export class Vendors {
       for (const [a, b] of [[0, 0], [0.75, 0.6], [-0.75, 0.6], [0.75, -0.95], [-0.75, -0.95]]) {
         if (!w.free(x - fz * a + fx * b, z + fx * a + fz * b)) return false;
       }
-      const stall = { type: type.type, def: type, x, z, y, heading, where, rank: rankName, seed: rng.int(0, 1e9) };
+      // Lifted onto the Kopje if the stall stands on its pavements.
+      const stall = { type: type.type, def: type, x, z, y: y + w.hill(x, z, true), heading, where, rank: rankName, seed: rng.int(0, 1e9) };
       this._layout(stall, rng);
       this.stalls.push(stall);
       taken.push({ x, z, r: 2.2 });
