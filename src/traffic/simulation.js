@@ -71,8 +71,8 @@ export class Simulation {
     if (v.reqJ) removeFrom(v.reqJ.requests, v);
     if (v.grantJ) removeFrom(v.grantJ.occupants, v);
     if (v.boxJ) removeFrom(v.boxJ.occupants, v);
-    this._unreserve(v, v.resLane);
     this._unreserve(v, v.resLane2);
+    this._unreserve(v, v.resLane);
     v.reqJ = v.grantJ = v.boxJ = null;
     removeFrom(this.vehicles, v);
   }

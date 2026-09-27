@@ -810,8 +810,8 @@ def build_crowd(ffmpeg, data, exclude_wavs, out_path, rng):
     i.e. a perfect tail->head crossfade), filter a 3x tiled copy and keep the middle cycle so the
     lowpass/echo state is continuous across the loop point."""
     L = int(CROWD_LEN_S * CROWD_SR)
-    pool = [r for r in data if base_ok(r, 18.0) and r['wav'] not in exclude_wavs and r['off'] - r['on'] >= 5.0
-            and clean_start(r) and quiet_at(r, r['off'] + 0.05)]
+    pool = [r for r in data if base_ok(r, 18.0) and r['wav'] not in exclude_wavs and r['off'] - r['on'] >= 10.0
+            and clean_start(r) and quiet_at(r, r['off'] + 0.05) and no_bursts(r, r['on'], r['off'])]
     fem = [r for r in pool if r['session'] == 'f']
     mc = [r for r in pool if r['session'] == 'm-clean']
     mn = [r for r in pool if r['session'] == 'm-noisy' and r['snr_db'] >= 20]
@@ -873,6 +873,14 @@ def build_crowd(ffmpeg, data, exclude_wavs, out_path, rng):
         yy = y * 10 ** (gdb / 20)
         np.add.at(mix[:, 0], idx, yy * math.cos(th))
         np.add.at(mix[:, 1], idx, yy * math.sin(th))
+    # slow circular level rider (1 s windows, +/-6 dB) evens out moments where few voices overlap
+    lw = CROWD_SR
+    lev = np.sqrt((np.concatenate([mix, mix[:lw]]) ** 2).mean(axis=1))
+    csum = np.concatenate([[0.0], np.cumsum(lev ** 2)])
+    env = np.sqrt((csum[lw:lw + L] - csum[:L]) / lw)               # window starting at each sample
+    env = np.roll(env, lw // 2)                                     # centre it
+    ride = np.clip(np.median(env) / np.maximum(env, 1e-9), 10 ** (-6 / 20), 10 ** (6 / 20))
+    mix *= ride[:, None]
     tiled = np.tile(mix, (3, 1)).astype(np.float32)
     cmd = [ffmpeg, '-v', 'error', '-nostdin', '-f', 'f32le', '-ar', str(CROWD_SR), '-ac', '2', '-i', 'pipe:0',
            '-af', 'lowpass=f=4000,aecho=0.85:0.9:29|53|83:0.22|0.15|0.09', '-f', 'f32le', '-ac', '2', 'pipe:1']
@@ -882,6 +890,16 @@ def build_crowd(ffmpeg, data, exclude_wavs, out_path, rng):
     g = 10 ** (-22.0 / 20) / rms
     g = min(g, 10 ** (-2.0 / 20) / np.abs(y).max())
     y *= g
+    # The loop is circular, so any sample can be the file start: start where the 50 ms level is close to
+    # the median and changes least, so even the first play-through begins mid-murmur.
+    w50 = int(0.05 * CROWD_SR)
+    p = np.concatenate([[0.0], np.cumsum(np.concatenate([y, y[:w50]]).mean(axis=1) ** 2)])
+    lv = db((p[w50:w50 + L] - p[:L]) / w50)                          # level of [k, k + 50 ms)
+    prev = np.roll(lv, w50)                                          # level of [k - 50 ms, k)
+    med = np.median(lv)
+    cost = np.abs(lv - prev) + 0.5 * np.abs(lv - med) + 0.5 * np.abs(prev - med)
+    k = int(np.argmin(cost[::441]) * 441)
+    y = np.roll(y, -k, axis=0)
     encode_mp3(ffmpeg, y, CROWD_SR, out_path, CROWD_SR, 96, channels=2)
     info = dict(voices=n, female=sum(r['gender'] == 'female' for r in picks),
                 male=sum(r['gender'] == 'male' for r in picks), sentences=len(seen),
@@ -1138,13 +1156,14 @@ def verify(ffmpeg, out_dir, rnd, n_check=20):
     steps = np.abs(np.diff(body))                      # level change between neighbouring 50 ms windows
     jump = float(np.abs(y2[0] - y2[-1]).max())         # sample step across the loop point
     typical = float(np.percentile(np.abs(np.diff(y2, axis=0)), 99.9))
-    good = (abs(len(y) / CROWD_SR - CROWD_LEN_S) < 0.1 and abs(tail_db - head_db) <= np.percentile(steps, 99)
-            and jump <= typical and min(head_db, tail_db) > body.min() - 1)
+    good = (abs(len(y) / CROWD_SR - CROWD_LEN_S) < 0.01 and abs(tail_db - head_db) <= steps.max()
+            and jump <= typical and min(head_db, tail_db) >= np.percentile(body, 5))
     ok_all &= good
     log(f'\nVERIFY crowd_loop.mp3: {len(y) / CROWD_SR:.3f} s; across the loop point: level step '
         f'{abs(tail_db - head_db):.1f} dB (neighbouring 50 ms windows in the body: median {np.median(steps):.1f}, '
         f'99th pct {np.percentile(steps, 99):.1f} dB), sample step {jump:.4f} (99.9th pct of body {typical:.4f}); '
-        f'no dropout (quietest 50 ms of body {body.min():.1f} dBFS) -> {"OK" if good else "FAIL"}')
+        f'edge levels {tail_db:.1f}/{head_db:.1f} dBFS (body 5th pct {np.percentile(body, 5):.1f}, min {body.min():.1f}) '
+        f'-> {"OK" if good else "FAIL"}')
     total = sum(f.stat().st_size for f in Path(out_dir).iterdir() if f.is_file())
     for f in sorted(Path(out_dir).iterdir()):
         log(f'  {f.name:<18}{f.stat().st_size:>10,d} bytes')

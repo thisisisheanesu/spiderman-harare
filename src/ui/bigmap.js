@@ -313,25 +313,30 @@ export class BigMap {
       placed.push([wpScreen[0] - 14, wpScreen[1] - 34, wpScreen[0] + 14, wpScreen[1]]);
     }
 
-    ctx.textBaseline = 'middle';
-    ctx.textAlign = 'left';
-    // Places: icon always, label when there is room.
-    ctx.font = '700 13px system-ui, sans-serif';
+    // Icons first (always drawn, and reserved so no label covers them), then labels where they fit.
+    const inView = (x, y) => x > -20 && y > -20 && x < this.w + 20 && y < this.h + 20;
+    const marks = [];
     for (const p of this.places.list) {
+      if (p.distant) continue;
       const [x, y] = this._toScreen(p.x, p.z);
-      if (p.distant || x < -20 || y < -20 || x > this.w + 20 || y > this.h + 20) continue;
+      if (!inView(x, y)) continue;
       drawPlaceIcon(ctx, x, y, 6, p.kind);
-      const tw = this._measure(ctx, p.name, '13');
-      if (fits(x - 8, y - 9, x + 12 + tw, y + 9)) haloText(ctx, p.name, x + 10, y, 4);
+      placed.push([x - 7, y - 7, x + 7, y + 7]);
+      marks.push([x, y, p.name, 13, 10]);
     }
-    ctx.font = '600 12px system-ui, sans-serif';
     for (const q of this.places.ranks) {
       const [x, y] = this._toScreen(q.x, q.z);
-      if (x < -20 || y < -20 || x > this.w + 20 || y > this.h + 20) continue;
+      if (!inView(x, y)) continue;
       drawRankIcon(ctx, x, y, 8);
-      if (this.zoom < 0.45) continue;
-      const tw = this._measure(ctx, q.label, '12');
-      if (fits(x - 10, y - 9, x + 14 + tw, y + 9)) haloText(ctx, q.label, x + 12, y, 4);
+      placed.push([x - 9, y - 9, x + 9, y + 9]);
+      if (this.zoom >= 0.45) marks.push([x, y, q.label, 12, 12]);
+    }
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    for (const [x, y, text, size, gap] of marks) {
+      ctx.font = `${size === 13 ? 700 : 600} ${size}px system-ui, sans-serif`;
+      const tw = this._measure(ctx, text, size);
+      if (fits(x + gap - 2, y - 9, x + gap + tw + 2, y + 9)) haloText(ctx, text, x + gap, y, 4);
     }
     this._drawStreetLabels(ctx, fits);
 
@@ -395,42 +400,69 @@ function legendItem(cls, text) {
   return el('span', 'legend-item', null, [el('i', cls), document.createTextNode(text)]);
 }
 
-// Per street name: straight runs (merged across polyline vertices while the direction holds within
-// ~12 degrees) sorted longest first, for placing rotated labels. Streets sorted by importance.
+// Per street name: straight runs, sorted longest first, for placing rotated labels. Polylines are split
+// where they turn by more than ~12 degrees; runs of the same street that meet end to end in the same
+// direction are joined (the map splits streets at every junction), so long avenues get one long run.
+// Streets are sorted by importance.
 function buildStreetCandidates(roads) {
   const byName = new Map();
   for (const r of roads) {
     if (!r.name || !(r.cls in LABEL_ZOOM)) continue;
     let st = byName.get(r.name);
     if (!st) {
-      st = { name: r.name, cls: r.cls, total: 0, segs: [] };
+      st = { name: r.name, cls: r.cls, total: 0, runs: [], segs: null };
       byName.set(r.name, st);
     }
     if (ROAD_RANK[r.cls] > ROAD_RANK[st.cls]) st.cls = r.cls;
     const p = r.pts;
-    let ax = p[0];
-    let az = p[1];
-    let dir = null;
+    let start = 0;
     for (let i = 2; i < p.length; i += 2) {
-      const bx = p[i];
-      const bz = p[i + 1];
-      const d = Math.atan2(bz - p[i - 1], bx - p[i - 2]);
-      if (dir !== null && Math.abs(Math.atan2(Math.sin(d - dir), Math.cos(d - dir))) > 12 * DEG) {
-        pushSeg(st, ax, az, p[i - 2], p[i - 1]);
-        ax = p[i - 2];
-        az = p[i - 1];
-      }
-      dir = d;
-      if (i === p.length - 2) pushSeg(st, ax, az, bx, bz);
+      const last = i === p.length - 2;
+      if (!last && turn(p[i - 2], p[i - 1], p[i], p[i + 1], p[i + 2], p[i + 3]) <= 12 * DEG) continue;
+      st.runs.push([p[start], p[start + 1], p[i], p[i + 1]]);
+      start = i;
     }
   }
   const list = [...byName.values()];
-  for (const st of list) st.segs.sort((a, b) => b.len - a.len);
+  for (const st of list) {
+    st.segs = joinRuns(st.runs)
+      .map(([ax, az, bx, bz]) => ({ ax, az, bx, bz, len: Math.hypot(bx - ax, bz - az) }))
+      .filter((sg) => sg.len >= 30)
+      .sort((a, b) => b.len - a.len);
+    st.total = st.segs.reduce((acc, sg) => acc + sg.len, 0);
+    delete st.runs;
+  }
   return list.sort((a, b) => ROAD_RANK[b.cls] - ROAD_RANK[a.cls] || b.total - a.total);
 }
 
-function pushSeg(st, ax, az, bx, bz) {
-  const len = Math.hypot(bx - ax, bz - az);
-  st.total += len;
-  if (len >= 30) st.segs.push({ ax, az, bx, bz, len });
+// Angle between segment (a->b) and (b->c).
+function turn(ax, az, bx, bz, cx, cz) {
+  const d = Math.atan2(cz - bz, cx - bx) - Math.atan2(bz - az, bx - ax);
+  return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+}
+
+function joinRuns(runs) {
+  const key = (x, z) => `${Math.round(x * 10)},${Math.round(z * 10)}`;
+  const out = runs.slice();
+  for (let changed = true; changed; ) {
+    changed = false;
+    const starts = new Map();
+    out.forEach((r, i) => {
+      starts.set(key(r[0], r[1]), [...(starts.get(key(r[0], r[1])) || []), [i, false]]);
+      starts.set(key(r[2], r[3]), [...(starts.get(key(r[2], r[3])) || []), [i, true]]);
+    });
+    for (let i = 0; i < out.length && !changed; i++) {
+      const a = out[i];
+      for (const [j, reversed] of starts.get(key(a[2], a[3])) || []) {
+        if (j === i) continue;
+        const b = reversed ? [out[j][2], out[j][3], out[j][0], out[j][1]] : out[j];
+        if (turn(a[0], a[1], a[2], a[3], b[2], b[3]) > 6 * DEG) continue;
+        out[i] = [a[0], a[1], b[2], b[3]];
+        out.splice(j, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+  return out;
 }
