@@ -74,7 +74,12 @@ export class SettingsPage {
       type: 'button',
       text: 'Reload to apply',
       onclick: () => {
+        // The stored choice is read on load; only an explicit ?quality= in the URL would override it.
         const url = new URL(location.href);
+        if (!url.searchParams.has('quality')) {
+          location.reload();
+          return;
+        }
         url.searchParams.set('quality', this.settings.get('quality') || current);
         location.assign(url.toString());
       },

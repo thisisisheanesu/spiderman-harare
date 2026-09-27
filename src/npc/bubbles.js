@@ -63,8 +63,10 @@ export class Bubbles {
     item.born = t;
     item.checkT = 0;
     item.sn.textContent = sn || '';
-    item.en.textContent = en || '';
-    item.en.style.display = en ? '' : 'none';
+    // Glosses in the phrase data carry translator notes such as "(respectful)"; bubbles show the plain gloss.
+    const gloss = (en || '').replace(/\s*\([^)]*\)/g, '').trim();
+    item.en.textContent = gloss;
+    item.en.style.display = gloss ? '' : 'none';
     item.el.className = `npc-bubble ${kind}${item.shown ? ' show' : ''}`;
     return item;
   }
