@@ -15,11 +15,13 @@ import { WallMove } from './wall.js';
 //
 // Ground locomotion (Marvel's Spider-Man style: the swing trigger sprints on the ground and swings in
 // the air):
-//   stick < WALK_INPUT (or Alt held / CapsLock on) → walk (~1.6 m/s)
+//   stick < WALK_INPUT (or Alt held / CapsLock toggled on in game) → walk (~1.6 m/s)
 //   stick beyond it, keyboard W                    → run (~7 m/s), a fast superhero jog
-//   swing held on the ground                       → parkour sprint (~13 m/s): auto-vaults and runs up
-//                                                    walls on contact; keep holding through a jump or
-//                                                    off a ledge and the web goes out once airborne
+//   swing held on the ground                       → parkour sprint (~13 m/s): auto-vaults, hops roof
+//                                                    parapets and runs up walls on contact; keep holding
+//                                                    through a jump or off a ledge and the web goes out
+//                                                    once airborne; let go of the stick and he stops
+//                                                    (only a hold begun standing still web-launches)
 // Speed eases in and out (ACCEL / BRAKE, exponential near the target), the turn rate is limited by a
 // lateral acceleration (LAT_ACCEL), so the turning radius grows with speed, and reversing at speed
 // skids to a stop and pivots. Exposed for animation: player.locomotion ('idle' | 'walk' | 'run' |
@@ -71,6 +73,10 @@ const PLUNGE_DRIFT = 3.5; // ...and the least
 const PLUNGE_END = 16; // m above the roof / street below: hand over to the normal dive carve
 const PLUNGE_RUN_HS = 10; // running / jumping off a tower's roof: the plunge keeps up to this drift
 const DROP_WAIT = 0.1; // s over a big drop after leaving a roof before that plunge starts
+
+// Keys the game uses (movement + actions): with Alt held (walking) their browser shortcuts are
+// blocked, see _listenKeys.
+const ALT_GAME_KEYS = /^(Key[WASDEQCFMHVTP]|Arrow|Space$)/;
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const smooth = (a, b, x) => {
@@ -131,7 +137,8 @@ export class Controller {
     this.turnRate = 0;
     this.skid = false;
     this.sprint = false;
-    this.walkLock = false; // CapsLock on (walk)
+    this.sprintHold = false; // swing held and used as the sprint since it went down
+    this.walkLock = false; // CapsLock switched on in game (walk)
     this.altHeld = false;
     this._lastHeading = 0;
     // Post-swing flight (lighter gravity) and short pushes applied over a few frames (boosts).
@@ -237,19 +244,25 @@ export class Controller {
     this.move.x = input.move.x;
     this.move.y = input.move.y;
     this.wish.set(0, 0, 0).addScaledVector(this.camFwd, input.move.y).addScaledVector(this.camRight, input.move.x);
-    // Walk modifier: Alt held, or CapsLock on (read from the key events' modifier state, so it is
-    // right on every platform), see _listenKeys.
+    // Walk modifier: Alt held, or CapsLock toggled on during play (see _listenKeys).
     const keys = input.keys;
     this.altHeld = !!keys && (keys.has('AltLeft') || keys.has('AltRight'));
   }
 
-  // CapsLock state for the walk toggle, and Alt kept from focusing the browser's menu bar.
+  // CapsLock walk toggle, and Alt (the hold-to-walk key) kept from reaching the browser.
+  // The toggle follows presses of CapsLock itself during play (its own event carries the new
+  // state), never the state it was left in before: a CapsLock left on from typing must not lock the
+  // player into walking with no idea why he can't run.
+  // Alt + a game key (Alt+D walking right, Alt+F, Alt+E...) is a browser shortcut (address bar,
+  // menus) on Windows / Linux: those keydowns are claimed too, and a lone Alt must not focus the
+  // menu bar.
   _listenKeys() {
     if (typeof window === 'undefined' || this._keysBound) return;
     this._keysBound = true;
     const onKey = (e) => {
-      if (e.getModifierState) this.walkLock = e.getModifierState('CapsLock');
+      if (e.code === 'CapsLock' && e.getModifierState) this.walkLock = e.getModifierState('CapsLock');
       if (e.code === 'AltLeft' || e.code === 'AltRight') e.preventDefault();
+      else if (e.altKey && e.type === 'keydown' && ALT_GAME_KEYS.test(e.code)) e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('keyup', onKey);
@@ -266,6 +279,10 @@ export class Controller {
     // On the ground the swing trigger is the parkour sprint (with the stick pushed); see tryStart
     // for what it does standing still.
     this.sprint = held && (st === 'ground' || st === 'perch');
+    // A hold that has been sprinting stays a sprint hold until the button is let go: letting go of
+    // the stick then just stops (it must not turn into the standing web launch).
+    if (!held) this.sprintHold = false;
+    else if (this.sprint && this.wish.lengthSq() > 0.04) this.sprintHold = true;
     if (st === 'swing') {
       if (!held) this.swing.release(false);
     } else if (held && st !== 'zip' && (input.pressed('swing') || this.swing.retry <= 0)) {
@@ -377,9 +394,11 @@ export class Controller {
     if (p.state === 'perch') {
       // Swan dive off the ledge: a small hop out, then head-first (straight down a tall facade).
       const high = this._perchDrop() > PLUNGE_DROP;
-      // The hop out, pushed over a few frames (the legs extend) rather than in one.
-      v.set(0, 0, 0);
-      this.push(_b.copy(this.perchOut).multiplyScalar(high ? PLUNGE_OUT : 8).setY(4), 0.15);
+      // The hop out: the spring up leaves the lip at once (from a standstill, dive gravity would
+      // outweigh a pushed-in rise and set the feet straight back down on the roof: a landing, and
+      // no dive); the push out is spread over a few frames as the legs extend.
+      v.set(0, 4, 0);
+      this.push(_b.copy(this.perchOut).multiplyScalar(high ? PLUNGE_OUT : 8), 0.15);
       this.emit('player:jump', { pos: p.position.clone() });
       if (high) {
         this._startPlunge();
@@ -491,6 +510,31 @@ export class Controller {
     if (!climb) return;
     this.wall.enter(n);
     if (p.state === 'wall' && this.move.y > 0.3) p.velocity.y = Math.max(p.velocity.y, speed * 0.85);
+    // Sprinting into a lip too low to climb with nothing to stand on beyond it (a roof's parapet
+    // over the street): hop it and fly on, off the roof (the sprint otherwise stalls against it).
+    if (p.state === 'ground') this._hopLip(n, speed);
+  }
+
+  // Leap over a low lip ahead (wall normal n): false if there is no lip top within VAULT_MAX, or no
+  // room over it for the body.
+  _hopLip(n, speed) {
+    const p = this.p;
+    const pos = p.position;
+    for (let d = p.radius + 0.05; d <= p.radius + 0.7; d += 0.13) {
+      _a.set(pos.x - n.x * d, pos.y + VAULT_MAX + 0.1, pos.z - n.z * d);
+      const hit = this.world.raycast(_a, _down, VAULT_MAX + 0.4);
+      if (!hit || hit.normal.y < 0.7) continue;
+      const rise = hit.point.y - pos.y;
+      if (rise < 0.2 || rise > VAULT_MAX) continue;
+      // Room for the body over the lip and a little beyond.
+      _a.set(pos.x, hit.point.y + 0.7, pos.z);
+      if (this.world.raycast(_a, _b.set(-n.x, 0, -n.z), d + 1.2)) return false;
+      const out = Math.max(speed, 7);
+      _a.set(-n.x * out, 3.5, -n.z * out);
+      this.startVault(_b.copy(hit.point).addScaledVector(n, -0.2), 0.16 + 0.12 * (rise / VAULT_MAX), 'air', _a);
+      return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------- ground
@@ -729,8 +773,8 @@ export class Controller {
 
   // ---------------------------------------------------------------- vault & perch
 
-  // Scripted hop along a curve (ledges, wall tops, zip arrivals, round overhangs); physics resumes at
-  // the end in state `then` ('ground' | 'perch' | 'wall').
+  // Scripted hop along a curve (ledges, wall tops, zip arrivals, round overhangs, parapets); physics
+  // resumes at the end in state `then` ('ground' | 'perch' | 'wall' | 'air').
   startVault(to, dur, then, exitVel) {
     const p = this.p;
     const vt = this.vault;
@@ -762,7 +806,12 @@ export class Controller {
     if (vt.then === 'perch') this.perchAt(vt.to, this.perchOut);
     // (Out round an overhang: carry on climbing the face wall.normal already points out of.)
     else if (vt.then === 'wall') p.state = 'wall';
-    else p.state = 'ground';
+    else if (vt.then === 'air') {
+      // (Over a parapet: off the roof, as if run off it; see _hopLip.)
+      p.state = 'air';
+      this.fromRoof = true;
+      this.dropTime = 0;
+    } else p.state = 'ground';
   }
 
   // Crouch on a ledge at `point` facing `outward` (horizontal).

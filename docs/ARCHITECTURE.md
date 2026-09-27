@@ -134,10 +134,12 @@ gait; 'idle' whenever `state` isn't 'ground'/'perch'; thresholds on groundSpeed 
 ~1.0-1.8, run ~3.6-7, sprint ~13, more for a moment after landing out of a swing — speed-match clips with
 playbackRate = groundSpeed / clipSpeed, e.g. walk 1.4, run 4, sprint 6.5 m/s at rate 1), `turnRate` (rad/s, + = turning
 left/CCW, smoothed, 0 off the ground); `controller.skid` (reversing at speed: planted skid, then a pivot).
-Gaits (controller.js): stick below 0.55 (or Alt held / CapsLock on) walks ~1.6 m/s, beyond it runs ~7 m/s (keyboard W
-runs); the swing action held ON THE GROUND is the parkour sprint (~13 m/s; auto-vaults, runs up walls on contact),
-jump while sprinting is a web launch (two lines yank you up and on) and the still-held swing webs on once airborne;
-holding swing standing still (no stick) also launches. Acceleration/braking are eased, turn rate is limited by
+Gaits (controller.js): stick below 0.55 (or Alt held / CapsLock pressed on during play) walks ~1.6 m/s, beyond it runs
+~7 m/s (keyboard W runs); the swing action held ON THE GROUND is the parkour sprint (~13 m/s; auto-vaults, hops a roof's
+parapet and flies off, runs up walls on contact), jump while sprinting is a web launch (two lines yank you up and on)
+and the still-held swing webs on once airborne; pressing swing standing still (no stick), or a hold begun standing
+still, also launches; letting go of the stick during a sprint hold just stops (`controller.sprintHold`). A plain run
+stops at a roof parapet (jump or sprint to go over). Acceleration/braking are eased, turn rate is limited by
 lateral grip (26 m/s²: ~2 rad/s at a sprint), reversing above 4.5 m/s skids.
 Swinging (swing.js): a rope pendulum whose pivot IS the web anchor (`controller.swing.anchor`, same vector as `.pivot`),
 stiff critically-damped rope with a capped catch tug (no velocity snaps), smooth reel-in only when the anchor is too low
@@ -205,8 +207,10 @@ city paints and pedestrians stay on the sidewalks the city builds.
 actions `jump swing zip dive suit map pause help camera time`. Keyboard: WASD/arrows, Space jump, Shift or
 left-click (pointer-locked) swing, E/Q or right-click zip, C dive (not Ctrl: Ctrl+W closes the tab), F suit, M map, Esc/P pause, H help, V camera,
 T time of day. Gamepad: sticks, A jump, RT swing, LB/RB/LT zip, B dive, Y suit, Back map, Start pause.
-(Swing held on the ground = parkour sprint; the controller also reads `input.keys` for Alt (hold = walk) and the key
-events' CapsLock state (on = walk), see player/controller.js.)
+(Swing held on the ground = parkour sprint; the controller also reads `input.keys` for Alt (hold = walk) and the
+CapsLock key's own events (pressed on during play = walk; a CapsLock already on at load is ignored), and claims
+Alt + game-key keydowns so browser Alt shortcuts (Alt+D address bar, Alt+F menu) don't fire while walking; see
+player/controller.js.)
 Touch UI calls `input.setVirtualMove(x, y)`, `input.addLook(dx, dy)`, `input.setVirtualButton(action, down)`.
 
 ## Rules for every module

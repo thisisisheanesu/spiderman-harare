@@ -220,7 +220,8 @@ export class SwingMove {
       // On a wall with the stick pushed up it is the parkour wall-run (keeps running up).
       if (st === 'wall' && c.move.y > 0.3) return;
       if (!fresh) {
-        if (st !== 'wall' && c.standTime < HELD_LEAP) return;
+        // (Not a hold that was sprinting: letting go of the stick stops the run, nothing more.)
+        if (st !== 'wall' && (c.standTime < HELD_LEAP || c.sprintHold)) return;
         // On a wall: climb over a low one; spring off a tall one.
         if (st === 'wall' && (c.wallTime < HELD_WALL || !this._wallAbove(HELD_WALL_ROOF))) return;
       }
