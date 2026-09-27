@@ -1,138 +1,176 @@
 import * as THREE from 'three';
-import { KOMBI_SLOGANS, DESTINATIONS } from '../data/streetlife.js';
+import { MAT, NO_LAYER } from './vehicleAssets.js';
 
-// One material for every vehicle body (and the hwindi figures), so all models share a single shader.
-// Per-vertex `vtag` (see modelKit TAG) + per-instance attributes:
-//   instanceColor  paint colour
-//   aColor2        rgb = accent colour (stripes, cargo, trousers); w = sticker rows packed as rowA + 64·rowB
-//   aState         x = headlights (0..1), y = brake, z = left indicator, w = right indicator
+// Materials for the batched traffic (vehicleRenderer.js). One opaque MeshStandardMaterial draws every
+// body, toggle, wheel and crew figure: per-vertex slots and texture layers (vehicleAssets.js) pick the
+// base colour, roughness / metalness, maps and lamp emission; the per-instance batch colour carries
+//   rgb = paint colour (linear), a = lamp flags (FLAG_*)
+// The glass is a second, blended material (tinted, glossy, reflective).
 
-export const NO_ROW = 63;
+export const FLAG = {
+  HEAD: 1, // headlights on
+  BRAKE: 2,
+  LEFT: 4, // left indicator lit (already blinking on the CPU)
+  RIGHT: 8,
+  BEACON_B: 16,
+  BEACON_R: 32,
+  TAIL: 64, // tail / marker lamps on (night)
+};
 
-const BANNER_COLORS = ['#d6201f', '#1d4fb8', '#111111', '#e3b21b'];
+const DEFAULT_EMIT = {
+  light_front: [1, 0.97, 0.9],
+  light_rear: [1, 0.2, 0.15],
+  indicator: [1, 0.6, 0.1],
+  beacon_blue: [0.15, 0.35, 1],
+  beacon_red: [1, 0.08, 0.05],
+};
 
-// Canvas atlas with one sticker per row: kombi slogans, ZUPCO, TAXI and bus destination displays.
-export function buildStickerAtlas() {
-  const rows = [];
-  rows.push({ key: 'ZUPCO', text: 'ZUPCO', bg: '#ffffff', fg: '#1c3f94', fill: 0.62 });
-  rows.push({ key: 'TAXI', text: 'TAXI', bg: '#f2d21b', fg: '#141414' });
-  const slogans = KOMBI_SLOGANS?.length ? KOMBI_SLOGANS : [{ text: 'MWARI VANOKWANISA' }, { text: 'ZVICHANAKA' }];
-  slogans.forEach((s, i) => {
-    const bg = BANNER_COLORS[i % BANNER_COLORS.length];
-    rows.push({ key: `slogan:${i}`, text: s.text, bg, fg: bg === '#e3b21b' ? '#141414' : '#ffffff', slogan: true });
-  });
-  const dests = (DESTINATIONS || []).filter((d) => d.dir !== 'CBD').slice(0, 12);
-  for (const d of dests.length ? dests : [{ name: 'Mbare' }, { name: 'Chitungwiza' }]) {
-    rows.push({ key: `dest:${d.name}`, text: `CITY - ${d.name.toUpperCase()}`, bg: '#0a0a0a', fg: '#ffae1a', led: true });
-  }
+function vec3Of(emissive, name) {
+  const a = emissive?.[name] || DEFAULT_EMIT[name];
+  return new THREE.Vector3(a[0], a[1], a[2]);
+}
 
-  const W = 512;
-  const H = 48;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H * rows.length;
-  const ctx = canvas.getContext('2d');
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  rows.forEach((r, i) => {
-    const y = i * H;
-    ctx.fillStyle = r.bg;
-    ctx.fillRect(0, y, W, H);
-    ctx.fillStyle = r.fg;
-    const font = r.led ? 'bold 30px monospace' : `bold ${r.fill ? 42 : 34}px Impact, "Arial Black", sans-serif`;
-    ctx.font = font;
-    const tw = ctx.measureText(r.text).width;
-    const sx = r.fill ? (W * r.fill) / tw : Math.min(1, (W - 24) / tw);
-    ctx.save();
-    ctx.translate(W / 2, y + H / 2 + 1);
-    ctx.scale(sx, 1);
-    ctx.fillText(r.text, 0, 0);
-    ctx.restore();
-  });
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 4;
-  texture.generateMipmaps = true;
-  const index = new Map(rows.map((r, i) => [r.key, i]));
+// Shared uniforms: textures, night factor (0..1) and the lamp colours from the models.
+export function createVehicleUniforms(lib) {
   return {
-    texture,
-    rows: rows.length,
-    row: (key) => index.get(key) ?? NO_ROW,
-    slogans: rows.map((r, i) => (r.slogan ? i : -1)).filter((i) => i >= 0),
-    destinations: rows.map((r, i) => (r.led ? i : -1)).filter((i) => i >= 0),
+    uAlbedo: { value: lib.textures.albedo },
+    uNormalArr: { value: lib.textures.normal },
+    uNight: { value: 0 },
+    uHeadColor: { value: vec3Of(lib.emissive, 'light_front') },
+    uTailColor: { value: vec3Of(lib.emissive, 'light_rear') },
+    uIndColor: { value: vec3Of(lib.emissive, 'indicator') },
+    uBeaconB: { value: vec3Of(lib.emissive, 'beacon_blue') },
+    uBeaconR: { value: vec3Of(lib.emissive, 'beacon_red') },
   };
 }
 
-export function createVehicleMaterial(atlas) {
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.05 });
+export function createBodyMaterial(uniforms) {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0 });
+  mat.name = 'traffic-body';
   mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uAtlas = { value: atlas.texture };
-    shader.uniforms.uAtlasRows = { value: atlas.rows };
+    Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
         `#include <common>
-attribute float vtag;
-attribute vec4 aState;
-attribute vec4 aColor2;
-varying float vTag;
-varying vec4 vState;
-varying vec2 vStickerUv;
-varying float vRow;`,
+attribute vec4 aBase;
+attribute vec4 aMat;
+varying vec4 vBase;
+flat varying vec4 vMat;
+flat varying vec4 vInst;
+varying vec2 vTrUv;`,
       )
       .replace(
         '#include <color_vertex>',
-        `vColor = vec4( color, 1.0 );
-#ifdef USE_INSTANCING_COLOR
-if ( abs( vtag - 1.0 ) < 0.5 || abs( vtag - 9.0 ) < 0.5 ) vColor.rgb *= instanceColor.rgb;
-#endif
-if ( abs( vtag - 6.0 ) < 0.5 ) vColor.rgb *= aColor2.rgb;
-vTag = vtag;
-vState = aState;
-vStickerUv = uv;
-vRow = vtag > 9.5 ? floor( aColor2.w / 64.0 + 0.001 ) : mod( aColor2.w + 0.001, 64.0 );`,
+        `vBase = vec4( aBase.rgb * aBase.rgb, aBase.a );
+vMat = aMat;
+vTrUv = uv;
+#ifdef USE_BATCHING_COLOR
+vInst = getBatchingColor( getIndirectIndex( gl_DrawID ) );
+#else
+vInst = vec4( 1.0, 1.0, 1.0, 0.0 );
+#endif`,
+      )
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+// Decals and plates sit millimetres off the body: pull them towards the camera a touch so they win
+// the depth test at any distance.
+if ( abs( aMat.x - ${MAT.LIVERY}.0 ) < 0.5 || abs( aMat.x - ${MAT.PLATE}.0 ) < 0.5 || abs( aMat.x - ${MAT.LED}.0 ) < 0.5 ) {
+  mvPosition.xyz *= 0.9985;
+  gl_Position = projectionMatrix * mvPosition;
+}`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
         `#include <common>
-uniform sampler2D uAtlas;
-uniform float uAtlasRows;
-varying float vTag;
-varying vec4 vState;
-varying vec2 vStickerUv;
-varying float vRow;`,
+uniform highp sampler2DArray uAlbedo;
+uniform highp sampler2DArray uNormalArr;
+uniform float uNight;
+uniform vec3 uHeadColor;
+uniform vec3 uTailColor;
+uniform vec3 uIndColor;
+uniform vec3 uBeaconB;
+uniform vec3 uBeaconR;
+varying vec4 vBase;
+flat varying vec4 vMat;
+flat varying vec4 vInst;
+varying vec2 vTrUv;
+int trMat;
+int trFlags;
+vec4 trAlbedo;
+vec4 trNormal;`,
       )
       .replace(
-        '#include <color_fragment>',
-        `#include <color_fragment>
-if ( vTag > 7.5 && floor( vRow ) < ${NO_ROW - 0.5} ) {
-  vec2 auv = vec2( vStickerUv.x, 1.0 - ( floor( vRow ) + 1.0 - vStickerUv.y ) / uAtlasRows );
-  diffuseColor.rgb = texture2D( uAtlas, auv ).rgb;
+        '#include <map_fragment>',
+        `trMat = int( vMat.x + 0.5 );
+trFlags = int( vInst.a + 0.5 );
+trAlbedo = vec4( 1.0 );
+trNormal = vec4( 0.5, 0.5, 1.0, 1.0 );
+if ( vMat.y < ${NO_LAYER - 0.5} ) trAlbedo = texture( uAlbedo, vec3( vTrUv, vMat.y ) );
+if ( vMat.z < ${NO_LAYER - 0.5} ) trNormal = texture( uNormalArr, vec3( vTrUv, vMat.z ) );
+if ( ( trMat == ${MAT.LIVERY} || trMat == ${MAT.LED} ) && trAlbedo.a < 0.5 ) discard;
+diffuseColor.rgb = vBase.rgb * trAlbedo.rgb;
+if ( trMat == ${MAT.PAINT} ) diffuseColor.rgb *= trNormal.a * vInst.rgb;`,
+      )
+      .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vBase.a;')
+      .replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vMat.w * 0.01;')
+      .replace(
+        '#include <normal_fragment_maps>',
+        `#include <normal_fragment_maps>
+if ( vMat.z < ${NO_LAYER - 0.5} ) {
+  // glTF normal map (no tangents: derivative frame, green flipped for the glTF UV convention).
+  vec3 mapN = trNormal.xyz * 2.0 - 1.0;
+  mapN.y = -mapN.y;
+  vec3 q0 = dFdx( -vViewPosition );
+  vec3 q1 = dFdy( -vViewPosition );
+  vec2 st0 = dFdx( vTrUv );
+  vec2 st1 = dFdy( vTrUv );
+  vec3 q1perp = cross( q1, normal );
+  vec3 q0perp = cross( normal, q0 );
+  vec3 T = q1perp * st0.x + q0perp * st1.x;
+  vec3 B = q1perp * st0.y + q0perp * st1.y;
+  float det = max( dot( T, T ), dot( B, B ) );
+  float sc = det == 0.0 ? 0.0 : inversesqrt( det );
+  normal = normalize( mat3( T * sc, B * sc, normal ) * mapN );
 }`,
-      )
-      .replace(
-        '#include <roughnessmap_fragment>',
-        `#include <roughnessmap_fragment>
-if ( abs( vTag - 4.0 ) < 0.5 ) roughnessFactor = 0.12;
-else if ( abs( vTag - 1.0 ) < 0.5 ) roughnessFactor = 0.38;`,
       )
       .replace(
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
-if ( abs( vTag - 2.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.93, 0.78 ) * ( 0.1 + 3.2 * vState.x );
-else if ( abs( vTag - 3.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.02, 0.01 ) * ( 0.04 + 0.7 * vState.x + 1.5 * vState.y );
-else if ( abs( vTag - 5.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.z;
-else if ( abs( vTag - 7.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.w;
-else if ( abs( vTag - 10.0 ) < 0.5 ) totalEmissiveRadiance += diffuseColor.rgb * ( 0.5 + 1.5 * vState.x );
-else if ( abs( vTag - 4.0 ) < 0.5 ) {
-  // Cheap sky reflection on glass (stronger at grazing angles), dimmed at night.
-  float fr = 1.0 - clamp( dot( normal, normalize( vViewPosition ) ), 0.0, 1.0 );
-  totalEmissiveRadiance += mix( vec3( 0.2, 0.25, 0.3 ), vec3( 0.015, 0.02, 0.03 ), vState.x ) * ( 0.25 + 0.9 * fr * fr );
+if ( trMat == ${MAT.HEAD} ) {
+  if ( ( trFlags & ${FLAG.HEAD} ) != 0 ) totalEmissiveRadiance += trAlbedo.rgb * uHeadColor * ( 0.35 + 2.6 * uNight );
+} else if ( trMat == ${MAT.TAIL} ) {
+  float k = ( ( trFlags & ${FLAG.TAIL} ) != 0 ? 0.55 : 0.0 ) + ( ( trFlags & ${FLAG.BRAKE} ) != 0 ? 2.2 : 0.0 );
+  totalEmissiveRadiance += trAlbedo.rgb * uTailColor * k;
+} else if ( trMat == ${MAT.IND_L} ) {
+  if ( ( trFlags & ${FLAG.LEFT} ) != 0 ) totalEmissiveRadiance += trAlbedo.rgb * uIndColor * 3.0;
+} else if ( trMat == ${MAT.IND_R} ) {
+  if ( ( trFlags & ${FLAG.RIGHT} ) != 0 ) totalEmissiveRadiance += trAlbedo.rgb * uIndColor * 3.0;
+} else if ( trMat == ${MAT.BEACON_B} ) {
+  if ( ( trFlags & ${FLAG.BEACON_B} ) != 0 ) totalEmissiveRadiance += uBeaconB * 4.0;
+} else if ( trMat == ${MAT.BEACON_R} ) {
+  if ( ( trFlags & ${FLAG.BEACON_R} ) != 0 ) totalEmissiveRadiance += uBeaconR * 4.0;
+} else if ( trMat == ${MAT.LED} ) {
+  totalEmissiveRadiance += diffuseColor.rgb * ( 0.5 + 1.6 * uNight );
 }`,
       );
   };
-  // All vehicle bodies share one program; the cache key keeps it distinct from stock materials.
-  mat.customProgramCacheKey = () => 'harare-vehicle-v1';
+  mat.customProgramCacheKey = () => 'harare-traffic-body-v2';
+  return mat;
+}
+
+// Tinted safety glass: dark, glossy, reflective; drivers show through as silhouettes.
+export function createGlassMaterial() {
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setRGB(0.045, 0.058, 0.062),
+    roughness: 0.05,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.6,
+    depthWrite: false,
+  });
+  mat.name = 'traffic-glass';
   return mat;
 }
