@@ -207,7 +207,13 @@ def main(only=None):
                 fix_loop(data)
             RAW[name] = data
             RT.write_action(tgt, name, data, FPS, loop)
-            info[name] = dict(source='procedural layer', loop=loop, frames=len(data), duration=round((len(data) - 1) / FPS, 3), speed=None)
+            prev = info.get(name, {})
+            # library clips re-layered by procedural_clips (pedestrian stance) keep their source
+            src = (prev['source'] + ' + stance layer') if prev.get('source') else 'procedural layer'
+            info[name] = dict(source=src, loop=loop, frames=len(data), duration=round((len(data) - 1) / FPS, 3),
+                              speed=prev.get('speed'))
+            if prev.get('root_motion_m'):
+                info[name]['root_motion_m'] = prev['root_motion_m']
             print(name, info[name])
     for name, d in info.items():
         if d['loop'] and name in RAW:

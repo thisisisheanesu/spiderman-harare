@@ -97,6 +97,73 @@ def gen(rig, base, n, fn, prep=None):
     return out
 
 
+class FixedFeet:
+    """Leg override: both feet reach fixed floor targets (per frame), knees by two-bone IK, feet keep
+    the base clip's world orientation."""
+    def __init__(self, targets, cur):
+        self.T = targets
+        self.cur = cur
+
+    def __call__(self, st, n):
+        if not n.startswith('thigh_'):
+            return None
+        s = n[-1]
+        rig = st['rig']
+        T = self.T[s][self.cur[0]]
+        u, f, hng, E = AL.two_bone(st['Pw'][n], T, rig.len['thigh_' + s], rig.len['calf_' + s], Vector((0, 1, 0)))
+        hng = -hng
+        Wt = AL.frame_from(rig.hinge['thigh_' + s], Vector((0, 1, 0)), hng, u)
+        Wc = AL.frame_from(rig.hinge['calf_' + s], Vector((0, 1, 0)), hng, f)
+        st['pending']['calf_' + s] = Wc
+        st['pending']['foot_' + s] = st['W0']['foot_' + s]
+        return Wt
+
+
+def natural_stance(rig, base, n, fn=None, prep=None, loop=True, out_x=0.025, ky=0.25):
+    """Stand like a pedestrian instead of the UAL idle's wide, split 'hero' stance: feet planted under
+    the hip joints (out_x metres outside them), the fore-aft split reduced to `ky`, ankles at the base
+    clip's height (at most the rest ankle height). The pelvis is raised per frame so the legs keep the base clip's knee bend instead of
+    crouching. fn(t, i) -> (overrides, weight, pelvis_offset) adds upper-body layers as in gen()."""
+    frames = loop_base(base, n) if loop else [copyfd(f) for f in base[:n]]
+    P = [rig.fk(fd)[1] for fd in frames]
+    N = len(P)
+    mean = lambda k: sum((p[k] for p in P), Vector((0, 0, 0))) / N
+    hip = {s: mean('thigh_' + s) for s in 'lr'}
+    foot = {s: mean('foot_' + s) for s in 'lr'}
+    ymid = 0.5 * (foot['l'].y + foot['r'].y)
+    xy = {}
+    for s in 'lr':
+        side = 1.0 if hip[s].x > 0 else -1.0
+        xy[s] = (hip[s].x + side * out_x, ymid + (foot[s].y - ymid) * ky)
+    targets = {s: [] for s in 'lr'}
+    lifts = []
+    for p in P:
+        need = []
+        for s in 'lr':
+            # ankle at the base clip's height, but never above standing height (UAL 'Idle_Rail_Call'
+            # floats both feet ~3 cm)
+            T = Vector((xy[s][0], xy[s][1], min(p['foot_' + s].z, rig.P['foot_' + s].z + 0.003)))
+            targets[s].append(T)
+            h = p['thigh_' + s]
+            reach = min((p['foot_' + s] - h).length, 0.995 * (rig.len['thigh_' + s] + rig.len['calf_' + s]))
+            hd2 = (h.x - T.x) ** 2 + (h.y - T.y) ** 2
+            need.append(math.sqrt(max(reach * reach - hd2, 0.0)) - (h.z - T.z))
+        lifts.append(max(0.0, min(need)))
+    cur = [0]
+    feet = FixedFeet(targets, cur)
+    out = []
+    for i, fd in enumerate(frames):
+        t = i / FPS
+        if prep:
+            prep(fd, t)
+        cur[0] = i
+        ov, w, po = fn(t, i) if fn else (None, 1.0, None)
+        ov_all = combine(feet, ov) if ov else feet
+        lift = Vector((0, 0, lifts[i]))
+        out.append(rig.apply(fd, ov_all, w, lift + po if po is not None else lift))
+    return out
+
+
 def keyed(t, keys):
     """piecewise smooth interpolation through (t, v) keys"""
     if t <= keys[0][0]:
@@ -155,7 +222,9 @@ def build_all(rig, RAW):
     def f_relaxed(t, i):
         tw = Twist({'upperarm_r': ((0, 1, 0), 7), 'upperarm_l': ((0, 1, 0), -7)})
         return combine(NarrowStance(0.25), tw), 1.0, None
-    C['idle_relaxed'] = (gen(rig, idle, len(idle), f_relaxed, prep=relax_hands), True)
+    def f_relaxed_arms(t, i):
+        return Twist({'upperarm_r': ((0, 1, 0), 7), 'upperarm_l': ((0, 1, 0), -7)}), 1.0, None
+    C['idle_relaxed'] = (natural_stance(rig, idle, len(idle), f_relaxed_arms, prep=relax_hands), True)
 
     # ---- walk_female: narrower foot placement (steps close to the centre line), arms closer ----
     def f_wf(t, i):
@@ -185,7 +254,7 @@ def build_all(rig, RAW):
         arm = ArmIK('r', (0.30 + 0.05 * w, 0.07, 0.25), (1, -0.1, -0.5), (0.4 * w, 0.1, 1), (0, 1, 0.1), frame_bone=None)
         tw = Twist({'head': ((0, 0, 1), -6)})
         return combine(arm, tw), 1.0, None
-    C['wave'] = (gen(rig, idle, len(idle), f_wave, prep=lambda fd, t: straight(fd, 'r', ('index', 'middle', 'ring', 'pinky'))), True)
+    C['wave'] = (natural_stance(rig, idle, len(idle), f_wave, prep=lambda fd, t: straight(fd, 'r', ('index', 'middle', 'ring', 'pinky'))), True)
 
     # ---- point (right arm, loop hold) ----
     def prep_point(fd, t):
@@ -196,7 +265,7 @@ def build_all(rig, RAW):
         arm = ArmIK('r', (0.06, 0.51, 0.12 + e), (1, 0, -1), (0.1, 1, 0.2), (-0.5, 0, -1), frame_bone=None)
         tw = Twist({'neck_01': ((0, 0, 1), -8), 'head': ((0, 0, 1), -10), 'spine_03': ((0, 0, 1), -6)})
         return combine(arm, tw), 1.0, None
-    C['point'] = (gen(rig, idle, len(idle), f_point, prep=prep_point), True)
+    C['point'] = (natural_stance(rig, idle, len(idle), f_point, prep=prep_point), True)
 
     # ---- cheer (both fists pumping, loop) ----
     def prep_fists(fd, t):
@@ -209,7 +278,7 @@ def build_all(rig, RAW):
         tw = Twist({'head': ((1, 0, 0), 12), 'neck_01': ((1, 0, 0), 5)})
         po = Vector((0, 0, 0.022 * abs(math.sin(ph / 2 * 2))))
         return combine(ar, al, tw), 1.0, po
-    C['cheer'] = (gen(rig, idle, 61, f_cheer, prep=prep_fists), True)  # 2.0 s
+    C['cheer'] = (natural_stance(rig, idle, 61, f_cheer, prep=prep_fists), True)  # 2.0 s
 
     # ---- phone_film (both hands holding a phone up, loop) ----
     def f_film(t, i):
@@ -218,10 +287,17 @@ def build_all(rig, RAW):
         al = ArmIK('l', (0.13 + pan, 0.33, 0.16), (-1, -0.5, -1), (0.0, 0.25, 1), (1, 0.3, 0), frame_bone=None)
         tw = Twist({'head': ((1, 0, 0), 4), 'neck_01': ((0, 0, 1), -pan * 100)})
         return combine(ar, al, tw), 1.0, None
-    C['phone_film'] = (gen(rig, idle, len(idle), f_film), True)
+    C['phone_film'] = (natural_stance(rig, idle, len(idle), f_film), True)
+
+    # ---- pedestrian stance for the UAL standing clips NPCs use (their base is the wide split
+    # hero stance of the UAL idle); Spider-Man keeps `idle` / `idle_look` as they are ----
+    for nm in ('talk', 'phone_call', 'call_out', 'idle_arms_folded', 'shake_no', 'nod_yes', 'drink'):
+        if nm in RAW:
+            lp = nm not in ('nod_yes', 'drink')
+            C[nm] = (natural_stance(rig, RAW[nm], len(RAW[nm]), loop=lp), lp)
 
     # ---- talk_2: mirrored talking ----
-    C['talk_2'] = (AL.mirror_frames(rig, RAW['talk']), True)
+    C['talk_2'] = (AL.mirror_frames(rig, C['talk'][0] if 'talk' in C else RAW['talk']), True)
 
     # ---- walk_slow: 75% stride, 82% cadence ----
     ws = amplitude(RAW['walk'], 0.75)

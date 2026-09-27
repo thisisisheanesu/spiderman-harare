@@ -219,6 +219,11 @@ def action_fcurves(act):
 
 
 def write_action(tgt, name, frames_data, fps=30, loop=False):
+    # a re-layered clip replaces the library version (otherwise Blender names it 'talk.001' and both
+    # get exported)
+    old = bpy.data.actions.get(name)
+    if old is not None:
+        bpy.data.actions.remove(old)
     act = bpy.data.actions.new(name)
     act.use_fake_user = True
     tgt.animation_data_create()

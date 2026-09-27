@@ -11,8 +11,8 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Idle_Rail_Call",
-   "note": "hand cupped, calling out (hwindi touting)"
+   "source": "ual2:Idle_Rail_Call + stance layer",
+   "note": "leaning forward, forearms resting on a rail / kombi window sill (~1 m), beckoning (hwindi touting)"
   },
   {
    "name": "carry_on_head",
@@ -137,7 +137,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Consume",
+   "source": "ual2:Consume + stance layer",
    "note": "drink / eat"
   },
   {
@@ -272,7 +272,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Idle_FoldArms_Loop",
+   "source": "ual2:Idle_FoldArms_Loop + stance layer",
    "note": "waiting with folded arms (vendors, guards)"
   },
   {
@@ -380,7 +380,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Yes",
+   "source": "ual2:Yes + stance layer",
    "note": "nodding (one-shot)"
   },
   {
@@ -392,7 +392,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Idle_TalkingPhone_Loop",
+   "source": "ual2:Idle_TalkingPhone_Loop + stance layer",
    "note": "phone held to the ear"
   },
   {
@@ -518,7 +518,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual2:Idle_No_Loop",
+   "source": "ual2:Idle_No_Loop + stance layer",
    "note": "head shake"
   },
   {
@@ -656,7 +656,7 @@
    "speed_mps": null,
    "root_speed_mps": 0.0,
    "root_motion_m": null,
-   "source": "ual1:Idle_Talking_Loop",
+   "source": "ual1:Idle_Talking_Loop + stance layer",
    "note": "talking with hand gestures"
   },
   {

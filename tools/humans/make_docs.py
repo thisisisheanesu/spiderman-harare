@@ -19,7 +19,7 @@ NOTES = {
     'talk': 'talking with hand gestures', 'talk_2': 'talking (mirrored gestures)',
     'phone_call': 'phone held to the ear', 'phone_film': 'filming with a phone held up in both hands (attach phone to hand_r)',
     'point': 'pointing forward with the right index finger', 'cheer': 'both fists up, pumping, small bounce',
-    'wave': 'waving the right hand overhead', 'call_out': 'hand cupped, calling out (hwindi touting)',
+    'wave': 'waving the right hand overhead', 'call_out': 'leaning forward, forearms resting on a rail / kombi window sill (~1 m), beckoning (hwindi touting)',
     'nod_yes': 'nodding (one-shot)', 'shake_no': 'head shake', 'dance': 'dance loop',
     'walk': 'normal walk', 'walk_female': 'walk with narrow (centre-line) steps', 'walk_formal': 'upright walk, arms straighter',
     'walk_slow': 'slow short-stride walk (elders)', 'walk_carry': 'walking carrying a box in front',

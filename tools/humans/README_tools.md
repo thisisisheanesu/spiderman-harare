@@ -30,7 +30,11 @@ $PY tools/humans/build_spiderman.py        # body + masked head + procedural sui
 $PY tools/humans/build_anims.py            # retarget UAL1+2 onto Spider-Man's skeleton + procedural clips -> humans_anims_raw.glb
 $PY tools/humans/build_npcs.py             # 23 NPC variants (npc_variants.py), one Blender process each, LOD0 + LOD1
 tools/humans/pack_all.sh                   # meshopt + WebP into public/models/{humans,anims}
-python3 tools/humans/make_docs.py $HUMANS_SCRATCH        # manifests + README tables
+# optional, after changing bodies, shoes or clips: re-measure how far soles sink in idle_relaxed / walk
+#   (serve review_viewer.html as described below)
+#   node tools/humans/verify/review_shot.mjs "mode=stats&vstep=1&clips=idle_relaxed,walk&models=pub/humans/spiderman.glb,pub/humans/npc_<id>.glb,..." stats.json
+#   python3 tools/humans/verify/ground_offsets.py stats.json > tools/humans/ground_offsets.json
+python3 tools/humans/make_docs.py $HUMANS_SCRATCH        # manifests (+ stride_scale, ground_offset_m) + README tables
 python3 tools/humans/make_credits.py $HUMANS_SCRATCH/npcs/variants_info.json <packs json dir> public/models/humans/CREDITS.md
 ```
 
@@ -46,14 +50,16 @@ NPCs about 3 min.
 | `suit_paint.py` | Procedural suit painter in 3D (web in spherical and cylindrical coordinates, red/blue SDF regions, emblems, lenses) |
 | `uvraster.py` | numpy UV rasteriser, island detection and dilation, used for texture painting and atlas baking |
 | `retarget.py` | UAL (UE mannequin) to MPFB game_engine rotation retargeting via a matched T-pose |
-| `anim_layers.py` / `procedural_clips.py` | FK, two-bone IK and twist layers used to author the extra clips on top of mocap-quality bases |
+| `anim_layers.py` / `procedural_clips.py` | FK, two-bone IK and twist layers used to author the extra clips on top of mocap-quality bases; `natural_stance` re-plants the feet of the NPC standing clips under the hips |
 | `build_anims.py` | clip list, retarget, loop fixing, speed measurement, NLA export |
-| `npc_variants.py` | the variant specs (bodies, clothes, colours from `src/data/streetlife.js`) |
-| `build_npcs.py` / `npc_atlas.py` | MPFB build, hidden-face removal, decimation, head wraps, recolouring, 1K atlas bake, LOD1 |
+| `npc_variants.py` | the variant specs (bodies, clothes, colours from `src/data/streetlife.js`), `LAYER_Z` garment stacking order, optional `cut` (shorten sleeves / trouser legs) |
+| `build_npcs.py` / `npc_atlas.py` | MPFB build, `cut_garment` (planar cut), hidden-face removal, decimation, head wraps, `resolve_layers` (pull inner layers under outer ones, re-skin covered hip-area vertices like their cover), recolouring (UV-masked blur), 1K atlas bake, LOD1 (resolved again) |
+| `ground_offsets.json` | measured sole penetration per character (idle_relaxed / walk), copied into `humans_manifest.json` as `ground_offset_m` |
 | `gltf_pack.mjs` / `pack.sh` / `pack_all.sh` | merge the suit variants, strip non-pelvis translation tracks, meshopt + WebP |
 | `make_docs.py` / `make_credits.py` | manifests, README tables and CREDITS.md |
 | `itch_dl.sh` | downloads free ("name your price") itch.io packs |
 | `verify/viewer.html` + `verify/shot.mjs` | three.js contact-sheet renderer (GLTFLoader + MeshoptDecoder + AnimationMixer) with headless Chromium screenshots |
+| `verify/review_viewer.html` + `verify/review_shot.mjs` + `verify/ground_offsets.py` | reviewer's viewer: PMREM environment, shadowed sun, ground, bone close-ups (`focus=head`), plain-material mode, and `mode=stats` (skinned min/max y, bone paths, loop pops) |
 
 Verification example (serve a directory containing `three` -> node_modules/three, `pub` -> public/models, and `viewer.html`):
 `node tools/humans/verify/shot.mjs "http://127.0.0.1:5391/viewer.html?models=pub/humans/spiderman.glb&anims=pub/anims/humans_anims.glb&clips=walk,run&times=4&views=front,side" out.png`

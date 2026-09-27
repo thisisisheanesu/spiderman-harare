@@ -10,7 +10,7 @@
   "height_m": 1.786,
   "hip_height_m": 0.9729963541030884,
   "stride_scale": 1.0,
-  "ground_offset_m": 0.011,
+  "ground_offset_m": 0.01,
   "materials": [
    "suit_classic",
    "suit_symbiote"
@@ -112,7 +112,7 @@
    "height_m": 1.437,
    "hip_height_m": 0.7631,
    "stride_scale": 0.784,
-   "ground_offset_m": 0.025,
+   "ground_offset_m": 0.023,
    "lod0": {
     "file": "npc_girl_high_school.glb",
     "tris": 9798,
@@ -146,7 +146,7 @@
    "height_m": 1.208,
    "hip_height_m": 0.6423,
    "stride_scale": 0.66,
-   "ground_offset_m": 0.026,
+   "ground_offset_m": 0.023,
    "lod0": {
     "file": "npc_girl_primary_school.glb",
     "tris": 7771,
@@ -179,7 +179,7 @@
    "height_m": 1.865,
    "hip_height_m": 1.0125,
    "stride_scale": 1.041,
-   "ground_offset_m": 0.008,
+   "ground_offset_m": 0.007,
    "lod0": {
     "file": "npc_man_apostolic.glb",
     "tris": 7071,
@@ -245,7 +245,7 @@
    "height_m": 1.739,
    "hip_height_m": 0.9421,
    "stride_scale": 0.968,
-   "ground_offset_m": 0.007,
+   "ground_offset_m": 0.004,
    "lod0": {
     "file": "npc_man_elder_flatcap.glb",
     "tris": 8671,
@@ -280,7 +280,7 @@
    "height_m": 1.617,
    "hip_height_m": 0.8589,
    "stride_scale": 0.883,
-   "ground_offset_m": 0.02,
+   "ground_offset_m": 0.019,
    "lod0": {
     "file": "npc_man_hoodie.glb",
     "tris": 9798,
@@ -453,7 +453,7 @@
    "height_m": 1.656,
    "hip_height_m": 0.8799,
    "stride_scale": 0.904,
-   "ground_offset_m": 0.011,
+   "ground_offset_m": 0.01,
    "lod0": {
     "file": "npc_man_shirt_tie.glb",
     "tris": 9797,
@@ -488,7 +488,7 @@
    "height_m": 1.67,
    "hip_height_m": 0.8913,
    "stride_scale": 0.916,
-   "ground_offset_m": 0.023,
+   "ground_offset_m": 0.022,
    "lod0": {
     "file": "npc_man_tshirt_jeans_cap.glb",
     "tris": 9798,
@@ -556,7 +556,7 @@
    "height_m": 1.59,
    "hip_height_m": 0.8272,
    "stride_scale": 0.85,
-   "ground_offset_m": 0.02,
+   "ground_offset_m": 0.019,
    "lod0": {
     "file": "npc_woman_blouse_skirt.glb",
     "tris": 9949,
@@ -590,7 +590,7 @@
    "height_m": 1.506,
    "hip_height_m": 0.793,
    "stride_scale": 0.815,
-   "ground_offset_m": 0.022,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_casual_tee.glb",
     "tris": 9970,
@@ -624,7 +624,7 @@
    "height_m": 1.473,
    "hip_height_m": 0.7819,
    "stride_scale": 0.804,
-   "ground_offset_m": 0.021,
+   "ground_offset_m": 0.019,
    "lod0": {
     "file": "npc_woman_dress_bright.glb",
     "tris": 7771,
@@ -657,7 +657,7 @@
    "height_m": 1.593,
    "hip_height_m": 0.8255,
    "stride_scale": 0.848,
-   "ground_offset_m": 0.021,
+   "ground_offset_m": 0.019,
    "lod0": {
     "file": "npc_woman_elder.glb",
     "tris": 10015,
@@ -692,7 +692,7 @@
    "height_m": 1.481,
    "hip_height_m": 0.796,
    "stride_scale": 0.818,
-   "ground_offset_m": 0.022,
+   "ground_offset_m": 0.02,
    "lod0": {
     "file": "npc_woman_jeans_top.glb",
     "tris": 9796,
@@ -726,7 +726,7 @@
    "height_m": 1.555,
    "hip_height_m": 0.8192,
    "stride_scale": 0.842,
-   "ground_offset_m": 0.021,
+   "ground_offset_m": 0.02,
    "lod0": {
     "file": "npc_woman_office_suit.glb",
     "tris": 9371,
@@ -760,7 +760,7 @@
    "height_m": 1.576,
    "hip_height_m": 0.8255,
    "stride_scale": 0.848,
-   "ground_offset_m": 0.021,
+   "ground_offset_m": 0.02,
    "lod0": {
     "file": "npc_woman_vendor_apron.glb",
     "tris": 9966,
@@ -796,7 +796,7 @@
    "height_m": 1.642,
    "hip_height_m": 0.8511,
    "stride_scale": 0.875,
-   "ground_offset_m": 0.022,
+   "ground_offset_m": 0.021,
    "lod0": {
     "file": "npc_woman_zambia_wrap.glb",
     "tris": 9988,

@@ -196,12 +196,18 @@ The NPC materials are double-sided on purpose (open sleeves, hems and skirts sho
 ## Animation clips (`../anims/humans_anims.glb`, 30 fps)
 
 Sources: Quaternius Universal Animation Library 1 and 2 (CC0, mocap-quality keyframed animation) retargeted onto the MakeHuman rig,
-plus procedural layers (IK, twists) built on top of those clips. `speed m/s` is the ground speed implied by the planted foot at
-timeScale 1. Use it to match the stride to movement speed (no foot sliding).
+plus procedural layers (IK, twists) built on top of those clips.
+The standing clips NPCs use (`idle_relaxed`, `talk`, `talk_2`, `phone_call`, `call_out`, `idle_arms_folded`, `shake_no`, `nod_yes`,
+`drink`, `wave`, `point`, `cheer`, `phone_film`) carry a "stance layer": the UAL idles stand in a wide, split hero stance, so the
+feet are planted under the hips and the pelvis is raised to keep the knees natural. `idle` and `idle_look` keep the hero stance
+for Spider-Man. `call_out` leans on a rail at the origin: the character stands about 0.3 m behind its object origin.
+
+`speed m/s` is the ground speed implied by the planted foot at
+timeScale 1 on the reference rig (multiply by the character's `stride_scale`). Use it to match the stride to movement speed (no foot sliding).
 
 | clip | s | loop | speed m/s | root motion (one-shots) | source | notes |
 |---|---|---|---|---|---|---|
-| `call_out` | 2.50 | yes |  |  | ual2:Idle_Rail_Call | hand cupped, calling out (hwindi touting) |
+| `call_out` | 2.50 | yes |  |  | ual2:Idle_Rail_Call + stance layer | leaning forward, forearms resting on a rail / kombi window sill (~1 m), beckoning (hwindi touting) |
 | `carry_on_head` | 1.63 | yes | 0.64 |  | procedural layer | walk steadying a load on the head with the left hand (market women) |
 | `cheer` | 2.00 | yes |  |  | procedural layer | both fists up, pumping, small bounce |
 | `climb` | 1.20 | yes |  |  | procedural layer | Spider-Man wall crawl: faces the wall (-Z), hands/feet on a plane ~0.34 m in front; move the character up yourself |
@@ -211,7 +217,7 @@ timeScale 1. Use it to match the stride to movement speed (no foot sliding).
 | `dance` | 1.00 | yes |  |  | ual1:Dance_Loop | dance loop |
 | `death` | 2.40 | no |  | fwd -0.67 m, up 0.00 m | ual1:Death01 | collapse |
 | `dive` | 1.00 | yes |  |  | procedural layer | head-first streamlined dive |
-| `drink` | 1.33 | no |  |  | ual2:Consume | drink / eat |
+| `drink` | 1.33 | no |  |  | ual2:Consume + stance layer | drink / eat |
 | `drive` | 1.67 | yes |  |  | ual1:Driving_Loop | seated, hands on a steering wheel (kombi / car drivers) |
 | `fall` | 2.00 | yes |  |  | ual2:NinjaJump_Idle_Loop | mid-air superhero crouch (falling) |
 | `flee_run` | 3.73 | yes | 6.26 |  | procedural layer | panicked run, arms flailing, looks back over the shoulder once |
@@ -222,7 +228,7 @@ timeScale 1. Use it to match the stride to movement speed (no foot sliding).
 | `hit_head` | 0.43 | no |  |  | ual1:Hit_Head | hit reaction (head) |
 | `hit_knockback` | 0.83 | no |  | fwd -3.11 m, up 0.00 m | ual2:Hit_Knockback | knocked back |
 | `idle` | 2.50 | yes |  |  | ual1:Idle_Loop | standing idle, wide "hero" stance (good for Spider-Man) |
-| `idle_arms_folded` | 2.50 | yes |  |  | ual2:Idle_FoldArms_Loop | waiting with folded arms (vendors, guards) |
+| `idle_arms_folded` | 2.50 | yes |  |  | ual2:Idle_FoldArms_Loop + stance layer | waiting with folded arms (vendors, guards) |
 | `idle_look` | 5.00 | yes |  |  | procedural layer | idle + looking left/right (5 s) |
 | `idle_relaxed` | 2.50 | yes |  |  | procedural layer | NPC idle: feet under hips, arms closer, hands open |
 | `interact` | 2.00 | no |  |  | ual1:Interact | reach and press / use |
@@ -231,8 +237,8 @@ timeScale 1. Use it to match the stride to movement speed (no foot sliding).
 | `kneel_work` | 5.20 | yes |  |  | ual1:Fixing_Kneeling | kneeling and working on something |
 | `land` | 1.27 | no |  |  | ual1:Jump_Land | landing recovery |
 | `land_hard` | 1.27 | no |  |  | ual2:NinjaJump_Land | superhero landing, crouch then stand |
-| `nod_yes` | 2.50 | no |  |  | ual2:Yes | nodding (one-shot) |
-| `phone_call` | 2.93 | yes |  |  | ual2:Idle_TalkingPhone_Loop | phone held to the ear |
+| `nod_yes` | 2.50 | no |  |  | ual2:Yes + stance layer | nodding (one-shot) |
+| `phone_call` | 2.93 | yes |  |  | ual2:Idle_TalkingPhone_Loop + stance layer | phone held to the ear |
 | `phone_film` | 2.50 | yes |  |  | procedural layer | filming with a phone held up in both hands (attach phone to hand_r) |
 | `pick_up` | 0.83 | no |  |  | ual1:PickUp_Table | pick something up from a table |
 | `point` | 2.50 | yes |  |  | procedural layer | pointing forward with the right index finger |
@@ -242,7 +248,7 @@ timeScale 1. Use it to match the stride to movement speed (no foot sliding).
 | `push` | 2.67 | yes | 0.32 |  | ual1:Push_Loop | pushing (handcart pushers) |
 | `roll` | 1.47 | no |  | fwd 5.18 m, up 0.00 m | ual1:Roll | forward combat roll |
 | `run` | 0.93 | yes | 6.26 |  | ual1:Jog_Fwd_Loop | fast run |
-| `shake_no` | 2.50 | yes |  |  | ual2:Idle_No_Loop | head shake |
+| `shake_no` | 2.50 | yes |  |  | ual2:Idle_No_Loop + stance layer | head shake |
 | `sit_down` | 1.30 | no |  |  | ual1:Sitting_Enter | stand -> sit |
 | `sit_idle` | 1.67 | yes |  |  | ual1:Sitting_Idle_Loop | seated idle (seat height ~0.45 m) |
 | `sit_talk` | 2.93 | yes |  |  | ual1:Sitting_Talking_Loop | seated talking |
@@ -253,7 +259,7 @@ timeScale 1. Use it to match the stride to movement speed (no foot sliding).
 | `sprint` | 0.67 | yes | 9.44 |  | ual1:Sprint_Loop | full sprint |
 | `stand_up` | 1.03 | no |  |  | ual1:Sitting_Exit | sit -> stand |
 | `swing` | 2.00 | yes |  |  | procedural layer | one full web-swing cycle (legs back -> tuck -> forward), right hand on the web |
-| `talk` | 2.93 | yes |  |  | ual1:Idle_Talking_Loop | talking with hand gestures |
+| `talk` | 2.93 | yes |  |  | ual1:Idle_Talking_Loop + stance layer | talking with hand gestures |
 | `talk_2` | 2.93 | yes |  |  | procedural layer | talking (mirrored gestures) |
 | `throw` | 1.33 | no |  |  | ual2:OverhandThrow | overhand throw |
 | `turn_left` | 1.00 | yes | 0.45 |  | procedural layer | in-place stepping, torso leading left: rotate the character yourself ~100 deg/s |
@@ -278,7 +284,8 @@ Independent review (PMREM environment, shadowed sun, ground plane, close-ups, wa
 `tools/humans/verify/review_viewer.html` + `review_shot.mjs`): all loop clips close to within 1 degree, the planted foot moves at the
 documented `speed_mps` (x `stride_scale`), no clip or file is missing. The review rebuilt the NPCs to remove garment interpenetration
 (shirts through trousers, legs through skirts, sweater hems), blotchy recolours (hoodie, sweaters) and the underwear-like school shorts,
-fixed an intermittent Blender crash in the atlas packer, made both Spider-Man suits double-sided (the welded mask has a few slits) and
+gave the NPC standing clips a pedestrian stance (feet under the hips instead of the UAL hero stance), fixed re-layered clips being
+exported twice (`talk` + `talk.001`), fixed an intermittent Blender crash in the atlas packer, made both Spider-Man suits double-sided (the welded mask has a few slits) and
 credited the upstream author of the CC BY sneakers. Review sheets: `tools/humans/previews/review_npc_front.jpg`,
 `review_npc_back.jpg`, `review_npc_walk.jpg`, `review_before_after.jpg`.
 
