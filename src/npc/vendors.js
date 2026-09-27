@@ -27,6 +27,9 @@ const BUILDERS = new Set(['fruit_veg', 'airtime_phone', 'sweets_snacks', 'newspa
 const _p = { x: 0, z: 0 };
 // Height of the upturned crate seated vendors sit on (the chair clip's seat is lowered onto it, population.js).
 const SEAT = 0.4;
+const STRIP = 16; // px of white under the sign tiles
+const V_WHITE = STRIP / 2 / (320 + STRIP); // texture v of the white strip (flipY: bottom rows)
+const CHUNK = 400; // m: stalls are merged per square of this size (culled as a whole)
 
 // Heading that faces back across edge e from its `out` side (+1 = left of a→b).
 function facingIn(e, out) {
@@ -85,8 +88,11 @@ function propGeometries() {
 function signTexture() {
   const c = document.createElement('canvas');
   c.width = 1024;
-  c.height = 320;
+  c.height = 320 + STRIP;
   const g = c.getContext('2d');
+  // A white strip under the tiles: every other stall prop samples it (one merged mesh, one material).
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 320, 1024, STRIP);
   const tiles = [
     { bg: '#f2c200', fg: '#1a1a1a', lines: ['AIRTIME', '$1  $2  $5', 'DATA · CHARGERS'] },
     { bg: '#f4f1e6', fg: '#b01e23', lines: HEADLINES.slice(0, 1).concat(['DAILY NEWS', '']) },
@@ -330,59 +336,71 @@ export class Vendors {
     this.obstacles.push({ x: st.x, z: st.z, r });
   }
 
+  // All stall props merged into static meshes (vertex colours; the boards' paint from the sign atlas), one
+  // per CHUNK-sized square of the city, so the stalls cost a draw call or two wherever you are.
   _buildMeshes() {
     const geos = propGeometries();
-    const buckets = Object.fromEntries(PROP_KINDS.map((k) => [k, []]));
-    for (const st of this.stalls) {
-      const c = Math.cos(st.heading);
-      const s = Math.sin(st.heading);
-      // Local (x right, z back) → world, with the stall facing -z at heading 0.
-      const toWorld = (lx, lz) => ({ x: st.x + lx * c + lz * s, z: st.z - lx * s + lz * c });
-      for (const p of st.localProps) {
-        const wpos = toWorld(p.x, p.z);
-        buckets[p.kind].push({ ...p, x: wpos.x, z: wpos.z, y: st.y + p.y, rot: st.heading + p.rot });
-      }
-      const v = toWorld(st.vendorLocal.x, st.vendorLocal.z);
-      st.vendorSpot = { x: v.x, z: v.z, y: st.y, heading: st.heading };
-    }
-    const shadows = this.game.quality.shadows;
-    const boardMat = new THREE.MeshStandardMaterial({ map: signTexture(), roughness: 0.9, side: THREE.DoubleSide });
-    boardMat.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute float aTile;')
-        .replace('#include <uv_vertex>', '#include <uv_vertex>\nvMapUv.x = (vMapUv.x + aTile) * 0.25;');
-    };
-    boardMat.customProgramCacheKey = () => 'npc-board';
-    this.group = new THREE.Group();
-    this.group.name = 'vendor-stalls';
+    const boardUv = geos.board.attributes.uv;
+    const chunks = new Map();
     const m = new THREE.Matrix4();
+    const nm = new THREE.Matrix3();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const pos = new THREE.Vector3();
     const scl = new THREE.Vector3();
+    const v = new THREE.Vector3();
     const color = new THREE.Color();
-    for (const kind of PROP_KINDS) {
-      const list = buckets[kind];
-      if (!list.length) continue;
-      const geo = geos[kind];
-      let mat;
-      if (kind === 'board') {
-        geo.setAttribute('aTile', new THREE.InstancedBufferAttribute(Float32Array.from(list.map((p) => p.tile)), 1));
-        mat = boardMat;
-      } else {
-        mat = new THREE.MeshStandardMaterial({ roughness: kind === 'bucket' ? 0.45 : 0.8, metalness: kind === 'bucket' ? 0.4 : 0, vertexColors: kind === 'umbrella', side: kind === 'umbrella' ? THREE.DoubleSide : THREE.FrontSide });
+    for (const st of this.stalls) {
+      const c = Math.cos(st.heading);
+      const s = Math.sin(st.heading);
+      // Local (x right, z back) -> world, with the stall facing -z at heading 0.
+      const toWorld = (lx, lz) => ({ x: st.x + lx * c + lz * s, z: st.z - lx * s + lz * c });
+      const key = `${Math.floor(st.x / CHUNK)},${Math.floor(st.z / CHUNK)}`;
+      if (!chunks.has(key)) chunks.set(key, { pos: [], nor: [], col: [], uv: [] });
+      const out = chunks.get(key);
+      for (const p of st.localProps) {
+        const w = toWorld(p.x, p.z);
+        q.setFromAxisAngle(up, st.heading + p.rot);
+        m.compose(pos.set(w.x, st.y + p.y, w.z), q, scl.set(p.sx, p.sy, p.sz));
+        nm.getNormalMatrix(m);
+        const g = geos[p.kind];
+        const P = g.attributes.position;
+        const N = g.attributes.normal;
+        const C = g.attributes.color;
+        color.set(p.color);
+        const index = g.index;
+        const count = index ? index.count : P.count;
+        for (let k = 0; k < count; k++) {
+          const i = index ? index.getX(k) : k;
+          v.fromBufferAttribute(P, i).applyMatrix4(m);
+          out.pos.push(v.x, v.y, v.z);
+          v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize();
+          out.nor.push(v.x, v.y, v.z);
+          // Instance colour x vertex colour (the umbrella's alternating panels and grey pole), as before.
+          if (C) out.col.push(color.r * C.getX(i), color.g * C.getY(i), color.b * C.getZ(i));
+          else out.col.push(color.r, color.g, color.b);
+          if (p.kind === 'board') out.uv.push((boardUv.getX(i) + p.tile) * 0.25, V_WHITE * 2 + boardUv.getY(i) * (1 - V_WHITE * 2));
+          else out.uv.push(0.5, V_WHITE);
+        }
       }
-      const mesh = new THREE.InstancedMesh(geo, mat, list.length);
-      list.forEach((p, i) => {
-        q.setFromAxisAngle(up, p.rot);
-        m.compose(pos.set(p.x, p.y, p.z), q, scl.set(p.sx, p.sy, p.sz));
-        mesh.setMatrixAt(i, m);
-        mesh.setColorAt(i, color.set(p.color));
-      });
-      mesh.castShadow = shadows && (kind === 'umbrella' || kind === 'table');
+      const vs = toWorld(st.vendorLocal.x, st.vendorLocal.z);
+      st.vendorSpot = { x: vs.x, z: vs.z, y: st.y, heading: st.heading };
+    }
+    const shadows = this.game.quality.shadows;
+    const mat = new THREE.MeshStandardMaterial({ map: signTexture(), vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
+    this.group = new THREE.Group();
+    this.group.name = 'vendor-stalls';
+    for (const [key, d] of chunks) {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(d.pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(d.nor, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(d.col, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(d.uv, 2));
+      geo.computeBoundingSphere();
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = shadows;
       mesh.receiveShadow = shadows;
-      mesh.computeBoundingSphere();
-      mesh.name = `stall-${kind}`;
+      mesh.name = `stalls-${key}`;
       this.group.add(mesh);
     }
     this.game.scene.add(this.group);

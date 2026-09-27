@@ -47,18 +47,26 @@ void main() {
   float fwd = max(dot(d, uSunDir), 0.0);
   sky += uGlow * (pow(fwd, 5.0) * 0.28 + pow(fwd, 48.0) * 0.45) * uSunVis;
   vec3 col = toLin(sky);
-  // Below the horizon: the HDRI street (or a plain ground tone), then haze towards the horizon.
+  // The HDRI supplies what surrounds a street: asphalt below the horizon, buildings and trees up to
+  // ~35 deg. Its own sky is replaced by the procedural one (so reflections follow the hour).
   vec3 ground = toLin(uGround);
+  float skyW = smoothstep(-0.02, 0.1, y);
+  vec3 near = ground;
   if (uHdrOn > 0.5) {
     float c = cos(uHdrRot);
     float s = sin(uHdrRot);
     vec3 r = vec3(c * d.x - s * d.z, d.y, s * d.x + c * d.z);
     vec2 uv = vec2(atan(r.z, r.x) * 0.15915494 + 0.5, asin(clamp(r.y, -1.0, 1.0)) * 0.31830988 + 0.5);
-    vec3 h = texture2D(uHdr, uv).rgb;
-    ground = min(h, vec3(4.0)) * uHdrTint;
+    vec3 h = min(texture2D(uHdr, uv).rgb, vec3(4.0));
+    // Blue-dominant pixels of the HDRI are its sky.
+    float blue = (h.b - h.r) / (h.b + h.r + 1e-3);
+    float hSky = smoothstep(0.18, 0.34, blue) * step(0.0, y);
+    near = h * uHdrTint;
+    skyW = y < 0.0 ? 0.0 : max(hSky, smoothstep(0.45, 0.62, y));
   }
-  float horizonBand = smoothstep(-0.02, 0.1, y);
-  col = mix(mix(ground, toLin(uFog), smoothstep(-0.12, 0.0, y) * 0.5), col, horizonBand);
+  // Haze: distant things take the colour of the horizon air.
+  near = mix(near, toLin(uFog) * mix(1.0, 0.75, uNight), 0.25 * (1.0 - smoothstep(0.0, 0.3, abs(y))));
+  col = mix(near, col, skyW);
   // City glow at night: sodium / LED light scattered in the haze low over the CBD.
   col += vec3(0.05, 0.032, 0.018) * uNight * (1.0 - smoothstep(-0.05, 0.35, abs(y)));
   gl_FragColor = vec4(col * uScale, 1.0);

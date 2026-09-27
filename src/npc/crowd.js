@@ -85,6 +85,7 @@ export class Agent {
     this.walkClip = look.variant ? walkClipFor(look.variant, look.load) : 'walk';
     this.talkClip = Math.random() < 0.5 ? 'talk' : 'talk_2';
     this.tempo = 0.92 + Math.random() * 0.16; // personal pace of standing clips
+    this.forceClip = null;
     this.follow = null; // walking with a group (pupils): the one they keep up with
     this.followId = -1;
     this.waitT = 0;
@@ -886,6 +887,7 @@ export class Crowd {
     }
     if (an.once && !an.moving && !sit && t < an.onceUntil) name = an.once;
     else an.once = null;
+    if (a.forceClip) name = a.forceClip; // (testing: window.__game.npcs.list[i].forceClip = 'wave')
     this._play(a, name, rate);
     a.phone = phone;
     p.sit = sit;
