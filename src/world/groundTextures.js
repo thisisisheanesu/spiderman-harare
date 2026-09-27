@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { Painter, noiseTile } from './atlas.js';
+import { polyArea } from '../core/geo.js';
 
 // Ground surface layers (UV scale noted per layer: metres per tile).
 function asphalt(p) {
@@ -152,7 +153,7 @@ function flowers(p) {
   p.speckle(p.S * 6, ['rgba(216,52,74,1)', 'rgba(242,194,48,1)', 'rgba(244,240,232,1)', 'rgba(224,96,154,1)', 'rgba(240,138,48,1)'], p.S / 120);
 }
 
-export const GROUND_LAYERS = {
+const GROUND_LAYERS = {
   asphalt: [asphalt, 7],
   paving: [paving, 3],
   bricks: [bricks, 2.4],
@@ -185,13 +186,23 @@ export function buildUrbanMask(buildings, bounds, res = 256) {
   const z0 = bounds.minZ - pad;
   const w = bounds.maxX - bounds.minX + 2 * pad;
   const h = bounds.maxZ - bounds.minZ + 2 * pad;
+  // Built-up coverage per cell (core buildings' footprint area spread over their bounding box).
   const acc = new Float32Array(res * res);
+  const cw = w / res;
+  const ch = h / res;
   for (const b of buildings) {
     if (!b.core) continue;
-    const ix = Math.floor(((b.cx - x0) / w) * res);
-    const iz = Math.floor(((b.cz - z0) / h) * res);
-    if (ix < 0 || iz < 0 || ix >= res || iz >= res) continue;
-    acc[iz * res + ix] += 1;
+    const bw = Math.max(1, b.maxX - b.minX);
+    const bh = Math.max(1, b.maxZ - b.minZ);
+    const fill = Math.min(1, polyArea(b.fp) / (bw * bh));
+    for (let ix = Math.floor((b.minX - x0) / cw); ix <= Math.floor((b.maxX - x0) / cw); ix++) {
+      for (let iz = Math.floor((b.minZ - z0) / ch); iz <= Math.floor((b.maxZ - z0) / ch); iz++) {
+        if (ix < 0 || iz < 0 || ix >= res || iz >= res) continue;
+        const ox = Math.min(b.maxX, x0 + (ix + 1) * cw) - Math.max(b.minX, x0 + ix * cw);
+        const oz = Math.min(b.maxZ, z0 + (iz + 1) * ch) - Math.max(b.minZ, z0 + iz * ch);
+        acc[iz * res + ix] += (Math.max(0, ox) * Math.max(0, oz) * fill) / (cw * ch);
+      }
+    }
   }
   // Two box blurs.
   const tmp = new Float32Array(res * res);
@@ -228,7 +239,7 @@ export function buildUrbanMask(buildings, bounds, res = 256) {
   blur(out, acc, 2);
   const data = new Uint8Array(res * res * 4);
   for (let i = 0; i < res * res; i++) {
-    const v = Math.min(1, acc[i] * 3.5);
+    const v = Math.min(1, Math.max(0, (acc[i] - 0.06) * 4));
     data[i * 4] = Math.round(v * 255);
     data[i * 4 + 3] = 255;
   }

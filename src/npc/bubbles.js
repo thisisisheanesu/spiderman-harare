@@ -9,7 +9,7 @@ const MAX_DIST = 45;
 const STYLE_ID = 'npc-bubble-style';
 const CSS = `
 .npc-bubbles { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
-.npc-bubble { position: absolute; left: 0; top: 0; max-width: 220px; padding: 6px 10px 7px; border-radius: 12px;
+.npc-bubble { position: absolute; left: 0; top: 0; max-width: 220px; transform-origin: 50% 100%; padding: 6px 10px 7px; border-radius: 12px;
   background: rgba(255, 253, 246, 0.95); color: #17130f; font: 600 15px/1.2 system-ui, sans-serif;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.28); opacity: 0; transition: opacity 0.18s; white-space: normal;
   text-align: center; will-change: transform, opacity; }
@@ -46,7 +46,7 @@ export class Bubbles {
       en.lang = 'en';
       el.append(sn, en);
       this.root.appendChild(el);
-      this.items.push({ el, sn, en, agent: null, id: 0, until: 0, born: 0, occluded: false, checkT: 0, shown: false });
+      this.items.push({ el, sn, en, agent: null, id: 0, until: 0, born: 0, occluded: false, checkT: 0, shown: false, visible: false, x: 0, y: 0, s: 1, dist: 0 });
     }
     this._v = new THREE.Vector3();
     this._dir = new THREE.Vector3();
@@ -106,15 +106,31 @@ export class Bubbles {
         this._hide(b);
         continue;
       }
-      const x = (v.x * 0.5 + 0.5) * w;
-      const y = (-v.y * 0.5 + 0.5) * h;
-      const s = Math.max(0.6, Math.min(1.1, 14 / Math.max(1, dist)));
-      b.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%) scale(${s.toFixed(3)})`;
-      b.el.style.transformOrigin = '50% 100%';
+      b.x = (v.x * 0.5 + 0.5) * w;
+      b.y = (-v.y * 0.5 + 0.5) * h;
+      b.s = Math.max(0.6, Math.min(1.1, 14 / Math.max(1, dist)));
+      b.dist = dist;
+      b.visible = true;
+    }
+    // Nudge overlapping bubbles apart vertically (nearest speaker keeps its place).
+    const vis = this._vis || (this._vis = []);
+    vis.length = 0;
+    for (const b of this.items) if (b.agent && b.visible) vis.push(b);
+    vis.sort((p, q) => p.dist - q.dist);
+    for (let i = 1; i < vis.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const p = vis[i];
+        const q = vis[j];
+        if (Math.abs(p.x - q.x) < 170 * Math.max(p.s, q.s) && Math.abs(p.y - q.y) < 46 * Math.max(p.s, q.s)) p.y = q.y - 48 * Math.max(p.s, q.s);
+      }
+    }
+    for (const b of vis) {
+      b.el.style.transform = `translate(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px) translate(-50%, -100%) scale(${b.s.toFixed(3)})`;
       if (!b.shown) {
         b.el.classList.add('show');
         b.shown = true;
       }
+      b.visible = false;
     }
   }
 

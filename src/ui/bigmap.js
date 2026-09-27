@@ -1,3 +1,4 @@
+import './bigmap.css';
 import { closestOnSegment } from '../core/geo.js';
 import { MAP_COLORS, MAJOR_ROADS } from './mapPainter.js';
 import { drawPlaceIcon, drawPlayerArrow, drawRankIcon, drawWaypointPin, haloText } from './mapIcons.js';

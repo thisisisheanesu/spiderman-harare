@@ -1,0 +1,238 @@
+/* On-screen touch controls and the touch HUD layout. Tokens: src/style.css. */
+
+.touch-ui {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+}
+
+.hud.touch.started:not(.has-overlay) .touch-ui {
+  display: block;
+}
+
+.touch-zone {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.stick {
+  position: absolute;
+  left: calc(var(--left) + 10px);
+  bottom: calc(var(--bottom) + 10px);
+  width: 124px;
+  height: 124px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03) 70%);
+  opacity: 0.55;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.stick.active {
+  opacity: 1;
+  transition: none;
+}
+
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.touch-cluster {
+  position: absolute;
+  right: var(--right);
+  bottom: var(--bottom);
+  width: 214px;
+  height: 200px;
+  pointer-events: none;
+}
+
+.tb {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.38);
+  background: rgba(10, 14, 20, 0.46);
+  color: #fff;
+  pointer-events: auto;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  transition: transform 0.08s ease, background 0.08s ease;
+}
+
+.tb svg {
+  width: 40%;
+  height: 40%;
+}
+
+.tb.pressed {
+  border-color: #fff;
+  background: rgba(215, 38, 61, 0.78);
+  transform: scale(0.93);
+}
+
+.tb-label {
+  font: 800 9px/1 var(--font);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.tb-swing {
+  right: 0;
+  bottom: 0;
+  width: 84px;
+  height: 84px;
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(215, 38, 61, 0.5);
+}
+
+.tb-jump {
+  right: 98px;
+  bottom: 2px;
+  width: 64px;
+  height: 64px;
+}
+
+.tb-zip {
+  right: 10px;
+  bottom: 98px;
+  width: 60px;
+  height: 60px;
+}
+
+.tb-dive {
+  right: 84px;
+  bottom: 80px;
+  width: 54px;
+  height: 54px;
+}
+
+.tb-suit {
+  right: 150px;
+  bottom: 118px;
+  width: 44px;
+  height: 44px;
+}
+
+.tb-suit .tb-label {
+  display: none;
+}
+
+.touch-top {
+  position: absolute;
+  top: var(--top);
+  left: var(--left);
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.tb-small {
+  position: static;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--panel-solid);
+  border-color: var(--panel-border);
+}
+
+.tb-small svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Touch layout: pause/map buttons top-left, location under them, minimap top-right,
+   thumbs own the bottom corners and subtitles sit between them. */
+.hud.touch {
+  --mini: clamp(96px, 24vmin, 150px);
+}
+
+.hud.touch .hud-left {
+  top: calc(var(--top) + 52px);
+  width: min(280px, calc(50% - var(--left) - 8px));
+}
+
+.hud.touch .minimap {
+  top: var(--top);
+  bottom: auto;
+}
+
+.hud.touch .hud-top {
+  width: clamp(180px, calc(100% - 2 * (var(--right) + var(--mini) + 16px)), 460px);
+}
+
+.hud.touch .toasts {
+  top: calc(var(--top) + 80px);
+}
+
+.hud.touch .subs {
+  width: min(560px, calc(100% - 2 * (var(--left) + 230px)));
+  bottom: var(--bottom);
+}
+
+.hud.touch .controls-hint {
+  left: 50%;
+  bottom: calc(var(--bottom) + 110px);
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px 14px;
+  max-width: calc(100% - 2 * (var(--left) + 230px));
+  transform: translate(-50%, 8px);
+}
+
+.hud.touch.hinting .controls-hint {
+  transform: translateX(-50%);
+}
+
+/* Narrow screens (portrait phones). */
+@media (max-width: 640px) {
+  .hud.touch .hud-top {
+    width: calc(100% - var(--left) - var(--right));
+  }
+
+  .hud.touch .toasts {
+    top: 42%;
+  }
+
+  .hud.touch .hud-left {
+    top: calc(var(--top) + 128px);
+    width: calc(100% - var(--left) - var(--right) - var(--mini) - 12px);
+  }
+
+  .hud.touch .touch-top {
+    top: calc(var(--top) + 76px);
+  }
+
+  .hud.touch .minimap {
+    top: calc(var(--top) + 76px);
+  }
+
+  .hud.touch .subs {
+    width: calc(100% - var(--left) - var(--right));
+    bottom: calc(var(--bottom) + 214px);
+  }
+
+  .hud.touch .controls-hint {
+    top: calc(var(--top) + 236px);
+    bottom: auto;
+    max-width: calc(100% - var(--left) - var(--right));
+  }
+}

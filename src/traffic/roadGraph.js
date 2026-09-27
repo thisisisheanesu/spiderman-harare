@@ -1,4 +1,4 @@
-import { Path, reversed, offsetLeft, trimmed, bezier, polylineDistance } from './polyline.js';
+import { Path, deduped, reversed, offsetLeft, trimmed, bezier, polylineDistance } from './polyline.js';
 import { laneOffset, allowsDirection, kerbOffset } from '../world/streetMetrics.js';
 
 // Drivable road network built from data.nodes / data.roads: one Lane per lane and direction (keep left),
@@ -21,6 +21,7 @@ const CLEARANCE = 2.6;
 // into the junction at either end.
 const MERGE_MAX = 16;
 const MERGE_SLACK = 4;
+const MIN_LANE = 2.75;
 const SLOT_SPACING = 18;
 export const GRID = 50;
 
@@ -50,6 +51,8 @@ export class Lane extends Path {
     this.signal = null;
     this.signalGroup = -1;
     this.priority = 0;
+    // Lateral offset of this lane from the road centreline, to the left of travel.
+    this.offset = 0;
   }
 }
 
@@ -214,21 +217,25 @@ export class RoadGraph {
     const groups = new Map(); // `${ri}:${dir}` -> [lanes by index]
     roads.forEach((r, ri) => {
       if (!drivable(r) || find(r.a) === find(r.b)) return;
-      const perDir = Math.max(1, r.lanes || 1);
+      // A few narrow roads are tagged with more lanes than a car fits in: drive them as fewer, wider lanes.
+      const share = r.oneway ? r.w : r.w / 2;
+      const perDir = Math.max(1, Math.min(r.lanes || 1, Math.floor(share / MIN_LANE)));
+      const shape = perDir === (r.lanes || 1) ? r : { ...r, lanes: perDir };
+      const pts = deduped(r.pts);
       for (const dir of [1, -1]) {
         if (!allowsDirection(r, dir)) continue;
-        const base = dir === 1 ? r.pts : reversed(r.pts);
+        const base = dir === 1 ? pts : reversed(pts);
         const from = dir === 1 ? r.a : r.b;
         const to = dir === 1 ? r.b : r.a;
         const t0 = trim.get(`${ri}:${dir === 1 ? 'a' : 'b'}`);
         const t1 = trim.get(`${ri}:${dir === 1 ? 'b' : 'a'}`);
         const list = [];
         for (let li = 0; li < perDir; li++) {
-          const pts = trimmed(offsetLeft(Float32Array.from(base), laneOffset(r, li)), t0, t1);
-          const lane = new Lane(pts, r, ri, dir, li, from, to);
+          const lane = new Lane(trimmed(offsetLeft(base, laneOffset(shape, li)), t0, t1), r, ri, dir, li, from, to);
           lane.index = this.lanes.length;
+          lane.offset = laneOffset(shape, li);
           lane.junction = this.junctions[to];
-          lane.kerbSpace = Math.max(0, kerbOffset(r) - Math.abs(laneOffset(r, 0)));
+          lane.kerbSpace = Math.max(0, kerbOffset(r) - Math.abs(laneOffset(shape, 0)));
           this.lanes.push(lane);
           list.push(lane);
         }

@@ -89,7 +89,7 @@ export class Traffic {
     this.atlas = buildStickerAtlas();
     this.mix = new TrafficMix(this.atlas);
     this.target = Math.max(12, Math.round(140 * scale));
-    const maxParked = Math.round(60 * scale);
+    const maxParked = Math.round(120 * scale);
     this.renderer = new VehicleRenderer(
       game.scene,
       this.atlas,

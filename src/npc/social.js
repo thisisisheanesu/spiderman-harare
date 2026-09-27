@@ -49,16 +49,15 @@ export class Social {
     const px = e.pos.x;
     const pz = e.pos.z;
     const R = hard ? 30 : 24;
-    const list = this.pop.list.filter((a) => {
+    const list = [];
+    for (const a of this.pop.list) {
       const d = Math.hypot(a.position.x - px, a.position.z - pz);
-      a._d = d;
-      return d < R && Math.abs(a.position.y - e.pos.y) < 8 && a.state !== 'flee' && a.state !== 'cross';
-    });
-    list.sort((p, q) => p._d - q._d);
+      if (d < R && Math.abs(a.position.y - e.pos.y) < 8 && a.state !== 'flee' && a.state !== 'cross') list.push({ a, d });
+    }
+    list.sort((p, q) => p.d - q.d);
     let bubbles = 0;
     let barked = false;
-    for (const a of list) {
-      const d = a._d;
+    for (const { a, d } of list) {
       if (!hard && t < (a.reactCool || 0)) continue;
       const notice = d < 9 ? 1 : 1 - (d - 9) / (R - 9);
       if (Math.random() > notice) continue;

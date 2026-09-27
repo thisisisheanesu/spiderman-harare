@@ -95,7 +95,7 @@ export function poseRun(p, c) {
     rot(p, bone('shin', s), -(0.3 + (1.15 + 0.8 * k) * fwd ** 0.8 + 0.35 * back));
     rot(p, bone('foot', s), -0.3 * back - 0.15 + 0.25 * Math.max(0, sw));
     rot(p, bone('upperArm', s), -(0.55 + 0.55 * k) * sw + 0.1, 0, s * (0.14 + 0.06 * k));
-    rot(p, bone('forearm', s), 1.3 + 0.35 * sw * s * 0.5 + 0.2 * k);
+    rot(p, bone('forearm', s), 1.2 + 0.3 * Math.max(0, -sw) + 0.2 * k);
     rot(p, bone('hand', s), 0.25);
   }
 }

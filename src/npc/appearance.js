@@ -47,7 +47,7 @@ const FEMALE_IDS = new Set(['office_woman', 'casual_woman', 'market_woman']);
 const MALE_SHARE = { youth: 0.7, school_kid: 0.5, elder: 0.5, hwindi: 1, security_guard: 0.85, police: 0.7, handcart_pusher: 1, street_preacher: 0.9, apostolic: 0.5, car_washer: 1 };
 const FIRST_NAMES = STREETLIFE.NPC_FIRST_NAMES?.length ? STREETLIFE.NPC_FIRST_NAMES : [{ name: 'Tendai', g: 'u' }, { name: 'Chipo', g: 'f' }, { name: 'Simba', g: 'm' }];
 
-export function packColor(hex) {
+function packColor(hex) {
   const v = parseInt(String(hex).replace('#', '').slice(0, 6), 16);
   return Number.isFinite(v) ? v : 0x808080;
 }
@@ -58,7 +58,7 @@ function inHours(a, hour) {
   return false;
 }
 
-// Pick an archetype for a spawn context: {hour, nearRank, stationary}.
+// Pick an archetype for a spawn context: {hour, nearRank, walking, group}.
 export function pickArchetype(rng, ctx) {
   const list = ARCHETYPES.filter((a) => {
     if (!inHours(a, ctx.hour)) return false;

@@ -42,6 +42,7 @@ export class Vehicle {
     this.runRed = false;
     this.grantJ = null;
     this.grantConn = null;
+    this.grantWait = 0;
     this.boxJ = null;
     this.boxConn = null;
     this.resLane = null;
@@ -54,7 +55,6 @@ export class Vehicle {
     this.stopS = -1;
     this.stopDwell = 0;
     this.dwell = 0;
-    this.atRank = false;
     this.leaveT = 0;
 
     this.lateral = 0;

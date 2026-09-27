@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { findZipTarget } from './anchors.js';
+import { findZipTarget, groundBelow } from './anchors.js';
 
 // Web-zip: fire two lines at the crosshair target (aim-assisted towards roof edges) and get yanked
 // there. Roof edges end in a vault + perch, walls in a wall crawl, open surfaces in a landing.
@@ -12,6 +12,7 @@ const SHOT_SPEED = 520;
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
 const _camDir = new THREE.Vector3();
+const _origin = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
 export class ZipMove {
@@ -26,34 +27,51 @@ export class ZipMove {
     this.delay = 0;
     this.dist0 = 1;
     this.progress = 0;
+    this.timeLeft = 0;
     this.launch = false;
     this.lines = [];
     this.hit = { kind: '', point: new THREE.Vector3(), normal: new THREE.Vector3(), distance: 0 };
   }
 
+  // Where a zip fired now would go (also drives the aim marker); null if there is nothing in reach.
+  target(out = this.hit) {
+    const c = this.c;
+    const cam = c.game.camera;
+    cam.getWorldDirection(_camDir);
+    _origin.copy(c.center).y += 0.5;
+    return findZipTarget(c.world, cam.position, _camDir, _origin, out);
+  }
+
   tryStart() {
     const c = this.c;
     const p = c.p;
-    const cam = c.game.camera;
-    cam.getWorldDirection(_camDir);
-    const origin = c.center.clone();
-    origin.y += 0.5;
-    const hit = findZipTarget(c.world, cam.position, _camDir, origin, this.hit);
+    const hit = this.target();
     if (!hit) return;
+    const origin = _origin.clone();
     if (p.state === 'swing') c.swing.release(false, true);
     c.dropWebs();
     this.kind = hit.kind;
     this.point.copy(hit.point);
     this.normal.copy(hit.normal);
     this.launch = false;
+    // Where the feet end up: just below a roof edge (then vault up), chest-high against a wall (never
+    // below the street), or on the surface.
     const r = p.radius;
-    if (hit.kind === 'edge') this.dest.copy(hit.point).addScaledVector(hit.normal, r + 0.12).setY(hit.point.y - 1.55);
-    else if (hit.kind === 'wall') this.dest.copy(hit.point).addScaledVector(hit.normal, r + 0.05).setY(hit.point.y - c.centerHeight);
-    else this.dest.copy(hit.point).addScaledVector(hit.normal, 0.05);
+    const dest = this.dest;
+    if (hit.kind === 'edge') {
+      dest.copy(hit.point).addScaledVector(hit.normal, r + 0.12);
+      dest.y = hit.point.y - 1.55;
+    } else if (hit.kind === 'wall') {
+      dest.copy(hit.point).addScaledVector(hit.normal, r + 0.05);
+      dest.y = Math.max(hit.point.y - c.centerHeight, groundBelow(c.world, dest.x, hit.point.y + 0.5, dest.z, 60));
+    } else {
+      dest.copy(hit.point).addScaledVector(hit.normal, 0.05);
+    }
     this.dist0 = Math.max(1, p.position.distanceTo(this.dest));
     this.dir.subVectors(this.dest, p.position).normalize();
     this.speed = Math.max(10, p.velocity.dot(this.dir));
     this.delay = Math.max(0.05, hit.distance / SHOT_SPEED);
+    this.timeLeft = this.delay + this.dist0 / (MAX_SPEED * 0.5) + 0.5;
     this.progress = 0;
     p.state = 'zip';
     c.clearActions();
@@ -78,6 +96,13 @@ export class ZipMove {
       v.multiplyScalar(1 - Math.min(1, 4 * h));
       p.position.addScaledVector(v, h);
       c.collide();
+      return;
+    }
+    this.timeLeft -= h;
+    if (this.timeLeft <= 0) {
+      // Snagged on something: let go rather than grinding against it.
+      c.dropWebs();
+      p.state = 'air';
       return;
     }
     const dir = _a.subVectors(this.dest, p.position);
@@ -115,6 +140,7 @@ export class ZipMove {
     }
     if (this.kind === 'edge') {
       _a.copy(this.point).addScaledVector(this.normal, -0.3);
+      _a.y = groundBelow(c.world, _a.x, _a.y + 1.5, _a.z, 3, _a.y);
       c.perchOut.copy(this.normal);
       c.startVault(_a, 0.3, 'perch', _b.set(0, 0, 0));
     } else if (this.kind === 'wall') {

@@ -168,11 +168,11 @@ export function findSwingAnchor(world, from, dir, opts, out) {
   return null;
 }
 
-// Height of the first surface below (x, y, z) (or 0 = street level).
-export function groundBelow(world, x, y, z, maxDist = 200) {
+// Height of the first surface below (x, y, z) within maxDist, else `fallback` (street level).
+export function groundBelow(world, x, y, z, maxDist = 200, fallback = 0) {
   _o.set(x, y, z);
   const hit = world.raycast(_o, DOWN, maxDist);
-  return hit ? hit.point.y : 0;
+  return hit ? hit.point.y : fallback;
 }
 
 // Web-zip target from the camera ray, with aim assist towards roof edges inside a cone.
@@ -311,7 +311,10 @@ export function findPerchEdge(world, feet, out) {
     else lo = mid;
   }
   const lip = Math.max(0, lo - 0.1);
-  out.point.set(feet.x + ox * lip, feet.y, feet.z + oz * lip);
+  // Stand on whatever is at the lip (a parapet or kerb may be higher than where we stood).
+  _o.set(feet.x + ox * lip, feet.y + 1.2, feet.z + oz * lip);
+  const top = world.raycast(_o, DOWN, 2);
+  out.point.set(_o.x, top ? top.point.y : feet.y, _o.z);
   out.outward.set(ox, 0, oz);
   return out;
 }

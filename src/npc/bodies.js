@@ -62,8 +62,7 @@ function femaleDelta(x, y, z, bone) {
 }
 
 class Builder {
-  constructor(lod) {
-    this.lod = lod;
+  constructor() {
     this.parts = [];
   }
 
@@ -75,14 +74,16 @@ class Builder {
     geo.applyMatrix4(_m);
     geo.deleteAttribute('uv');
     const n = geo.attributes.position.count;
-    const part = new Float32Array(n * 4);
+    const part = new Float32Array(n * 3);
     const fem = new Float32Array(n * 3);
     const p = geo.attributes.position;
     for (let i = 0; i < n; i++) {
-      part.set([bone, slot, flag, 0], i * 4);
+      part[i * 3] = bone;
+      part[i * 3 + 1] = slot;
+      part[i * 3 + 2] = flag;
       fem.set(femaleDelta(p.getX(i), p.getY(i), p.getZ(i), bone), i * 3);
     }
-    geo.setAttribute('aPart', new THREE.BufferAttribute(part, 4));
+    geo.setAttribute('aPart', new THREE.BufferAttribute(part, 3));
     geo.setAttribute('aFem', new THREE.BufferAttribute(fem, 3));
     this.parts.push(geo);
   }
@@ -116,7 +117,7 @@ const hiddenBy = (name) => -(BIT[name] + 1);
 export function createBodyGeometry(lod) {
   const near = lod === 0;
   const seg = near ? 7 : 4;
-  const b = new Builder(lod);
+  const b = new Builder();
   for (const side of [1, -1]) {
     const x = J.hipX * side;
     const thigh = side > 0 ? B.THIGH_R : B.THIGH_L;
@@ -185,7 +186,7 @@ export function createBodyGeometry(lod) {
 // Shared GLSL: bone animation + colour resolution. Rotation angles: pitch > 0 swings a limb forward
 // (-z) / tilts the head up; roll > 0 lifts an arm away from the body.
 const VERT_HEAD = /* glsl */ `
-attribute vec4 aPart;
+attribute vec3 aPart; // bone, colour slot, flag rule
 attribute vec3 aFem;
 attribute vec4 iColA;
 attribute vec4 iColB;
@@ -230,7 +231,9 @@ void npcPose(inout vec3 p, inout vec3 n) {
   float gait = iAnim.y;
   float walk = clamp(gait, 0.0, 1.0);
   float run = clamp(gait - 1.0, 0.0, 1.0);
-  float sit = iStyle.w;
+  // iStyle.w: 0 standing .. 1 seated on a stool/crate .. 2 seated on the ground, legs out in front.
+  float sit = min(iStyle.w, 1.0);
+  float ground = max(iStyle.w - 1.0, 0.0);
   float lean = iStyle.z + run * 0.22;
   float s = sin(phase);
   float c = cos(phase);
@@ -241,8 +244,8 @@ void npcPose(inout vec3 p, inout vec3 n) {
   float kneeAmp = 0.55 * walk + 0.85 * run;
   float hipR = hipAmp * s + sit * 1.45;
   float hipL = -hipAmp * s + sit * 1.45;
-  float kneeR = -(0.08 * walk + kneeAmp * pow(max(0.0, cos(phase + 0.35)), 1.5)) - sit * 1.5;
-  float kneeL = -(0.08 * walk + kneeAmp * pow(max(0.0, cos(phase + 0.35 + 3.14159)), 1.5)) - sit * 1.5;
+  float kneeR = -(0.08 * walk + kneeAmp * pow(max(0.0, cos(phase + 0.35)), 1.5)) - sit * 1.5 + ground * 1.3;
+  float kneeL = -(0.08 * walk + kneeAmp * pow(max(0.0, cos(phase + 0.35 + 3.14159)), 1.5)) - sit * 1.5 + ground * 1.3;
   float hipX = ${J.hipX.toFixed(3)} + 0.014 * fem + 0.02 * build;
   if (bone > 6.5 && bone < 10.5) {
     bool right = bone < 8.5;
@@ -285,7 +288,7 @@ void npcPose(inout vec3 p, inout vec3 n) {
   // Whole body: pelvis twist, bob (stance leg length), sway, sitting drop.
   npcRot(p, n, vec3(0.0), npcRotY(0.11 * walk * s));
   float drop = 0.84 * (1.0 - cos(hipAmp * s)) * (1.0 - run) + run * (0.04 - 0.07 * abs(c));
-  p.y -= drop + sit * 0.43;
+  p.y -= drop + sit * 0.43 + ground * 0.4;
   p.x += (0.022 * walk * s + 0.018 * sin(phase * 0.25) * (1.0 - walk)) * (1.0 - sit);
 
   // Colour for this vertex.

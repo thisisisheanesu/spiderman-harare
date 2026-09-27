@@ -52,6 +52,7 @@ export class CameraRig {
     this._time = 0;
     this._lastManual = -10;
     this._lastYaw = 0;
+    this._diveK = 0;
   }
 
   async init(game) {
@@ -102,10 +103,12 @@ export class CameraRig {
     const speedK = smoothstep(8, 42, speed);
 
     // Follow point: tight horizontally, softer vertically so bounces and landings don't jolt.
+    // Diving, the rig centres on the body rather than looking over the shoulder.
+    this._diveK = damp(this._diveK, p.state === 'dive' ? 1 : 0, 3, dt);
     _v.copy(p.position);
-    _v.y += preset.height;
+    _v.y += preset.height + (0.9 - preset.height) * this._diveK;
     if (p.state === 'wall') _v.addScaledVector(p.controller.wall.normal, 0.7);
-    const catchUp = 14 + speed * 0.3;
+    const catchUp = 14 + speed * (0.3 + 0.3 * this._diveK);
     this.follow.x = damp(this.follow.x, _v.x, catchUp, dt);
     this.follow.z = damp(this.follow.z, _v.z, catchUp, dt);
     this.follow.y = damp(this.follow.y, _v.y, p.state === 'swing' ? 9 : catchUp, dt);
@@ -114,12 +117,12 @@ export class CameraRig {
     const lag = _v.length();
     if (lag > 4) this.follow.addScaledVector(_v, (lag - 4) / lag);
 
-    let want = preset.dist + speedK * (p.state === 'dive' ? 1.2 : 3.4);
+    let want = preset.dist + speedK * (p.state === 'dive' ? 0.5 : 3.4);
     if (p.state === 'perch') want += 1.0;
     this.distance = damp(this.distance, want, 3, dt);
 
     this._kick = damp(this._kick, 0, 2.5, dt);
-    const fov = damp(this._fov, BASE_FOV + speedK * 14 + (p.state === 'dive' ? 6 : 0), 3, dt);
+    const fov = damp(this._fov, BASE_FOV + speedK * 12 + (p.state === 'dive' ? 3 : 0), 3, dt);
     this._fov = fov;
     const finalFov = fov + this._kick;
     if (Math.abs(cam.fov - finalFov) > 0.01) {
@@ -188,7 +191,13 @@ export class CameraRig {
       this.pitch = damp(this.pitch, -0.12, 0.8, dt);
       return;
     }
-    if (hs < 3 || !(st === 'swing' || st === 'dive' || st === 'zip' || st === 'air')) return;
+    if (st === 'ground' || st === 'wall') {
+      // Ease back to a level view after dives and falls (looking up a wall while climbing it);
+      // yaw stays with the player.
+      this.pitch = damp(this.pitch, st === 'wall' && v.y > 3 ? 0.3 : -0.2, 0.8, dt);
+      return;
+    }
+    if (hs < 3) return;
     const k = clamp(hs / 20, 0.3, 1);
     const yawRate = st === 'air' ? 1.0 : st === 'dive' ? 2.6 : 1.7;
     this.yaw = dampAngle(this.yaw, Math.atan2(-v.x, -v.z), yawRate * k, dt);

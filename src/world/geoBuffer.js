@@ -3,7 +3,7 @@ import * as THREE from 'three';
 // Growable vertex/index buffer used to build the big merged city meshes without allocating a
 // BufferGeometry per piece. Every vertex carries:
 //   position (3f), normal (3f), uv (2f, usually metres or tile units),
-//   color  (4 x u8, normalized)  - tint multiplied into the texture
+//   color  (4 x u8, normalized)  - tint multiplied into the texture (alpha: ground blend factor)
 //   facade (4 x u8, integer)     - [texture-array layer, seed, kind + 8 * class, glass preset]
 // The current "brush" (tint + facade bytes) and an optional local transform (translation,
 // rotation about Y, uniform scale) apply to every vertex written after they are set.
@@ -55,6 +55,7 @@ export class GeoBuffer {
     this.brushColor[0] = rgb[0];
     this.brushColor[1] = rgb[1];
     this.brushColor[2] = rgb[2];
+    this.brushColor[3] = 255;
     this.brushFacade[0] = layer;
     this.brushFacade[1] = seed & 255;
     this.brushFacade[2] = (kind & 7) + 8 * (cls & 31);
@@ -72,10 +73,11 @@ export class GeoBuffer {
     return this;
   }
 
-  setTint(rgb) {
+  setTint(rgb, alpha = 255) {
     this.brushColor[0] = rgb[0];
     this.brushColor[1] = rgb[1];
     this.brushColor[2] = rgb[2];
+    this.brushColor[3] = alpha;
     return this;
   }
 
@@ -117,7 +119,7 @@ export class GeoBuffer {
     this.col[c] = this.brushColor[0];
     this.col[c + 1] = this.brushColor[1];
     this.col[c + 2] = this.brushColor[2];
-    this.col[c + 3] = 255;
+    this.col[c + 3] = this.brushColor[3];
     this.fac[c] = this.brushFacade[0];
     this.fac[c + 1] = this.brushFacade[1];
     this.fac[c + 2] = this.brushFacade[2];
@@ -214,6 +216,49 @@ export class GeoBuffer {
     }
   }
 
+  // Square-section beam of width w between two 3D points (struts, legs, masts).
+  beam(ax, ay, az, bx, by, bz, w, uvScale = 1) {
+    let dx = bx - ax;
+    let dy = by - ay;
+    let dz = bz - az;
+    const len = Math.hypot(dx, dy, dz) || 1;
+    dx /= len;
+    dy /= len;
+    dz /= len;
+    // Side vectors perpendicular to the axis.
+    let sx = -dz;
+    let sy = 0;
+    let sz = dx;
+    let sl = Math.hypot(sx, sz);
+    if (sl < 1e-4) {
+      sx = 1;
+      sz = 0;
+      sl = 1;
+    }
+    sx /= sl;
+    sz /= sl;
+    const tx = dy * sz - dz * sy;
+    const ty = dz * sx - dx * sz;
+    const tz = dx * sy - dy * sx;
+    const h = w / 2;
+    const v = len / uvScale;
+    const corners = [[1, 1], [-1, 1], [-1, -1], [1, -1]];
+    for (let k = 0; k < 4; k++) {
+      const [a1, b1] = corners[k];
+      const [a2, b2] = corners[(k + 1) % 4];
+      const o1x = (sx * a1 + tx * b1) * h;
+      const o1y = (sy * a1 + ty * b1) * h;
+      const o1z = (sz * a1 + tz * b1) * h;
+      const o2x = (sx * a2 + tx * b2) * h;
+      const o2y = (sy * a2 + ty * b2) * h;
+      const o2z = (sz * a2 + tz * b2) * h;
+      const nx = (o1x + o2x) / w;
+      const ny = (o1y + o2y) / w;
+      const nz = (o1z + o2z) / w;
+      this.quad(ax + o1x, ay + o1y, az + o1z, ax + o2x, ay + o2y, az + o2z, bx + o2x, by + o2y, bz + o2z, bx + o1x, by + o1y, bz + o1z, nx, ny, nz, 0, 0, w / uvScale, v);
+    }
+  }
+
   // Horizontal polygon (flat [x,z,...] ring, optional holes) at height y facing up or down.
   // UVs are world x/z divided by uvScale (plus offset).
   polygon(ring, holes, y, uvScale = 1, up = true) {
@@ -303,7 +348,7 @@ const _holes = [];
 
 // Earcut via THREE.ShapeUtils on flat [x,z,...] rings. Returns flat index triples into the
 // concatenation [ring, ...holes], or null.
-export function triangulate(ring, holes) {
+function triangulate(ring, holes) {
   _contour.length = 0;
   for (let i = 0; i < ring.length; i += 2) _contour.push(new THREE.Vector2(ring[i], ring[i + 1]));
   _holes.length = 0;

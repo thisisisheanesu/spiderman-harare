@@ -68,7 +68,21 @@ export class Animator {
     this.cur = new Float32Array(POSE_SIZE);
     this.tgt = new Float32Array(POSE_SIZE);
     this.tmp = new Float32Array(POSE_SIZE);
-    this.c = { time: 0, speed: 0, vy: 0, runPhase: 0, run01: 0, rising: 0, webSide: 1, zipT: 0, wallPhase: 0, wallMove: 0, wallLook: 0, actionT: 0 };
+    // Inputs for the pose functions (see poses.js).
+    this.c = {
+      time: 0,
+      speed: 0,
+      vy: 0,
+      runPhase: 0,
+      run01: 0,
+      rising: 0,
+      webSide: 1,
+      zipT: 0,
+      wallPhase: 0,
+      wallMove: 0,
+      wallLook: 0,
+      actionT: 0,
+    };
     this.body = new THREE.Quaternion();
     this.fallK = 0;
     poseIdle(this.cur, this.c);

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { closestOnSegment } from '../core/geo.js';
 import { probeLedge, findPerchEdge } from './anchors.js';
 import { SwingMove } from './swing.js';
 import { ZipMove } from './zip.js';
@@ -63,7 +64,17 @@ export class Controller {
     this.perchHit = { point: new THREE.Vector3(), outward: new THREE.Vector3() };
     this.idleTime = 0;
     this.perchCheck = 0;
-    this.vault = { active: false, from: new THREE.Vector3(), ctrl: new THREE.Vector3(), to: new THREE.Vector3(), t: 0, dur: 0.3, then: 'ground', exit: new THREE.Vector3() };
+    // Scripted hop (Bézier from → ctrl → to), then state `then` with velocity `exit`.
+    this.vault = {
+      active: false,
+      from: new THREE.Vector3(),
+      ctrl: new THREE.Vector3(),
+      to: new THREE.Vector3(),
+      t: 0,
+      dur: 0.3,
+      then: 'ground',
+      exit: new THREE.Vector3(),
+    };
 
     this.landMode = null; // 'soft' | 'roll' | 'hard' while a landing plays out
     this.landT = 0;
@@ -264,6 +275,9 @@ export class Controller {
     if (res.ground && v.y < 0) v.y = 0;
     if (res.ceiling && v.y > 0) v.y = 0;
     this.wallImpact = 0;
+    // Rolling over a roof edge also reports a (bogus, inward-facing) wall: only trust walls that are
+    // really there at knee height.
+    if (res.wall && !this._wallAtKnee(res.wallNormal)) res.wall = false;
     if (res.wall) {
       const into = v.dot(res.wallNormal);
       if (into < 0) {
@@ -272,6 +286,13 @@ export class Controller {
       }
     }
     return res;
+  }
+
+  _wallAtKnee(n) {
+    const p = this.p;
+    _a.set(p.position.x, p.position.y + 0.3, p.position.z);
+    const hit = this.world.raycast(_a, _b.copy(n).negate(), p.radius + 0.3);
+    return !!hit && Math.abs(hit.normal.y) < 0.5;
   }
 
   // Ran or flew into an obstacle: vault it if it is low, otherwise grab it and climb.
@@ -376,8 +397,11 @@ export class Controller {
     }
     p.position.addScaledVector(v, h);
     const res = this.collide();
-    if (res.ground && this.impactVy >= -0.5) this.land(Math.max(0, this.impactVy));
-    else if (res.wall && !res.ground && this.wall.wantsToGrab(res.wallNormal, this.wallImpact)) this.obstacle(res.wallNormal, this.wallImpact);
+    if (res.ground && this.impactVy >= -0.5) {
+      this.land(Math.max(0, this.impactVy));
+    } else if (res.wall && !res.ground && this.wall.wantsToGrab(res.wallNormal, this.wallImpact)) {
+      this.obstacle(res.wallNormal, this.wallImpact);
+    }
   }
 
   // Touchdown: superhero landing on big impacts, a roll when carrying speed, a knee dip otherwise.
@@ -470,7 +494,8 @@ export class Controller {
   _checkPerch(dt) {
     const p = this.p;
     const v = p.velocity;
-    if (p.state !== 'ground' || this.landMode === 'hard' || this.vault.active || this.wish.lengthSq() > 0.01 || Math.hypot(v.x, v.z) > 0.8) {
+    const idle = p.state === 'ground' && this.landMode !== 'hard' && !this.vault.active;
+    if (!idle || this.wish.lengthSq() > 0.01 || Math.hypot(v.x, v.z) > 0.8) {
       this.idleTime = 0;
       return;
     }
@@ -495,12 +520,20 @@ export class Controller {
     if (!this.vault.active && p.state !== 'perch') {
       const b = this.world.buildingAt(pos.x, pos.z);
       if (b && pos.y < b.h - 0.3 && pos.y + p.height > (b.minH || 0) + 0.1) {
-        // Somehow inside a building volume: pop onto its roof.
+        // Somehow inside a building volume: pop onto the roof if it is close, else out of the
+        // nearest facade.
         if (p.state === 'swing') this.swing.release(false, true);
         this.dropWebs();
-        pos.y = b.h + 0.02;
-        v.y = Math.max(0, v.y);
-        p.state = 'ground';
+        if (b.h - pos.y >= 2.5) this._pushOutOf(b);
+        // Still inside something (a close roof, or the neighbour of a terrace)? Stand on top of it.
+        const inside = this.world.buildingAt(pos.x, pos.z);
+        if (inside && pos.y < inside.h) {
+          pos.y = inside.h + 0.02;
+          v.y = Math.max(0, v.y);
+          p.state = 'ground';
+        } else {
+          p.state = 'air';
+        }
       }
     }
     // Soft push back towards the map, hard stop further out.
@@ -517,6 +550,25 @@ export class Controller {
       pos.y = 0.05;
       v.y = 0;
     }
+  }
+
+  _pushOutOf(b) {
+    const p = this.p;
+    const pos = p.position;
+    const fp = b.fp;
+    const n = fp.length / 2;
+    let best = null;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const c = closestOnSegment(pos.x, pos.z, fp[i * 2], fp[i * 2 + 1], fp[j * 2], fp[j * 2 + 1]);
+      if (!best || c.d2 < best.d2) best = c;
+    }
+    const dx = best.x - pos.x;
+    const dz = best.z - pos.z;
+    const d = Math.hypot(dx, dz) || 1;
+    pos.x = best.x + (dx / d) * (p.radius + 0.05);
+    pos.z = best.z + (dz / d) * (p.radius + 0.05);
+    p.velocity.set(0, Math.min(p.velocity.y, 0), 0);
   }
 
   _updateHeading() {

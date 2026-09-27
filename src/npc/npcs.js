@@ -7,6 +7,7 @@ import { CrowdRenderer } from './bodies.js';
 import { VoiceDirector } from './voices.js';
 import { Bubbles } from './bubbles.js';
 import { Social } from './social.js';
+import { Flashes } from './flashes.js';
 
 // Pedestrians of Harare CBD: pavements, crossings, First Street Mall, the parks and the kombi ranks,
 // with vendors at their stalls and people who speak with real Zimbabwean (Shona) voices.
@@ -43,13 +44,12 @@ export class Npcs {
     this.social = new Social(game, this.crowd, this.population, this.voices, this.bubbles);
     this.lod = LOD[game.quality.level] || LOD.high;
     this.renderer = new CrowdRenderer(game.scene, this.population.max, { shadows: !!game.quality.shadows });
+    this.flashes = new Flashes(game.scene);
     this.ctx = {
       focus: new THREE.Vector3(),
       px: 0,
       py: 0,
       pz: 0,
-      fx: 0,
-      fz: 0,
       r2: 0,
       playerOnFoot: false,
       nearGround: false,
@@ -80,8 +80,6 @@ export class Npcs {
     ctx.px = p.x;
     ctx.py = p.y;
     ctx.pz = p.z;
-    ctx.fx = p.x;
-    ctx.fz = p.z;
     ctx.r2 = this.population.radius ** 2;
     const ground = this.walkways.groundY(p.x, p.z);
     ctx.playerOnFoot = player?.state === 'ground' && p.y - ground < 1;
@@ -95,7 +93,7 @@ export class Npcs {
     this.social.update(dt, ctx);
     this.voices.update(dt, ctx, this.crowd.near(p.x, p.z, 15, this._near));
     this._ambience(dt, ctx);
-    this._render();
+    this._render(dt);
     this.bubbles.update(dt);
   }
 
@@ -119,8 +117,9 @@ export class Npcs {
     this.game.audio?.setAmbience?.('crowd', Math.round(this.ambience * 100) / 100);
   }
 
-  _render() {
+  _render(dt) {
     const r = this.renderer;
+    const t = this.game.time;
     const cam = this.game.camera.position;
     const frustum = this.population.frustum;
     const { near, far, blob } = this.lod;
@@ -135,8 +134,11 @@ export class Npcs {
       sphere.center.set(a.position.x, a.position.y + 0.9, a.position.z);
       if (!frustum.intersectsSphere(sphere)) continue;
       r.push(a, d2 < near * near ? 0 : 1, d2 < blob * blob);
+      // People filming Spider-Man: the odd phone flash.
+      if (a.state === 'react' && a.react.type === 'photo' && t > a.react.start && Math.random() < dt * 0.7) this.flashes.fire(a);
     }
     r.end();
+    this.flashes.update(dt);
     r.setShadowStrength(this.game.sky?.isNight ? 0.55 : 1);
   }
 }

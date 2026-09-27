@@ -11,7 +11,7 @@ const SILL = '#f6f4ef';
 
 function wallBase(p, color = '#ebe9e3', grime = 0.2) {
   p.rect(0, 0, 1, 1, color);
-  p.grime(grime, 1);
+  p.grime(grime * 0.6, 1);
   p.speckle(p.S * 3, ['rgba(0,0,0,0.06)', 'rgba(255,255,255,0.07)'], p.S / 256);
 }
 
@@ -33,7 +33,7 @@ function window1(p, x0, y0, x1, y1, { reveal = 0.025, mullions = 1, transom = 0.
   }
 }
 
-export const FACADE_STYLES = {
+const FACADE_STYLES = {
   // 1950s-70s office slab: continuous glass bands between concrete spandrels.
   bands: {
     tileW: 3.0,
@@ -214,54 +214,100 @@ export const FACADE_STYLES = {
       p.streaks(0.8, 1, 4, 'rgba(60,55,50,1)', 0.12);
     },
   },
-  // Eastgate Centre: grey precast with deep saw-tooth window hoods.
+  // Eastgate Centre: grey precast window hoods ("teeth") over recessed glass, salmon brick infill.
   eastgate: {
     tileW: 3.2,
     draw(p) {
-      wallBase(p, '#bdb8ae', 0.25);
-      p.solid(0.18, 0.34, 0.82, 0.78, '#5c5a56');
-      p.glass(0.21, 0.38, 0.79, 0.76, '#48545b', '#2b3338');
-      p.solid(0.495, 0.38, 0.505, 0.76, FRAME);
-      const c = p.c;
-      const S = p.S;
-      c.fillStyle = '#d8d3ca';
-      c.beginPath();
-      c.moveTo(0.12 * S, 0.12 * S);
-      for (let i = 0; i <= 6; i++) {
-        const x = 0.12 + (0.76 * i) / 6;
-        c.lineTo(x * S, (i % 2 ? 0.3 : 0.12) * S);
+      p.rect(0, 0, 1, 1, '#d9c2ac');
+      for (let r = 0; r < 12; r++) {
+        for (let c = 0; c < 8; c++) p.rect(c / 8 + 0.004, r / 12 + 0.004, (c + 1) / 8 - 0.004, (r + 1) / 12 - 0.004, r % 2 ? '#e2cbb5' : '#d6bda6');
       }
-      c.lineTo(0.88 * S, 0.32 * S);
-      c.lineTo(0.12 * S, 0.32 * S);
-      c.fill();
-      p.rect(0.12, 0.32, 0.88, 0.36, 'rgba(0,0,0,0.35)');
-      p.rect(0.02, 0, 0.05, 1, '#44484a');
-      for (let y = 0.05; y < 1; y += 0.11) {
-        c.fillStyle = y % 0.22 < 0.11 ? '#4d6b3a' : '#5f7d45';
-        c.beginPath();
-        c.arc(0.035 * S, y * S, 0.03 * S, 0, Math.PI * 2);
-        c.fill();
+      p.grime(0.25, 1);
+      for (const x0 of [0.08, 0.54]) {
+        p.solid(x0, 0.3, x0 + 0.38, 0.8, '#4a4845');
+        p.glass(x0 + 0.03, 0.36, x0 + 0.35, 0.78, '#4b565c', '#2a3136');
+        // Hood: a deep precast visor casting a shadow over the window.
+        p.solid(x0 - 0.04, 0.2, x0 + 0.42, 0.3, '#ece6dc');
+        p.vgrad(x0 - 0.04, 0.3, x0 + 0.42, 0.42, 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0)');
+        p.solid(x0 - 0.04, 0.8, x0 + 0.42, 0.84, '#e6e0d6');
       }
+      p.solid(0.47, 0, 0.53, 1, '#e4ded4');
+      p.rect(0.525, 0, 0.53, 1, 'rgba(0,0,0,0.15)');
     },
   },
-  // Polished granite piers with narrow vertical dark-glass strips (Reserve Bank).
-  granite: {
-    tileW: 1.8,
+  // X-braced precast service tower (Eastgate).
+  lattice: {
+    tileW: 4,
     draw(p) {
-      p.rect(0, 0, 1, 1, '#e4e0dc');
-      p.speckle(p.S * 40, ['rgba(40,35,35,0.35)', 'rgba(255,255,255,0.5)', 'rgba(150,110,100,0.35)'], p.S / 300);
-      p.rect(0, 0.5, 1, 0.503, 'rgba(0,0,0,0.12)');
-      p.rect(0, 0.997, 1, 1, 'rgba(0,0,0,0.12)');
-      p.solid(0.7, 0, 0.72, 1, '#4b4b4b');
-      p.glass(0.72, 0, 0.96, 1, '#394148', '#20262b');
-      p.solid(0.72, 0.48, 0.96, 0.495, '#3a3d40');
-      p.solid(0.96, 0, 0.98, 1, '#4b4b4b');
+      p.rect(0, 0, 1, 1, '#2f302f');
+      const c = p.c;
+      const S = p.S;
+      c.strokeStyle = '#e4ddd2';
+      c.lineWidth = 0.09 * S;
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(S, S);
+      c.moveTo(S, 0);
+      c.lineTo(0, S);
+      c.stroke();
+      p.rect(0, 0, 0.08, 1, '#e4ddd2');
+      p.rect(0.92, 0, 1, 1, '#e4ddd2');
+      p.rect(0, 0, 1, 0.06, '#e4ddd2');
+      p.grime(0.3, 1);
+    },
+  },
+  // Pale granite frieze with a Great Zimbabwe chevron relief (Reserve Bank).
+  frieze: {
+    tileW: 3,
+    draw(p) {
+      p.rect(0, 0, 1, 1, '#eceeea');
+      p.speckle(p.S * 30, ['rgba(40,40,40,0.25)', 'rgba(255,255,255,0.5)'], p.S / 300);
+      const c = p.c;
+      const S = p.S;
+      for (const [y, shade] of [[0.3, 'rgba(0,0,0,0.22)'], [0.56, 'rgba(0,0,0,0.16)']]) {
+        c.strokeStyle = shade;
+        c.lineWidth = 0.035 * S;
+        c.beginPath();
+        for (let k = 0; k <= 6; k++) c.lineTo((k / 6) * S, (y + (k % 2 ? 0.12 : 0)) * S);
+        c.stroke();
+      }
+      p.rect(0, 0.08, 1, 0.1, 'rgba(0,0,0,0.2)');
+      p.rect(0, 0.84, 1, 0.87, 'rgba(0,0,0,0.25)');
+    },
+  },
+  // Rough granite / sandstone ashlar with a lancet window (cathedrals).
+  stone: {
+    tileW: 4,
+    draw(p) {
+      p.rect(0, 0, 1, 1, '#9a948c');
+      const rows = 9;
+      for (let r = 0; r < rows; r++) {
+        let x = -p.rng() * 0.2;
+        while (x < 1) {
+          const w = 0.12 + p.rng() * 0.16;
+          const v = Math.round(215 + p.rng() * 35);
+          p.rect(x + 0.006, r / rows + 0.008, x + w - 0.006, (r + 1) / rows - 0.008, `rgb(${v},${v - 6},${v - 14})`);
+          x += w;
+        }
+      }
+      p.grime(0.35, 1);
+      const c = p.c;
+      const S = p.S;
+      c.fillStyle = '#e8e2d6';
+      c.beginPath();
+      c.moveTo(0.4 * S, 0.8 * S);
+      c.lineTo(0.4 * S, 0.38 * S);
+      c.quadraticCurveTo(0.5 * S, 0.14 * S, 0.6 * S, 0.38 * S);
+      c.lineTo(0.6 * S, 0.8 * S);
+      c.fill();
+      p.glass(0.425, 0.36, 0.575, 0.78, '#3e4f63', '#26303b');
+      p.solid(0.495, 0.36, 0.505, 0.78, '#2a2a2a');
     },
   },
 };
 
 // Ground-floor (street level) layers: the top of the tile is the fascia band.
-export const GROUND_STYLES = {
+const GROUND_STYLES = {
   shop: {
     tileW: 4.5,
     draw(p) {
@@ -337,7 +383,7 @@ export const GROUND_STYLES = {
 };
 
 // Roofs and plain surfaces (UVs in metres / tileW on both axes).
-export const SURFACE_STYLES = {
+const SURFACE_STYLES = {
   roofFlat: {
     tileW: 8,
     draw(p) {
@@ -358,8 +404,8 @@ export const SURFACE_STYLES = {
         p.rect(k / 4, 0, k / 4 + 0.004, 1, 'rgba(0,0,0,0.12)');
         p.rect(0, k / 4, 1, k / 4 + 0.004, 'rgba(0,0,0,0.12)');
       }
-      p.rect(0.3, 0.55, 0.45, 0.7, 'rgba(40,40,40,0.35)');
-      p.rect(0.7, 0.1, 0.78, 0.35, 'rgba(40,40,40,0.25)');
+      p.rect(0.3, 0.55, 0.45, 0.7, 'rgba(40,40,40,0.14)');
+      p.rect(0.7, 0.1, 0.78, 0.35, 'rgba(40,40,40,0.1)');
     },
   },
   corrugated: {
@@ -447,7 +493,7 @@ export const SURFACE_STYLES = {
 // Small non-repeating details on one layer, addressed by cell (4 x 4 grid) sub-rects.
 export const MISC_CELLS = { ac: 0, door: 1, clock: 2, louvre: 3, dish: 4, flame: 5, vent: 6, stone: 7, lamp: 8 };
 
-export function drawMisc(p) {
+function drawMisc(p) {
   const cell = (i, fn) => {
     const cx = (i % 4) / 4;
     const cy = Math.floor(i / 4) / 4;

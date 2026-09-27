@@ -1,6 +1,5 @@
 import { ROAD_CLASSES } from './roadGraph.js';
 import { GREEN, AMBER, NONE } from './signals.js';
-import { laneOffset } from '../world/streetMetrics.js';
 
 // Microscopic traffic: IDM car following along lanes and junction connectors, junction reservations
 // (requests granted first-come-first-served with priority for the main road and against right turns,
@@ -127,7 +126,7 @@ export class Simulation {
     if (!c || c.conflictFree) return;
     const lane = c.from;
     const j = lane.junction;
-    if (v.grantJ === j) return;
+    if (v.grantJ === j || (v.stopS >= 0 && v.stopLane === lane)) return;
     if (this.distToLine(v) > Math.max(12, v.speed * REQUEST_TIME + 6)) return;
     if (!this._firstInLine(v, lane, j)) return;
     const sig = this.signals.state(lane);
@@ -462,8 +461,21 @@ export class Simulation {
       v.prev = p;
     }
     if (v.boxJ && v.path.isLane && v.s >= v.length) this._releaseBox(v);
+    // A grant is a promise to cross soon: give it back if something stops us well short of the line.
+    if (v.grantJ && v.speed < 0.2 && this.distToLine(v) > 4) {
+      v.grantWait += dt;
+      if (v.grantWait > 4) this._cancelGrant(v);
+    } else v.grantWait = 0;
     v.lineWait = v.gapKind === GAP_LINE && v.hardGap < 3 && v.speed < 0.5 ? v.lineWait + dt : 0;
     v.stuck = v.speed < 0.3 ? v.stuck + dt : 0;
+  }
+
+  _cancelGrant(v) {
+    removeFrom(v.grantJ.occupants, v);
+    this._unreserve(v, v.grantConn.to);
+    v.grantJ = null;
+    v.grantConn = null;
+    v.grantWait = 0;
   }
 
   _releaseBox(v) {
@@ -478,12 +490,10 @@ export class Simulation {
     if (!v.stopChance || lane.laneIndex !== 0 || lane.length < 30) return;
     let s = -1;
     let dwell = 0;
-    let rank = false;
     for (const st of lane.stops) {
       if (this.rng() < (v.type === 'kombi' ? 0.8 : 0.35)) {
         s = st.s;
         dwell = this.rng.range(8, 18);
-        rank = true;
         break;
       }
     }
@@ -495,7 +505,6 @@ export class Simulation {
     v.stopLane = lane;
     v.stopS = s;
     v.stopDwell = dwell;
-    v.atRank = rank;
   }
 
   // Pull out around a slow or loading vehicle when the neighbouring lane has a safe gap. Kombis accept
@@ -530,7 +539,7 @@ export class Simulation {
       if (fol && (fol.grantJ || gapB < 1.5 + fol.speed * (v.wild ? 0.35 : 1.0))) continue;
       removeFrom(lane.vehicles, v);
       list.splice(k, 0, v);
-      v.lateral += laneOffset(lane.road, lane.laneIndex) - laneOffset(t.road, t.laneIndex);
+      v.lateral += lane.offset - t.offset;
       v.path = t;
       v.s = s2;
       v.next = this.choose(v, t);

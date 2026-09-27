@@ -3,8 +3,8 @@ import { LayerAtlas } from './atlas.js';
 import { paintFacadeLayers } from './facades.js';
 import { paintGroundLayers, buildUrbanMask } from './groundTextures.js';
 import { createCityUniforms, createFacadeMaterial, createGroundMaterial } from './materials.js';
-import { ChunkGrid, planBuilding, emitBuilding } from './buildings.js';
-import { buildStreets } from './roads.js';
+import { ChunkGrid, CHUNK, planBuilding, emitBuilding } from './buildings.js';
+import { buildStreets, StreetIndex } from './roads.js';
 import { buildGround } from './ground.js';
 import { GeoBuffer } from './geoBuffer.js';
 import { planTrees, createVegetation } from './vegetation.js';
@@ -15,8 +15,8 @@ import { Kopje, createFlame } from './terrain.js';
 
 const QUALITY = {
   low: { tex: 256, props: 0.5, trees: 0.4, signs: 48 },
-  medium: { tex: 512, props: 0.8, trees: 0.7, signs: 96 },
-  high: { tex: 512, props: 1, trees: 1, signs: 128 },
+  medium: { tex: 384, props: 0.8, trees: 0.7, signs: 80 },
+  high: { tex: 384, props: 1, trees: 1, signs: 112 },
 };
 
 // City renderer: buildings, streets, parks, trees, street furniture and landmarks, built from the
@@ -71,12 +71,12 @@ export class City {
     // Buildings (+ landmark details).
     const landmarks = new Landmarks(data);
     const landmarkStyles = new Map((data.meta.landmarks || []).map((l) => [l.key, l.style || {}]));
-    const ctx = { game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks };
+    const ctx = { game, data, world, L, tileW, G, groundScale, quality, landmarkStyles, landmarks, chunks, streets: new StreetIndex(data) };
     const frontages = [];
     const emit = (b, extra) => {
       const spec = planBuilding(b, ctx);
       Object.assign(spec, extra);
-      for (const f of emitBuilding(b, spec, chunks.at(b.cx, b.cz), colliderFor(b.id), ctx)) frontages.push(f);
+      for (const f of emitBuilding(b, spec, chunks.at(b.cx, b.cz), chunks.detailAt(b.cx, b.cz), colliderFor(b.id), ctx)) frontages.push(f);
     };
     for (const b of data.buildings) emit(b);
     tick('buildings');
@@ -96,11 +96,11 @@ export class City {
     // Signs, street furniture, trees.
     for (const pl of signs.assign(frontages, data.pois)) {
       const f = pl.frontage;
-      emitSign(chunks.at(f.ax, f.az), L, pl);
+      emitSign(chunks.detailAt(f.ax, f.az), pl);
     }
     const props = buildProps({ ...ctx, colliderFor, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, frontages, signs, heightAt: this.heightAt });
     const trees = planTrees({ ...ctx, sidewalkPaths: this.sidewalkPaths, urbanAt: urban.at, heightAt: this.heightAt });
-    this.vegetation = createVegetation(this.group, trees, landmarks.palms, this.uniforms, quality, !!game.quality.shadows);
+    this.vegetation = createVegetation(this.group, trees, landmarks.palms, this.uniforms, quality, !!game.quality.shadows, game.quality.drawDistance || 2500);
     tick('props+trees');
 
     // Physics for everything that sticks out of the plain footprint extrusions.
@@ -119,11 +119,13 @@ export class City {
     const ground = (offset) => createGroundMaterial(groundTex, this.uniforms, G, urban, { offset });
     const mats = { base: ground(3), landuse: ground(2), areas: ground(1), paths: ground(0), roads: ground(-1), marks: ground(-2) };
 
-    this.chunkMeshes = [];
-    for (const gb of chunks.map.values()) {
-      const mesh = this._mesh(gb, this.facadeMat, true);
-      if (mesh) this.chunkMeshes.push(mesh);
+    this.chunks = [];
+    for (const e of chunks.map.values()) {
+      const base = this._mesh(e.base, this.facadeMat, true);
+      const detail = this._mesh(e.detail, this.facadeMat, true);
+      if (base || detail) this.chunks.push({ base, detail, x: e.cx, z: e.cz });
     }
+    this.detailRange = game.quality.level === 'low' ? 380 : 560;
     const { minX, maxX, minZ, maxZ } = data.meta.bounds;
     const pad = 3500;
     const plane = new GeoBuffer(8);
@@ -162,14 +164,25 @@ export class City {
     this.uniforms.uNight.value = t;
     this.uniforms.uShutterFrac.value = 0.18 + 0.5 * t;
     if (this.lightPools) {
-      this.lightPools.material.opacity = 0.55 * t;
+      this.lightPools.material.opacity = 0.85 * t;
       this.lightPools.visible = t > 0.02;
     }
   }
 
   update(dt, game) {
     this.uniforms.uTime.value += dt;
-    this.vegetation.update(game.camera.position);
+    const cam = game.camera.position;
+    this.vegetation.update(cam);
+    // Chunk LOD: drop the detail layer away from the camera and whole chunks beyond the fog.
+    const half = CHUNK / 2;
+    const far = (game.scene.fog?.far ?? 3000) + half;
+    for (const c of this.chunks) {
+      const dx = Math.max(0, Math.abs(cam.x - c.x) - half);
+      const dz = Math.max(0, Math.abs(cam.z - c.z) - half);
+      const d = Math.hypot(dx, dz);
+      if (c.base) c.base.visible = d < far;
+      if (c.detail) c.detail.visible = d < this.detailRange;
+    }
     this.flame.update(this.uniforms.uTime.value);
     const pal = game.sky?.palette;
     if (pal && pal.version !== this._palVersion) {

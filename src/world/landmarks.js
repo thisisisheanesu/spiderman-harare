@@ -1,4 +1,4 @@
-import { cleanRing, edgeNormals, offsetRing, orientedBox, signedArea } from './polygon.js';
+import { cleanRing, edgeNormals, offsetRing, orientedBox } from './polygon.js';
 import { MISC_CELLS, miscUV } from './facades.js';
 import { tint } from './palette.js';
 import { makeRng } from '../core/rng.js';
@@ -135,13 +135,12 @@ export class Landmarks {
         c.x + ux * L2 - uz * W2, c.z + uz * L2 + ux * W2,
         c.x - ux * L2 - uz * W2, c.z - uz * L2 + ux * W2,
       ];
-      if (signedArea(fp) > 0) fp.reverse();
       emit({ id: -7, oid: 'rainbow-towers-hotel', fp, h: 75, fl: 19, core: 1, lm: 'rainbow_towers', cx: c.x, cz: c.z }, { fullCollider: true });
     }
     const statue = data.features.find((f) => f.key === 'mbuya_nehanda_statue');
-    if (statue) nehanda(chunks.at(statue.x, statue.z), colliderFor(-8), L, statue.x, statue.z);
+    if (statue) nehanda(chunks.detailAt(statue.x, statue.z), colliderFor(-8), L, statue.x, statue.z);
     const fountain = data.features.find((f) => f.kind === 'fountain');
-    if (fountain) fountainAt(chunks.at(fountain.x, fountain.z), colliderFor(-9), L, fountain.x, fountain.z, paths, G);
+    if (fountain) fountainAt(chunks.detailAt(fountain.x, fountain.z), colliderFor(-9), L, fountain.x, fountain.z, paths, G);
   }
 }
 
@@ -173,44 +172,49 @@ function shellRing(gb, col, ring, inner, y0, y1, fh, layer, tintBytes, seed, til
   }
 }
 
-// Reserve Bank: broad granite base stepping in twice towards the top, a coronet of fins on the
-// roof edge and a mast (off-centre so the roof centre stays clear).
+// Reserve Bank: broad granite base stepping in twice towards the top, a coronet of fins set back
+// from the roof edge and a mast (off-centre so the roof centre stays clear for spawning).
 function rbzTaper(gb, col, L, fp, b, spec, seed) {
   const normals = edgeNormals(fp, true);
   const outer = offsetRing(fp, normals, 3.2);
   const mid = offsetRing(fp, normals, 1.6);
   shellRing(gb, col, outer, mid, 0, b.h - 24, spec.fh, L.granite, spec.tint, seed, 1.8);
   shellRing(gb, col, mid, fp, b.h - 24, b.h - 12, spec.fh, L.granite, spec.tint, seed, 1.8);
-  // Coronet of fins standing on the roof edge.
-  const n = fp.length / 2;
+  // Coronet of fins set back from the roof edge (the edge stays clear for perching).
+  const crown = offsetRing(fp, normals, -6);
+  const n = crown.length / 2;
   gb.brush(spec.tint, L.concrete, seed, 2);
   for (let i = 0; i < n; i++) {
     const j = (i + 1) % n;
-    const ax = fp[i * 2];
-    const az = fp[i * 2 + 1];
-    const bx = fp[j * 2];
-    const bz = fp[j * 2 + 1];
+    const ax = crown[i * 2];
+    const az = crown[i * 2 + 1];
+    const bx = crown[j * 2];
+    const bz = crown[j * 2 + 1];
     const len = Math.hypot(bx - ax, bz - az);
     const ex = (bx - ax) / len;
     const ez = (bz - az) / len;
     const nx = normals[i * 2];
     const nz = normals[i * 2 + 1];
-    const fins = Math.max(1, Math.round(len / 2.6));
+    const fins = Math.max(1, Math.round(len / 2.4));
     for (let k = 0; k < fins; k++) {
       const t = ((k + 0.5) / fins) * len;
-      const x = ax + ex * t - nx * 0.3;
-      const z = az + ez * t - nz * 0.3;
+      const x = ax + ex * t;
+      const z = az + ez * t;
       gb.setTransform(x, b.h, z, Math.atan2(nx, nz));
-      gb.box(0, 0, 0, 0.45, 6.5, 0.9, 4);
+      gb.box(0, 0, 0, 0.45, 5.5, 0.9, 4);
       gb.clearTransform();
       col.setTransform(x, b.h, z, Math.atan2(nx, nz));
-      col.box(0, 0, 0, 0.45, 6.5, 0.9, 1);
+      col.box(0, 0, 0, 0.45, 5.5, 0.9, 1);
       col.clearTransform();
     }
+    // Ring beam tying the fins together.
+    gb.setTransform((ax + bx) / 2, b.h + 5.5, (az + bz) / 2, Math.atan2(nx, nz));
+    gb.box(0, 0, 0, len + 0.6, 0.55, 0.7, 4);
+    gb.clearTransform();
   }
   const obb = orientedBox(fp);
-  const mx = obb.cx + obb.ux * 7;
-  const mz = obb.cz + obb.uz * 7;
+  const mx = obb.cx + obb.ux * 4;
+  const mz = obb.cz + obb.uz * 4;
   gb.brush(tint('#9aa0a4'), L.metal, seed, 2);
   gb.cylinder(mx, b.h, mz, 0.35, 16, 6, 2, false, 0.12);
   gb.box(mx, b.h, mz, 1.4, 1.2, 1.4, 1);

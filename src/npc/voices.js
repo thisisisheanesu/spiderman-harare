@@ -4,11 +4,15 @@ import * as THREE from 'three';
 // Clips come from the manifest in game.voices: 'line' = full sentence with Shona + English text,
 // 'bark' = short fragment used for exclamations. Each speaking NPC is bound to one FLEURS speaker
 // ('voice' id) of their own gender for as long as they live, and no two live NPCs share a speaker.
-// At most two voices play at once; clips are not repeated until the gender's pool is used up.
+// At most two voices play at once; a clip is not heard again for a few minutes, or until the gender's
+// pool is used up.
 
 const MAX_VOICES = 2;
 const LINE_RANGE = 15; // m: ambient lines only play when people are this close
 const MIN_GAP = 1.1; // s between two voice starts
+// Most FLEURS speakers have a single clip, so a bound speaker may repeat it after this long (s);
+// otherwise the few people near a player who stands still fall silent for good.
+const REPEAT_AFTER = 150;
 
 export class VoiceDirector {
   constructor(game) {
@@ -23,7 +27,7 @@ export class VoiceDirector {
       this.byVoice.get(c.voice).push(c);
     }
     this.owner = new Map(); // voice id -> agent
-    this.played = new Set();
+    this.played = new Map(); // clip id -> game time it last started
     this.active = []; // {agent, id, until, handle}
     this.lastStart = -1e9;
     this.nextLine = 4;
@@ -39,6 +43,11 @@ export class VoiceDirector {
     agent.voice = null;
   }
 
+  _fresh(c, t) {
+    const at = this.played.get(c.id);
+    return at === undefined || t - at > REPEAT_AFTER;
+  }
+
   busy() {
     const t = this.game.time;
     this.active = this.active.filter((v) => v.until > t && v.agent.id === v.id);
@@ -48,15 +57,16 @@ export class VoiceDirector {
   // Choose a clip of `kind` for this agent, binding a speaker to them on first use.
   pickClip(agent, kind) {
     if (agent.look.child) return null;
+    const t = this.game.time;
     if (agent.voice) {
       const own = (this.byVoice.get(agent.voice) || []).filter((c) => c.kind === kind);
-      if (!own.length) return null;
-      return own.find((c) => !this.played.has(c.id)) || own[Math.floor(Math.random() * own.length)];
+      // Nothing fresh from this speaker: let someone else talk.
+      return own.find((c) => this._fresh(c, t)) || null;
     }
     const pool = this.pools[kind]?.[agent.gender];
     if (!pool?.length) return null;
     const free = (c) => !this.owner.has(c.voice);
-    let cands = pool.filter((c) => free(c) && !this.played.has(c.id));
+    let cands = pool.filter((c) => free(c) && this._fresh(c, t));
     if (!cands.length) {
       for (const c of pool) this.played.delete(c.id);
       cands = pool.filter(free);
@@ -77,7 +87,7 @@ export class VoiceDirector {
   speak(agent, clip, shown) {
     const game = this.game;
     const t = game.time;
-    this.played.add(clip.id);
+    this.played.set(clip.id, t);
     const head = this._head.set(agent.position.x, agent.position.y + 1.6 * agent.look.scale, agent.position.z);
     const handle = game.audio?.playVoice?.(clip.id, head.clone(), { volume: clip.kind === 'line' ? 1 : 0.9 });
     const dur = handle?.duration || clip.dur;
@@ -108,6 +118,12 @@ export class VoiceDirector {
   update(dt, ctx, candidates) {
     if (!this.available) return;
     const t = this.game.time;
+    // Voices follow their speakers (people talk as they walk).
+    for (const v of this.active) {
+      if (v.until < t || v.agent.id !== v.id || !v.handle?.setPosition) continue;
+      const a = v.agent;
+      v.handle.setPosition(this._head.set(a.position.x, a.position.y + 1.6 * a.look.scale, a.position.z));
+    }
     if (t < this.nextLine || !ctx.nearGround || this.busy()) return;
     this.nextLine = t + 6 + Math.random() * 8;
     let total = 0;

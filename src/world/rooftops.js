@@ -173,7 +173,8 @@ function ventPipes(gb, L, x, y, z, seed) {
   gb.cylinder(x, y + 0.9, z, 0.16, 0.12, 6, 1, true, 0.12);
 }
 
-// Places clutter inside `inner` (roof polygon inset ~1 m) at roof height y.
+// Places clutter inside `inner` (roof polygon inset ~1 m) at roof height y. Lift rooms go to
+// opts.base (they shape the skyline), the small stuff to `gb`.
 export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts) {
   const placed = [];
   const free = (x, z, r) => {
@@ -216,7 +217,7 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
       const z = obb.cz + obb.uz * off * sgn;
       if (free(x, z, r)) {
         placed.push({ x, z, r });
-        liftRoom(gb, col, L, x, y, z, w, d, h, rot, opts.wallTint, seed);
+        liftRoom(opts.base, col, L, x, y, z, w, d, h, rot, opts.wallTint, seed);
         if (opts.clutter > 0.5 && rng() < 0.6) {
           tank(gb, col, L, x + obb.ux * (w * 0.25), y + h + 0.18, z + obb.uz * (w * 0.25), 0.85, 1.9, 0.4, tint(rng.pick(PALETTE.tanks)), seed);
         }
@@ -263,4 +264,3 @@ export function addRooftopClutter(gb, col, L, b, inner, holes, y, obb, rng, opts
   }
 }
 
-export { tank as rooftopTank, rbox };

@@ -109,7 +109,7 @@ function rails(chunks, L, pts) {
     const bz = pts[i + 3];
     const len = Math.hypot(bx - ax, bz - az);
     if (len < 0.05) continue;
-    const gb = chunks.at((ax + bx) / 2, (az + bz) / 2);
+    const gb = chunks.detailAt((ax + bx) / 2, (az + bz) / 2);
     const rot = Math.atan2(-(bz - az), bx - ax);
     gb.brush(steel, L.metal, 0, 2);
     gb.setTransform((ax + bx) / 2, 0, (az + bz) / 2, rot);

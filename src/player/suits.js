@@ -100,41 +100,69 @@ function splitFill(ctx, r, edge, below, fill, line) {
 }
 
 // Spider emblem drawn in metres (y down) around the current transform origin.
-function spider(ctx, { size, legWidth, legs, color }) {
+// shape: {head: [x, y, rx, ry], body: [x, y, rx, ry], width, legs: [[x0, y0, x1, y1, x2, y2], ...]}
+function spider(ctx, shape, scale, color) {
+  const k = scale;
   ctx.fillStyle = color;
   ctx.strokeStyle = color;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  ctx.beginPath();
-  ctx.ellipse(0, -0.024 * size, 0.012 * size, 0.013 * size, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(0, 0.014 * size, 0.015 * size, 0.027 * size, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = legWidth;
+  for (const [x, y, rx, ry] of [shape.head, shape.body]) {
+    ctx.beginPath();
+    ctx.ellipse(x * k, y * k, rx * k, ry * k, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = shape.width * k;
   for (const sx of [-1, 1]) {
-    for (const leg of legs) {
+    for (const leg of shape.legs) {
       ctx.beginPath();
-      ctx.moveTo(sx * leg[0] * size, leg[1] * size);
-      ctx.lineTo(sx * leg[2] * size, leg[3] * size);
-      ctx.lineTo(sx * leg[4] * size, leg[5] * size);
+      ctx.moveTo(sx * leg[0] * k, leg[1] * k);
+      ctx.lineTo(sx * leg[2] * k, leg[3] * k);
+      ctx.lineTo(sx * leg[4] * k, leg[5] * k);
       ctx.stroke();
     }
   }
 }
 
-const CHEST_LEGS = [
-  [0.006, -0.026, 0.03, -0.05, 0.036, -0.082],
-  [0.01, -0.014, 0.045, -0.032, 0.06, -0.06],
-  [0.01, 0.0, 0.045, 0.018, 0.06, 0.054],
-  [0.006, 0.012, 0.03, 0.045, 0.036, 0.085],
-];
-const SYMBIOTE_LEGS = [
-  [0.006, -0.026, 0.04, -0.06, 0.06, -0.14],
-  [0.01, -0.014, 0.08, -0.04, 0.2, -0.07],
-  [0.01, 0.0, 0.08, 0.03, 0.2, 0.07],
-  [0.006, 0.014, 0.04, 0.07, 0.07, 0.16],
-];
+// The classic suit's small black chest spider.
+const CHEST_SPIDER = {
+  head: [0, -0.024, 0.012, 0.013],
+  body: [0, 0.014, 0.015, 0.027],
+  width: 0.0048,
+  legs: [
+    [0.006, -0.026, 0.03, -0.05, 0.036, -0.082],
+    [0.01, -0.014, 0.045, -0.032, 0.06, -0.06],
+    [0.01, 0.0, 0.045, 0.018, 0.06, 0.054],
+    [0.006, 0.012, 0.03, 0.045, 0.036, 0.085],
+  ],
+};
+// The symbiote's big white spider (metres, drawn at scale 1): legs reach over the shoulders and wrap
+// around the ribs towards the back.
+const SYMBIOTE_SPIDER = {
+  head: [0, -0.078, 0.024, 0.028],
+  body: [0, 0.012, 0.034, 0.07],
+  width: 0.026,
+  legs: [
+    [0.018, -0.085, 0.06, -0.14, 0.085, -0.24],
+    [0.025, -0.058, 0.12, -0.09, 0.27, -0.07],
+    [0.028, -0.018, 0.12, 0.02, 0.27, 0.07],
+    [0.022, 0.045, 0.07, 0.12, 0.1, 0.24],
+  ],
+};
+
+// Web-line density per body part: [meridians around, strands along]. Thighs (plain blue on the classic
+// suit) get webbing only on the symbiote.
+const WEB_GRID = {
+  torso: [14, 12],
+  head: [16, 7],
+  neck: [10, 3],
+  hand: [8, 5],
+  foot: [8, 4],
+  upperArm: [8, 8],
+  forearm: [8, 8],
+  thigh: [8, 8],
+  shin: [8, 8],
+};
 
 // Torso pixels-per-metre at chest height (circumference ≈ 0.99 m, height 0.705 m).
 function emblemTransform(ctx, r, u, t) {
@@ -144,18 +172,18 @@ function emblemTransform(ctx, r, u, t) {
 
 function paintClassic(ctx) {
   const c = CLASSIC;
-  const all = (key, cols, rows, width = 3.5) => {
+  const all = (key, width = 3) => {
     const r = region(ATLAS[key]);
     ctx.fillStyle = c.red;
     ctx.fillRect(r.x0, r.y0, r.w, r.h);
-    webGrid(ctx, r, cols, rows, c.web, width);
+    webGrid(ctx, r, ...WEB_GRID[key], c.web, width);
     return r;
   };
   ctx.fillStyle = c.red;
   ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
 
   // Torso: red chest and back, blue flanks tapering into the armpits, blue trunks below the belt.
-  const torso = all('torso', 14, 12, 4);
+  const torso = all('torso', 4);
   const belt = 0.235;
   const flank = (t) => 0.035 + 0.075 * (1 - Math.min(1, Math.max(0, (t - belt) / 0.58)) ** 1.3);
   sideBand(ctx, torso, 0.25, belt, 0.84, flank, c.blue, c.line);
@@ -163,26 +191,26 @@ function paintClassic(ctx) {
   splitFill(ctx, torso, () => belt, true, c.blue, c.line);
   ctx.save();
   emblemTransform(ctx, torso, 0.5, 0.715);
-  spider(ctx, { size: 1.15, legWidth: 0.0055, legs: CHEST_LEGS, color: '#0a0a0d' });
+  spider(ctx, CHEST_SPIDER, 1.15, '#0a0a0d');
   ctx.restore();
   ctx.save();
   emblemTransform(ctx, torso, 0.0, 0.66);
-  spider(ctx, { size: 1.9, legWidth: 0.008, legs: CHEST_LEGS, color: '#0a0a0d' });
+  spider(ctx, CHEST_SPIDER, 1.9, '#0a0a0d');
   ctx.restore();
   ctx.save();
   emblemTransform(ctx, torso, 1.0, 0.66);
-  spider(ctx, { size: 1.9, legWidth: 0.008, legs: CHEST_LEGS, color: '#0a0a0d' });
+  spider(ctx, CHEST_SPIDER, 1.9, '#0a0a0d');
   ctx.restore();
 
-  all('head', 16, 7, 3);
-  all('neck', 10, 3, 3);
-  all('hand', 8, 5, 3);
-  all('foot', 8, 4, 3);
+  all('head');
+  all('neck');
+  all('hand');
+  all('foot');
 
   // Arms: red on top/outside, blue underside; red gloves from mid-forearm.
-  const ua = all('upperArm', 8, 8, 3);
+  const ua = all('upperArm');
   sideBand(ctx, ua, 0.75, 0, 1, (t) => 0.1 + 0.12 * t, c.blue, c.line);
-  const fa = all('forearm', 8, 8, 3);
+  const fa = all('forearm');
   sideBand(ctx, fa, 0.75, 0, 0.45, () => 0.22, c.blue, c.line);
   splitFill(ctx, fa, () => 0.45, true, 'rgba(0,0,0,0)', c.line);
 
@@ -190,7 +218,7 @@ function paintClassic(ctx) {
   const th = region(ATLAS.thigh);
   ctx.fillStyle = c.blue;
   ctx.fillRect(th.x0, th.y0, th.w, th.h);
-  const sh = all('shin', 8, 8, 3);
+  const sh = all('shin');
   splitFill(ctx, sh, (u) => 0.46 + 0.1 * Math.cos(u * Math.PI * 2), true, c.blue, c.line);
 
   paintEyes(ctx);
@@ -200,8 +228,7 @@ function paintSymbiote(ctx) {
   const s = SYMBIOTE;
   ctx.fillStyle = s.base;
   ctx.fillRect(0, 0, ATLAS_SIZE, ATLAS_SIZE);
-  const grid = { torso: [14, 12], head: [16, 7], neck: [10, 3], hand: [8, 5], foot: [8, 4], upperArm: [8, 8], forearm: [8, 8], thigh: [8, 8], shin: [8, 8] };
-  for (const [key, [cols, rows]] of Object.entries(grid)) {
+  for (const [key, [cols, rows]] of Object.entries(WEB_GRID)) {
     const r = region(ATLAS[key]);
     const g = ctx.createLinearGradient(0, r.y0, 0, r.y0 + r.h);
     g.addColorStop(0, '#15161b');
@@ -214,12 +241,12 @@ function paintSymbiote(ctx) {
   clipTo(ctx, torso);
   ctx.save();
   emblemTransform(ctx, torso, 0.5, 0.7);
-  spider(ctx, { size: 3.1, legWidth: 0.034, legs: SYMBIOTE_LEGS, color: s.white });
+  spider(ctx, SYMBIOTE_SPIDER, 1, s.white);
   ctx.restore();
   for (const u of [0, 1]) {
     ctx.save();
     emblemTransform(ctx, torso, u, 0.66);
-    spider(ctx, { size: 2.3, legWidth: 0.026, legs: SYMBIOTE_LEGS, color: s.white });
+    spider(ctx, SYMBIOTE_SPIDER, 0.8, s.white);
     ctx.restore();
   }
   ctx.restore();
@@ -254,9 +281,10 @@ function reliefNormalMap() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, N, N);
   ctx.scale(0.5, 0.5);
-  const grid = { torso: [14, 12, 5], head: [16, 7, 4], neck: [10, 3, 4], hand: [8, 5, 4], foot: [8, 4, 4], upperArm: [8, 8, 4], forearm: [8, 8, 4], shin: [8, 8, 4] };
   ctx.filter = 'blur(1px)';
-  for (const [key, [cols, rows, w]] of Object.entries(grid)) webGrid(ctx, region(ATLAS[key]), cols, rows, '#fff', w);
+  for (const [key, [cols, rows]] of Object.entries(WEB_GRID)) {
+    if (key !== 'thigh') webGrid(ctx, region(ATLAS[key]), cols, rows, '#fff', key === 'torso' ? 5 : 4);
+  }
   const src = ctx.getImageData(0, 0, N, N).data;
   const out = new Uint8Array(N * N * 4);
   const hgt = (x, y) => src[(((y + N) % N) * N + ((x + N) % N)) * 4] / 255;
@@ -357,6 +385,10 @@ diffuseColor *= mix(texture2D(map, vMapUv), texture2D(mapB, vMapUv), suitB);`,
 float front = uEdge * (1.0 - smoothstep(0.0, 0.05, abs(suitDist - uRadius)));
 totalEmissiveRadiance += vec3(0.7, 0.8, 1.0) * front * 2.5 + vec3(0.32 * vLens);`,
       );
+  }
+
+  get transitioning() {
+    return this._t < TRANSITION_TIME;
   }
 
   // Switch suits; the new one spreads from the chest emblem unless instant.

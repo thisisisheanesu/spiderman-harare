@@ -3,10 +3,13 @@
 
 Usage:
     python3 tools/build_map.py OVERTURE_DIR [--out public/data/harare.json] [--preview preview.png]
+                               [--osm osm.json]
 
 Input: parquet files written by tools/fetch_overture.py (segment, building, place,
 land_use, land, infrastructure). Optional tools/landmark_overrides.json supplies
-researched heights/styles for landmark buildings.
+researched heights/styles for landmark buildings. Optional --osm takes the raw Overpass
+JSON written by tools/fetch_osm.py and adds OSM details Overture drops (lanes, sidewalks,
+widths, signals/crossings/bus stops/lamps/trees/markets, building colours/materials).
 
 Output coordinate system (see docs/ARCHITECTURE.md):
     metres, x = east, z = south (north is -z), y = up.
@@ -19,6 +22,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import sys
 from collections import Counter, defaultdict
 
@@ -110,6 +114,40 @@ def load(dirpath, name):
         print(f"warning: missing {p}", file=sys.stderr)
         return []
     return pq.read_table(p).to_pylist()
+
+
+def osm_refs(r, kinds=("w",), spans=False):
+    """OSM elements an Overture feature was built from, from sources[].record_id ("w532698242@4").
+
+    Returns [(kind, id)] or, with spans=True, [(kind, id, from, to)] where from/to is the
+    source's 'between' range along the feature (0..1)."""
+    out = []
+    for s in r.get("sources") or []:
+        if s.get("dataset") != "OpenStreetMap" or (s.get("property") or "") != "":
+            continue
+        rid = s.get("record_id") or ""
+        if rid[:1] not in kinds:
+            continue
+        try:
+            oid = int(rid[1:].split("@")[0])
+        except ValueError:
+            continue
+        if spans:
+            bt = s.get("between") or [0.0, 1.0]
+            out.append((rid[0], oid, float(bt[0]), float(bt[1])))
+        else:
+            out.append((rid[0], oid))
+    return out
+
+
+def pick_span(srcs, a0, a1):
+    """OSM way id whose 'between' span overlaps [a0, a1] the most (None if no OSM source)."""
+    best, bo = None, 0.0
+    for _, oid, s0, s1 in srcs:
+        ov = min(a1, s1) - max(a0, s0)
+        if ov > bo:
+            best, bo = oid, ov
+    return best
 
 
 # ---------------------------------------------------------------- buildings
@@ -206,7 +244,10 @@ def build_buildings(rows, overrides):
                 b["roofColor"] = r["roof_color"]
             if r.get("roof_shape"):
                 b["roofShape"] = r["roof_shape"]
+            if r.get("facade_material"):
+                b["material"] = r["facade_material"]
             b["_c"] = (c.x, c.y, p.area)
+            b["_osm"] = osm_refs(r, ("w", "r"))
             out.append(b)
             by_id.setdefault(r["id"], []).append(b)
 
@@ -320,6 +361,7 @@ def build_roads(rows):
             mx = s.get("max_speed")
             if mx and mx.get("value") and s.get("between") is None:
                 sl = mx["value"] * (1.609 if mx.get("unit") == "mph" else 1)
+        srcs = osm_refs(r, ("w",), spans=True)
         for a, b in zip(conns, conns[1:]):
             if b["at"] - a["at"] < 1e-9:
                 continue
@@ -347,6 +389,7 @@ def build_roads(rows):
                 e["bridge"] = 1
             if sl:
                 e["speed"] = round(sl)
+            e["_osm"] = pick_span(srcs, a["at"], b["at"])
             roads.append(e)
     return roads, paths, rail, node_list
 
@@ -459,6 +502,448 @@ def build_points(infra_rows, land_rows, place_rows, buildings, overrides):
     return ranks, trees, features, pois
 
 
+# ---------------------------------------------------------------- OSM enrichment (optional --osm)
+# Raw Overpass JSON from tools/fetch_osm.py. Everything here only *adds* optional fields /
+# entries (or refines values: lanes, w, estimated heights); without --osm none of it runs.
+CSS_COLOURS = {
+    "white": "#FFFFFF", "black": "#000000", "grey": "#808080", "gray": "#808080", "silver": "#C0C0C0",
+    "lightgrey": "#D3D3D3", "lightgray": "#D3D3D3", "darkgrey": "#A9A9A9", "darkgray": "#A9A9A9",
+    "red": "#FF0000", "darkred": "#8B0000", "maroon": "#800000", "brown": "#A52A2A", "sienna": "#A0522D",
+    "orange": "#FFA500", "yellow": "#FFFF00", "beige": "#F5F5DC", "cream": "#FFFDD0", "tan": "#D2B48C",
+    "green": "#008000", "darkgreen": "#006400", "olive": "#808000", "blue": "#0000FF", "navy": "#000080",
+    "lightblue": "#ADD8E6", "teal": "#008080", "pink": "#FFC0CB", "purple": "#800080", "gold": "#FFD700",
+}
+# OSM shop=* -> category words the runtime's shop-sign matcher understands (Overture-style).
+SHOP_CAT = {
+    "clothes": "fashion_and_apparel_store", "shoes": "fashion_and_apparel_store", "boutique": "fashion_and_apparel_store",
+    "supermarket": "grocery_store", "convenience": "grocery_store", "mall": "shopping_mall",
+    "department_store": "department_store", "mobile_phone": "mobile_phone_store", "computer": "electronics_store",
+    "electrical": "electronics_store", "hairdresser": "personal_or_beauty_service", "beauty": "personal_or_beauty_service",
+    "car_repair": "automotive_service", "copyshop": "printing_service", "bookmaker": "betting_shop",
+    "optician": "optician_store", "books": "book_store", "jewelry": "jewelry_store",
+    "variety_store": "discount_store", "hardware": "hardware_home_and_garden_store", "yes": "shopping",
+}
+
+
+def shop_cat(shop):
+    """Overture-style category for an OSM shop=* value (never 'x_store_store')."""
+    shop = shop.strip().lower().replace(" ", "_")
+    if shop in SHOP_CAT:
+        return SHOP_CAT[shop]
+    return shop if shop.endswith(("_store", "_shop")) else f"{shop}_store"
+
+
+def load_osm(path):
+    with open(path) as f:
+        d = json.load(f)
+    osm = {"nodes": [], "ways": {}, "rels": {}, "timestamp": (d.get("osm3s") or {}).get("timestamp_osm_base")}
+    for e in d.get("elements", []):
+        t = e.get("type")
+        if t == "node":
+            osm["nodes"].append(e)
+        elif t == "way":
+            osm["ways"][e["id"]] = e
+        elif t == "relation":
+            osm["rels"][e["id"]] = e
+    return osm
+
+
+def num(v):
+    """First number in an OSM value ('3', '2;3', '7 m', '12.5'), or None."""
+    if v is None:
+        return None
+    m = re.match(r"\s*(\d+(?:\.\d+)?)", str(v))
+    return float(m.group(1)) if m else None
+
+
+def inum(v):
+    n = num(v)
+    return int(round(n)) if n is not None else None
+
+
+def colour(v):
+    if not v:
+        return None
+    v = v.strip().lower().replace(" ", "").replace("_", "")
+    if re.fullmatch(r"#[0-9a-f]{6}", v):
+        return v.upper()
+    if re.fullmatch(r"#[0-9a-f]{3}", v):
+        return ("#" + "".join(c * 2 for c in v[1:])).upper()
+    return CSS_COLOURS.get(v)
+
+
+def osm_xy(e):
+    return proj(e["lon"], e["lat"])
+
+
+def way_line(way, cache):
+    wid = way["id"]
+    if wid not in cache:
+        g = way.get("geometry") or []
+        pts = [proj(p["lon"], p["lat"]) for p in g if p]
+        cache[wid] = LineString(pts) if len(pts) >= 2 else None
+    return cache[wid]
+
+
+def edge_reversed(e, line):
+    """True when the edge's a->b direction runs against the OSM way's node order."""
+    pts = e["pts"]
+    d0 = line.project(Point(pts[0], pts[1]))
+    d1 = line.project(Point(pts[-2], pts[-1]))
+    if line.is_ring and abs(d1 - d0) > line.length / 2:
+        return d1 > d0
+    return d1 < d0
+
+
+def osm_lanes(t, e, rev):
+    """(lanes per direction, (a->b, b->a) if asymmetric) for edge e from OSM lane tags, or (None, None).
+
+    OSM 'lanes' counts every lane of the way: on a oneway that is all in one direction, on a two-way
+    road it is split between both (minus lanes:both_ways centre turn lanes)."""
+    total, fw, bw = inum(t.get("lanes")), inum(t.get("lanes:forward")), inum(t.get("lanes:backward"))
+    both = inum(t.get("lanes:both_ways")) or 0
+    osm_oneway = t.get("oneway") in ("yes", "true", "1", "-1", "reversible") or t.get("junction") in ("roundabout", "circular")
+    if total is not None and total <= 0:
+        total = None
+    if e["oneway"]:
+        if osm_oneway:
+            n = total or fw or bw
+        else:
+            forward = (e["oneway"] == 1) != rev  # allowed travel direction == OSM forward?
+            n = (fw if forward else bw) or (max(1, (total - both) // 2) if total else None)
+        return (max(1, n) if n else None), None
+    if osm_oneway:
+        # Overture keeps this piece two-way (e.g. a partial restriction): share the lanes out.
+        return (max(1, (total + 1) // 2) if total else None), None
+    if total and (fw is None) != (bw is None):
+        known = fw if fw is not None else bw
+        other = max(1, total - both - known)
+        fw, bw = (known, other) if fw is not None else (other, known)
+    if fw and bw:
+        fe, be = (bw, fw) if rev else (fw, bw)
+        # The runtime model is symmetric (lanes per direction), so round the average up.
+        return max(1, (fe + be + 1) // 2), ((fe, be) if fe != be else None)
+    if total:
+        return max(1, (total - both) // 2), None
+    return None, None
+
+
+def osm_sidewalk(t, rev):
+    v = t.get("sidewalk")
+    if v == "none":
+        v = "no"
+    if v not in ("both", "left", "right", "no", "separate"):
+        v = None
+        sb = t.get("sidewalk:both")
+        sl, sr = t.get("sidewalk:left"), t.get("sidewalk:right")
+        if sb in ("yes", "separate", "no"):
+            v = {"yes": "both"}.get(sb, sb)
+        elif sl or sr:
+            ly, ry = sl in ("yes", "separate"), sr in ("yes", "separate")
+            if sl == "separate" and sr == "separate":
+                v = "separate"
+            elif ly and ry:
+                v = "both"
+            elif ly:
+                v = "left"
+            elif ry:
+                v = "right"
+            elif sl == "no" and sr == "no":
+                v = "no"
+    if v and rev and v in ("left", "right"):
+        v = "right" if v == "left" else "left"
+    return v
+
+
+MIN_LANE_W = 2.75
+
+
+def enrich_roads(roads, osm):
+    """Add OSM lanes / osmSidewalk / width to road edges via the OSM way each edge was built from."""
+    st = Counter()
+    cache = {}
+    for e in roads:
+        wid = e.get("_osm")
+        way = osm["ways"].get(wid) if wid else None
+        if not way:
+            continue
+        st["matched"] += 1
+        t = way.get("tags") or {}
+        line = way_line(way, cache)
+        rev = edge_reversed(e, line) if line is not None else False
+        lanes, asym = osm_lanes(t, e, rev)
+        if lanes:
+            st["lanes"] += 1
+            st["lanes_len"] += e["len"]
+            if lanes != e["lanes"]:
+                st["lanes_changed"] += 1
+            e["lanes"] = min(lanes, 5)
+            if asym:
+                e["lanesF"], e["lanesB"] = asym
+                st["lanes_asym"] += 1
+        sw = osm_sidewalk(t, rev)
+        if sw:
+            e["osmSidewalk"] = sw
+            st["sidewalk"] += 1
+        # Width: a measured OSM carriageway width beats the class default (reject road-reserve values).
+        wv = num(t.get("width"))
+        if wv is not None and ("'" in t["width"] or "ft" in t["width"]):
+            wv *= 0.3048
+        used_width = False
+        if wv and 3.0 <= wv <= ROAD_WIDTH.get(e["cls"], 8) * 1.8:
+            used_width = True
+            if abs(wv - e["w"]) >= 0.5:
+                e["w"] = r1(max(wv, 4.0))
+                st["width"] += 1
+        # A class-default width too narrow for the mapped lane count: widen (at most +40 %).
+        k = 1 if e["oneway"] else 2
+        if lanes and not used_width and e["w"] / (e["lanes"] * k) < MIN_LANE_W:
+            e["w"] = r1(min(e["lanes"] * k * 3.0, e["w"] * 1.4))
+            st["widened"] += 1
+        # Still no room (e.g. a measured 7 m width tagged with 3 lanes): drop lanes until each is >= 2.5 m.
+        if lanes and e["lanes"] > 1 and e["w"] / (e["lanes"] * k) < 2.5:
+            while e["lanes"] > 1 and e["w"] / (e["lanes"] * k) < 2.5:
+                e["lanes"] -= 1
+            e.pop("lanesF", None)
+            e.pop("lanesB", None)
+            st["lanes_fit"] += 1
+        if (t.get("oneway") in ("yes", "-1") or t.get("junction") == "roundabout") and not e["oneway"]:
+            st["oneway_mismatch"] += 1  # reported only; Overture's oneway stays authoritative
+    return st
+
+
+def node_finder(nodes, roads):
+    deg = Counter()
+    for r in roads:
+        deg[r["a"]] += 1
+        deg[r["b"]] += 1
+
+    def nearest(x, z, maxd=25.0):
+        """Index of the nearest road graph node within maxd, preferring junctions (3+ edges)."""
+        best, bd = None, 1e9
+        for i, (nx, nz) in enumerate(nodes):
+            d = math.hypot(nx - x, nz - z)
+            if d > maxd:
+                continue
+            score = d + (0.0 if deg[i] >= 3 else 8.0)
+            if score < bd:
+                best, bd = i, score
+        return best
+
+    return nearest
+
+
+def osm_polygon(el, osm):
+    """Projected shapely Polygon of a closed way / multipolygon relation, or None."""
+    from shapely.ops import polygonize, unary_union
+
+    if el["type"] == "way":
+        g = el.get("geometry") or []
+        pts = [proj(p["lon"], p["lat"]) for p in g if p]
+        if len(pts) >= 4 and el.get("nodes", [0])[0] == el.get("nodes", [1])[-1]:
+            return Polygon(pts)
+        return None
+    lines = []
+    for m in el.get("members") or []:
+        if m.get("type") == "way" and m.get("role") in ("outer", "") and m.get("geometry"):
+            lines.append(LineString([proj(p["lon"], p["lat"]) for p in m["geometry"] if p]))
+    polys = list(polygonize(unary_union(lines))) if lines else []
+    return max(polys, key=lambda p: p.area) if polys else None
+
+
+def enrich_points(osm, bounds, nodes, roads, features, ranks, trees, pois, buildings):
+    """OSM nodes -> features / lamps / trees / markets / pois. Returns (lamps, markets, stats)."""
+    st = Counter()
+    x0, x1, z0, z1 = bounds["minX"], bounds["maxX"], bounds["minZ"], bounds["maxZ"]
+    inside = lambda x, z: x0 <= x <= x1 and z0 <= z <= z1  # noqa: E731
+    nearest = node_finder(nodes, roads)
+
+    def find_feature(kind, x, z, rad):
+        for f in features:
+            if f["kind"] == kind and math.hypot(f["x"] - x, f["z"] - z) < rad:
+                return f
+        return None
+
+    lamps, markets = [], []
+    tree_grid = defaultdict(list)
+
+    def add_tree(x, z):
+        k = (int(x // 4), int(z // 4))
+        for dx in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                for tx, tz in tree_grid.get((k[0] + dx, k[1] + dz), []):
+                    if math.hypot(tx - x, tz - z) < 2.0:
+                        return False
+        tree_grid[k].append((x, z))
+        trees.append([r1(x), r1(z)])
+        return True
+
+    for tx, tz in trees:
+        tree_grid[(int(tx // 4), int(tz // 4))].append((tx, tz))
+
+    kinds = {"traffic_signals": "traffic_signals", "crossing": "crossing", "bus_stop": "bus_stop", "stop": "stop", "give_way": "give_way"}
+    amen = {"fountain": "fountain", "bench": "bench", "waste_basket": "waste_basket", "taxi": "taxi"}
+    for n in osm["nodes"]:
+        t = n.get("tags") or {}
+        x, z = osm_xy(n)
+        if not inside(x, z):
+            continue
+        hw = t.get("highway")
+        if hw == "street_lamp":
+            lamps.append([r1(x), r1(z)])
+            continue
+        if t.get("natural") == "tree":
+            st["trees_osm"] += add_tree(x, z)
+            continue
+        kind = kinds.get(hw) or amen.get(t.get("amenity"))
+        if not kind and t.get("crossing") == "traffic_signals":
+            kind = "crossing"
+        if kind:
+            f = find_feature(kind, x, z, 15.0 if kind == "fountain" else 5.0)
+            if f is None:
+                f = {"kind": kind, "x": r1(x), "z": r1(z)}
+                features.append(f)
+                st["feat_" + kind] += 1
+            else:
+                st["feat_dup"] += 1
+            if t.get("name") and not f.get("name"):
+                f["name"] = t["name"]
+            if kind == "crossing" and (t.get("crossing") == "traffic_signals" or t.get("crossing_ref") == "pelican"):
+                f["signals"] = 1
+            if kind == "traffic_signals":
+                ni = nearest(f["x"], f["z"])
+                if ni is not None:
+                    f["node"] = ni
+        if t.get("amenity") == "marketplace" or (
+            t.get("shop") and re.search(r"\bmarket\b", t.get("name", ""), re.I) and not re.search(r"super|mega|hyper", t.get("name", ""), re.I)
+        ):
+            markets.append({"name": t.get("name") or "Market", "x": r1(x), "z": r1(z)})
+
+    # Tree rows: a tree every ~9 m.
+    cache = {}
+    for w in list(osm["ways"].values()) + list(osm["rels"].values()):
+        t = w.get("tags") or {}
+        if w["type"] == "way" and t.get("natural") == "tree_row":
+            line = way_line(w, cache)
+            if line is None:
+                continue
+            n = max(1, round(line.length / 9.0))
+            for i in range(n + 1):
+                p = line.interpolate(line.length * i / n)
+                if inside(p.x, p.y):
+                    st["trees_row"] += add_tree(p.x, p.y)
+        if t.get("amenity") == "marketplace":
+            poly = osm_polygon(w, osm)
+            if poly is None or poly.is_empty:
+                continue
+            c = poly.centroid
+            m = {"name": t.get("name") or "Market", "x": r1(c.x), "z": r1(c.y)}
+            p = poly.simplify(0.4)
+            if p.geom_type == "Polygon" and not p.is_empty:
+                m["pts"] = flat(orient(list(p.exterior.coords), True))
+            markets.append(m)
+
+    # Named OSM shops Overture's places layer lacks -> pois (for shop signs / map labels).
+    grid = defaultdict(list)
+    cell = 40.0
+    for b in buildings:
+        xs, zs = b["fp"][0::2], b["fp"][1::2]
+        cx, cz = sum(xs) / len(xs), sum(zs) / len(zs)
+        grid[(int(cx // cell), int(cz // cell))].append((b, cx, cz))
+    norm = lambda s: re.sub(r"[^a-z0-9]", "", s.lower())  # noqa: E731
+    known = defaultdict(list)
+    for p in pois:
+        known[norm(p["name"])].append((p["x"], p["z"]))
+    for n in osm["nodes"]:
+        t = n.get("tags") or {}
+        name = t.get("name")
+        if not t.get("shop") or not name:
+            continue
+        x, z = osm_xy(n)
+        if not inside(x, z) or any(math.hypot(px - x, pz - z) < 80 for px, pz in known[norm(name)]):
+            continue
+        best, bd = None, 1e9
+        gx, gz = int(x // cell), int(z // cell)
+        for dx in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                for b, cx, cz in grid.get((gx + dx, gz + dz), []):
+                    d = math.hypot(cx - x, cz - z)
+                    if d < bd:
+                        best, bd = b, d
+        p = {"name": name, "cat": shop_cat(t["shop"]), "x": r1(x), "z": r1(z)}
+        if best is not None and bd < 60:
+            p["b"] = best["id"]
+        pois.append(p)
+        known[norm(name)].append((x, z))
+        st["pois"] += 1
+    return lamps, markets, st
+
+
+def enrich_buildings(buildings, osm):
+    """Colours / material / roof shape (and heights for estimated ones) from the cited OSM building."""
+    st = Counter()
+    for b in buildings:
+        tags = None
+        for kind, oid in b.get("_osm") or []:
+            el = (osm["ways"] if kind == "w" else osm["rels"]).get(oid)
+            if el and el.get("tags"):
+                tags = el["tags"]
+                break
+        if not tags:
+            continue
+        st["matched"] += 1
+        for key, field, conv in (
+            ("building:colour", "facade", colour),
+            ("roof:colour", "roofColor", colour),
+            ("building:material", "material", lambda v: v.strip().lower() or None),
+            ("roof:shape", "roofShape", lambda v: v.strip().lower() or None),
+        ):
+            v = conv(tags[key]) if tags.get(key) else None
+            if v and not b.get(field):
+                b[field] = v
+                st[field] += 1
+        if b.get("est") and not b.get("lm"):
+            h, lv = num(tags.get("height")), num(tags.get("building:levels"))
+            if h and 2.5 <= h <= 200:
+                b["h"], b["fl"] = r1(h), int(lv) if lv else max(1, round(h / 3.5))
+            elif lv and 1 <= lv <= 60:
+                b["h"], b["fl"] = r1(lv * 3.5 + 1.2), int(lv)
+            else:
+                continue
+            b.pop("est", None)
+            st["height"] += 1
+    return st
+
+
+def validate(data):
+    """Sanity checks on the output; returns a list of problems (empty = ok)."""
+    errs = []
+    nn = len(data["nodes"])
+    bd = data["meta"]["bounds"]
+    for i, r in enumerate(data["roads"]):
+        if not (0 <= r["a"] < nn and 0 <= r["b"] < nn):
+            errs.append(f"road {i}: bad node index {r['a']}/{r['b']}")
+        if len(r["pts"]) < 4 or len(r["pts"]) % 2:
+            errs.append(f"road {i}: bad pts")
+        if r.get("lanes", 1) < 1:
+            errs.append(f"road {i}: lanes {r.get('lanes')}")
+    for f in data["features"]:
+        # Researched places (with a 'key') may sit outside on purpose, e.g. heroes_acre as a skyline marker.
+        if not f.get("key") and not (bd["minX"] <= f["x"] <= bd["maxX"] and bd["minZ"] <= f["z"] <= bd["maxZ"]):
+            errs.append(f"feature outside bounds: {f}")
+        if "node" in f and not (0 <= f["node"] < nn):
+            errs.append(f"feature bad node: {f}")
+    nb = len(data["buildings"])
+    for p in data["pois"]:
+        if "b" in p and not (0 <= p["b"] < nb):
+            errs.append(f"poi bad building: {p}")
+    for k in ("lamps", "trees"):
+        for x, z in data.get(k, []):
+            if not (bd["minX"] - 1 <= x <= bd["maxX"] + 1 and bd["minZ"] - 1 <= z <= bd["maxZ"] + 1):
+                errs.append(f"{k} point outside bounds: {x},{z}")
+    return errs
+
+
 # ---------------------------------------------------------------- preview
 def preview(data, path):
     from PIL import Image, ImageDraw
@@ -491,6 +976,24 @@ def preview(data, path):
     for rk in data["ranks"]:
         x, y = P(rk["x"], rk["z"])
         d.ellipse([x - 5, y - 5, x + 5, y + 5], fill=(255, 140, 0))
+    for m in data.get("markets", []):
+        x, y = P(m["x"], m["z"])
+        d.rectangle([x - 5, y - 5, x + 5, y + 5], outline=(150, 40, 170), width=2)
+    for tx, tz in data.get("trees", []):
+        x, y = P(tx, tz)
+        d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(40, 140, 50))
+    for lx, lz in data.get("lamps", []):
+        x, y = P(lx, lz)
+        d.ellipse([x - 2, y - 2, x + 2, y + 2], fill=(250, 220, 0))
+    fcol = {"traffic_signals": (230, 0, 0), "crossing": (255, 255, 255), "bus_stop": (30, 90, 230),
+            "stop": (140, 0, 0), "give_way": (140, 0, 0)}
+    for f in data["features"]:
+        col = fcol.get(f["kind"])
+        if not col:
+            continue
+        x, y = P(f["x"], f["z"])
+        r = 6 if f["kind"] == "traffic_signals" else 3
+        d.ellipse([x - r, y - r, x + r, y + r], fill=col, outline=(0, 0, 0))
     x, y = P(0, 0)
     d.ellipse([x - 6, y - 6, x + 6, y + 6], outline=(255, 0, 0), width=2)
     im.save(path)
@@ -502,6 +1005,7 @@ def main():
     ap.add_argument("--out", default="public/data/harare.json")
     ap.add_argument("--overrides", default="tools/landmark_overrides.json")
     ap.add_argument("--preview")
+    ap.add_argument("--osm", help="raw Overpass JSON from tools/fetch_osm.py (optional)")
     args = ap.parse_args()
 
     overrides = {}
@@ -516,24 +1020,41 @@ def main():
     land = load(args.overture_dir, "land")
     inf = load(args.overture_dir, "infrastructure")
 
-    buildings, applied = build_buildings(bld, overrides)
-    roads, paths, rail, nodes = build_roads(seg)
-    areas = build_areas({"land_use": lu, "land": land, "infrastructure": inf}, overrides)
-    ranks, trees, features, pois = build_points(inf, land, plc, buildings, overrides)
+    osm = None
+    if args.osm:
+        if os.path.exists(args.osm):
+            osm = load_osm(args.osm)
+        else:
+            print(f"warning: missing {args.osm}; building without OSM details", file=sys.stderr)
 
     W, S, E, N = BBOX
     x0, z1 = proj(W, S)
     x1, z0 = proj(E, N)
+    bounds = {"minX": r1(x0), "maxX": r1(x1), "minZ": r1(z0), "maxZ": r1(z1)}
+
+    buildings, applied = build_buildings(bld, overrides)
+    roads, paths, rail, nodes = build_roads(seg)
+    areas = build_areas({"land_use": lu, "land": land, "infrastructure": inf}, overrides)
+    ranks, trees, features, pois = build_points(inf, land, plc, buildings, overrides)
+    lamps, markets = [], []
+    rst = bst = pst = Counter()
+    if osm:
+        rst = enrich_roads(roads, osm)
+        bst = enrich_buildings(buildings, osm)
+        lamps, markets, pst = enrich_points(osm, bounds, nodes, roads, features, ranks, trees, pois, buildings)
+    for item in buildings + roads:
+        item.pop("_osm", None)
     data = {
         "meta": {
             "name": "Harare CBD",
             "origin": {"lat": ORIGIN_LAT, "lon": ORIGIN_LON, "label": "Africa Unity Square"},
             "mPerDegLat": M_PER_DEG_LAT,
             "mPerDegLon": round(M_PER_DEG_LON, 3),
-            "bounds": {"minX": r1(x0), "maxX": r1(x1), "minZ": r1(z0), "maxZ": r1(z1)},
+            "bounds": bounds,
             "units": "metres; x=east, z=south (north=-z), y=up; outer rings CCW seen from above (north up)",
             "attribution": "Map data: Overture Maps Foundation (release 2026-09-23.0), incl. OpenStreetMap contributors (ODbL), "
-            "Google Open Buildings (CC BY 4.0), Microsoft ML Buildings (ODbL).",
+            "Google Open Buildings (CC BY 4.0), Microsoft ML Buildings (ODbL)."
+            + (" Extra details from OpenStreetMap contributors (ODbL) via the Overpass API." if osm else ""),
             "landmarksApplied": applied,
             "landmarks": [
                 {k: v for k, v in lm.items() if k in ("key", "name", "height", "floors", "style", "label", "confidence")}
@@ -550,10 +1071,19 @@ def main():
         "features": features,
         "trees": trees,
         "pois": pois,
+        "lamps": lamps,
+        "markets": markets,
     }
+    if osm and osm.get("timestamp"):
+        data["meta"]["osmTimestamp"] = osm["timestamp"]
+    problems = validate(data)
+    for msg in problems[:20]:
+        print("validate:", msg, file=sys.stderr)
+    if problems:
+        sys.exit(f"validation failed ({len(problems)} problems)")
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     with open(args.out, "w") as f:
-        json.dump(data, f, separators=(",", ":"), ensure_ascii=False)
+        json.dump(data, f, separators=(",", ":"), ensure_ascii=False, allow_nan=False)
     size = os.path.getsize(args.out)
     hs = sorted((b["h"] for b in buildings), reverse=True)
     print(f"wrote {args.out}: {size/1e6:.2f} MB")
@@ -562,6 +1092,21 @@ def main():
     print(f"roads {len(roads)} nodes {len(nodes)} paths {len(paths)} rail {len(rail)} areas {len(areas)} ranks {len(ranks)} pois {len(pois)}")
     print(f"landmarks applied: {applied}")
     print("road classes:", Counter(r["cls"] for r in roads).most_common())
+    if osm:
+        sig = [f for f in features if f["kind"] == "traffic_signals"]
+        tot_len = sum(r["len"] for r in roads)
+        print(f"osm ({osm.get('timestamp')}): roads matched {rst['matched']}/{len(roads)}; "
+              f"lanes {rst['lanes']} edges ({rst['lanes_len'] / max(tot_len, 1):.0%} of length, "
+              f"{rst['lanes_changed']} changed, {rst['lanes_asym']} asymmetric, {rst['lanes_fit']} reduced to fit w); "
+              f"osmSidewalk {rst['sidewalk']}; width from OSM {rst['width']}; widened for lanes {rst['widened']}; "
+              f"oneway mismatches {rst['oneway_mismatch']}")
+        print("lanes per direction:", sorted(Counter((r["lanes"], r["oneway"] != 0) for r in roads).items()))
+        print(f"signals {len(sig)} (on a road node: {sum(1 for f in sig if 'node' in f)}), "
+              f"features {dict(Counter(f['kind'] for f in features))}, new: {dict((k, v) for k, v in pst.items() if k.startswith('feat'))}")
+        print(f"lamps {len(lamps)}, trees {len(trees)} (+{pst['trees_osm']} OSM, +{pst['trees_row']} from tree rows), "
+              f"markets {len(markets)} {[m['name'] for m in markets]}, OSM shop pois +{pst['pois']}")
+        print(f"buildings: OSM tags matched {bst['matched']}, set facade {bst['facade']}, roofColor {bst['roofColor']}, "
+              f"material {bst['material']}, roofShape {bst['roofShape']}, height {bst['height']}")
     if args.preview:
         preview(data, args.preview)
         print("preview:", args.preview)

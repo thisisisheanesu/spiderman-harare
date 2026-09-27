@@ -33,4 +33,3 @@ export function tint(hex, mul = 1) {
   return v;
 }
 
-export const WHITE = [255, 255, 255];

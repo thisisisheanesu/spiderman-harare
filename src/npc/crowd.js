@@ -40,6 +40,7 @@ const ARMS = {
   talk: [0.55, 0.15, 1.25],
   fold: [0.38, -0.32, 1.95],
   rest: [0.85, 0.1, 0.75],
+  prop: [-0.62, 0.3, 0.12], // sitting on the grass, leaning back on the hands
   hwindi: [2.4, 0.7, 0.5],
   bag: [0.05, 0.14, 0.12],
 };
@@ -92,15 +93,21 @@ export class Agent {
     this.blocked = 0;
     this.slow = 1;
     this.hurry = 0;
+    this.carT = 0;
+    this.carAhead = false;
+    this.carWait = 0;
     this.timer = 0;
     this.home = null;
     this.group = null;
     this.stall = null;
+    this.rank = null;
+    this.lounge = false;
     this.habit = null; // 'text' | 'call' | 'fold' | null
     this.habitT = 0;
     this.glance = 0;
     this.glanceT = 0;
     this.react = null;
+    this.reactCool = 0;
     this.resume = null;
     this.talkUntil = 0;
     this.voice = null;
@@ -125,11 +132,10 @@ export class Crowd {
   constructor(game, walkways, obstacles) {
     this.game = game;
     this.walk = walkways;
-    this.obstacles = obstacles;
     this.agents = [];
+    this.obstaclesOn = true; // stalls are packed away at night
     this.head = new Int32Array(HASH_SIZE);
     this.next = new Int32Array(1);
-    this._p = { x: 0, z: 0 };
     this._armR = new Float32Array(4);
     this._armL = new Float32Array(4);
     this._near = [];
@@ -280,6 +286,19 @@ export class Crowd {
 
     const spread = e.spread;
     this._avoid(a, ux, uz, spread, ctx, dt);
+    if (e.kind === CROSS && (a.carT -= dt) <= 0) {
+      a.carT = 0.2;
+      a.carAhead = this._carAt(a.position.x + ux * 0.9, a.position.z + uz * 0.9, 0.35);
+    }
+    if (e.kind === CROSS && a.carAhead) {
+      // A car is in the way: wait for it, and head back to the kerb if it stays put.
+      a.slow = 0;
+      a.carWait += dt;
+      if (a.carWait > 4) {
+        a.carWait = 0;
+        this._turnAround(a);
+      }
+    } else a.carWait = 0;
     if (a.hurry && a.state !== 'cross' && e.kind !== CROSS) {
       // Keep to the building side of the pavement (lateral sign of the edge's outer side).
       const out = (e.side || 0) * (a.fwd ? 1 : -1);
@@ -339,7 +358,7 @@ export class Crowd {
       oncoming = b.vx * ux + b.vz * uz < -0.3;
       staticBlock = b.vx * b.vx + b.vz * b.vz < 0.04;
     }
-    const cells = this.obGrid.get(this._cellKey(Math.floor(x / 8), Math.floor(z / 8)));
+    const cells = this.obstaclesOn && this.obGrid.get(this._cellKey(Math.floor(x / 8), Math.floor(z / 8)));
     if (cells) {
       for (const o of cells) {
         const rx = o.x - x;
@@ -434,7 +453,7 @@ export class Crowd {
           w = (0.2 + 0.8 * Math.max(0, straight)) * (0.25 + n.density);
           // Keep the crowd where the player is: wander away from the active area less often.
           const far = W.nodes[out > 0 ? n.b : n.a];
-          if ((far.x - ctx.fx) ** 2 + (far.z - ctx.fz) ** 2 > ctx.r2) w *= 0.25;
+          if ((far.x - ctx.focus.x) ** 2 + (far.z - ctx.focus.z) ** 2 > ctx.r2) w *= 0.25;
         }
       }
       weights.push(w);
@@ -504,16 +523,36 @@ export class Crowd {
     }
   }
 
+  // Is (x, z) inside a vehicle's footprint grown by `pad`?
+  _carAt(x, z, pad) {
+    const cars = this.game.traffic?.vehiclesNear?.(x, z, pad + 0.5);
+    if (!cars?.length) return false;
+    for (let i = 0; i < cars.length; i++) {
+      const v = cars[i];
+      const dx = x - v.position.x;
+      const dz = z - v.position.z;
+      const fx = -Math.sin(v.heading);
+      const fz = -Math.cos(v.heading);
+      if (Math.abs(dx * fx + dz * fz) < (v.length || 4.5) / 2 + pad && Math.abs(dx * fz - dz * fx) < (v.width || 1.8) / 2 + pad) return true;
+    }
+    return false;
+  }
+
   _canCross(a, e, ctx) {
     const traffic = ctx.traffic;
+    const W = this.walk;
+    const A = W.nodes[a.fwd ? e.a : e.b];
+    const Bn = W.nodes[a.fwd ? e.b : e.a];
+    // Never set off into a car stopped across the crossing, whatever the lights say.
+    for (let k = 1; k <= 4; k++) {
+      const f = k / 5;
+      if (this._carAt(A.x + (Bn.x - A.x) * f, A.z + (Bn.z - A.z) * f, 0.6)) return false;
+    }
     if (e.jn >= 0 && traffic?.signalAt) {
       const sig = traffic.signalAt(e.jn, e.from);
       if (sig === 'red') return true;
       if (sig === 'green' || sig === 'amber') return false;
     }
-    const W = this.walk;
-    const A = W.nodes[e.a];
-    const Bn = W.nodes[e.b];
     const mx = (A.x + Bn.x) / 2;
     const mz = (A.z + Bn.z) / 2;
     const cars = traffic?.vehiclesNear?.(mx, mz, 30);
@@ -532,7 +571,7 @@ export class Crowd {
       const speed = Math.abs(v.speed || 0);
       if (d < 3.2 + (v.length || 4) / 2) {
         if (speed > 0.3 || patient) return false;
-        continue; // walk between stopped cars once we've waited a while
+        continue; // weave between stopped cars once we've waited a while
       }
       const toward = -Math.sin(v.heading) * (mx - vx) - Math.cos(v.heading) * (mz - vz);
       if (toward > 0 && speed > 0.8 && d < 4 + speed * (patient ? 2.8 : 1.6)) return false;
@@ -613,8 +652,8 @@ export class Crowd {
     a.vx = 0;
     a.vz = 0;
     if (t < r.start) return;
-    // Turn to face Spider-Man (seated vendors only turn their heads).
-    if (!a.pose.sit) {
+    // Turn to face Spider-Man (people sitting down only turn their heads).
+    if (a.pose.sit < 0.5) {
       const want = headingOf(ctx.px - a.position.x, ctx.pz - a.position.z);
       a.heading += wrapAngle(want - a.heading) * Math.min(1, dt * 4);
     }
@@ -629,7 +668,12 @@ export class Crowd {
     const sp = a.state === 'react' || a.state === 'wait' ? a.speed : Math.hypot(a.vx, a.vz);
     const gait = sp < 0.05 ? 0 : sp < 1.8 ? Math.min(1, sp / 1.1) : 1 + Math.min(1, (sp - 1.8) / 1.6);
     p.gait += (gait - p.gait) * Math.min(1, dt * 6);
-    const stride = L.scale * (p.gait <= 1 ? 0.5 + 0.95 * p.gait : 1.45 + 1.2 * (p.gait - 1));
+    // Stride from the same hip swing the shader uses (four leg-lengths x sin(amplitude) per cycle,
+    // plus flight when running) so feet do not slide.
+    const walk = Math.min(1, p.gait);
+    const run = Math.max(0, Math.min(1, p.gait - 1));
+    const amp = (0.42 * walk + 0.36 * run) * (L.flags & FLAG.LONG ? 0.72 : 1);
+    const stride = L.scale * Math.max(0.35, 3.36 * Math.sin(amp) + 0.9 * run);
     a.phase += sp > 0.05 ? (TAU * sp * dt) / stride : dt * 1.4;
     if (a.phase > 1e4) a.phase -= TAU * 1000;
 
@@ -649,6 +693,7 @@ export class Crowd {
         const r = Math.random();
         const still = a.state !== 'walk';
         a.habit = r < (still ? 0.28 : 0.12) ? 'text' : r < (still ? 0.38 : 0.16) ? 'call' : still && r < 0.55 && a.state !== 'chat' ? 'fold' : null;
+        if (a.lounge && a.habit !== 'text') a.habit = null;
         a.habitT = 4 + Math.random() * 10;
       }
     } else a.habit = null;
@@ -657,6 +702,11 @@ export class Crowd {
       sit = 1;
       setArm(R, ARMS.rest);
       setArm(Lw, ARMS.rest);
+    } else if (a.lounge) {
+      sit = 2;
+      lean = -0.12;
+      setArm(R, ARMS.prop);
+      setArm(Lw, ARMS.prop);
     }
     if (L.flags & FLAG.LOAD && a.id % 3 !== 0) setArm(Lw, ARMS.steady);
     if (L.flags & FLAG.BAGHAND) setArm(Lw, ARMS.bag, 0.6);

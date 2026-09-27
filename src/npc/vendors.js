@@ -4,6 +4,7 @@ import * as STREETLIFE from '../data/streetlife.js';
 import { hashString, makeRng } from '../core/rng.js';
 import { pointInPoly } from '../core/geo.js';
 import { WALK, PATH } from './walkways.js';
+import { rankSites } from './ranks.js';
 
 // Street vendors: stalls placed once from the pedestrian network (busy junction corners, pavements in
 // the core, First Street Mall, flower sellers around Africa Unity Square, kombi ranks) and drawn as a
@@ -16,7 +17,6 @@ const TYPES = STREETLIFE.VENDOR_TYPES?.length
       { type: 'airtime_phone', weight: 0.2, placement: ['corner', 'rank', 'pavement'], vendor: 'young man' },
       { type: 'flowers', weight: 0.05, placement: ['square'], vendor: 'women and men' },
     ];
-const RANKS = STREETLIFE.KOMBI_RANKS || [];
 const PRODUCE = Object.values(TYPES.find((t) => t.type === 'fruit_veg')?.goodsColors || { tomatoes: '#d6331f', onions: '#b5654a', bananas: '#f0d23c', oranges: '#f08c1a' });
 const FLOWERS = TYPES.find((t) => t.type === 'flowers')?.goodsColors || ['#c8102e', '#ffffff', '#f7c21b', '#e75480'];
 const UMBRELLAS = STREETLIFE.STREET_PROPS?.vendorUmbrella?.colors || ['#d6201f', '#1d4fb8', '#2e8b57', '#f2c200', '#ffffff'];
@@ -133,8 +133,7 @@ export class Vendors {
     this.game = game;
     this.walk = walkways;
     this.stalls = [];
-    this.props = []; // {kind, x, y, z, rot, sx, sy, sz, color, tile}
-    this.obstacles = []; // {x, z, r}
+    this.obstacles = []; // {x, z, r} for walkers to steer around
   }
 
   build() {
@@ -144,13 +143,11 @@ export class Vendors {
     const clear = (x, z, r) => taken.every((t) => (t.x - x) ** 2 + (t.z - z) ** 2 > (t.r + r) ** 2);
     const place = (type, x, z, y, heading, where, rankName) => {
       if (!clear(x, z, 2.2)) return false;
-      // Footprint: centre, the four corners of a 1.4 x 1.8 box and the vendor spot must be walkable ground.
+      // Footprint: the table's front corners, and the back corners behind the vendor, on open ground.
       const fx = -Math.sin(heading);
       const fz = -Math.cos(heading);
-      const rx = -fz;
-      const rz = fx;
-      for (const [a, b] of [[0, 0], [0.7, 0.5], [-0.7, 0.5], [0.7, -1.3], [-0.7, -1.3]]) {
-        if (!w.free(x + rx * a - fx * b, z + rz * a - fz * b)) return false;
+      for (const [a, b] of [[0, 0], [0.75, 0.6], [-0.75, 0.6], [0.75, -0.95], [-0.75, -0.95]]) {
+        if (!w.free(x - fz * a + fx * b, z + fx * a + fz * b)) return false;
       }
       const stall = { type: type.type, def: type, x, z, y, heading, where, rank: rankName, seed: rng.int(0, 1e9) };
       this._layout(stall, rng);
@@ -192,7 +189,8 @@ export class Vendors {
       }
     }
     this._flowerSellers(rng, place);
-    this._rankStalls(rng, place, typeFor);
+    const markets = (this.game.data.markets || []).map((m) => ({ ...m, kind: 'market', info: { vendors: ['fruit_veg', 'secondhand_clothes', 'sweets_snacks', 'roast_maize'] } }));
+    this._siteStalls(rng, place, typeFor, [...rankSites(this.game.data), ...markets]);
     this._buildMeshes();
   }
 
@@ -215,17 +213,13 @@ export class Vendors {
     }
   }
 
-  // Ranks: stalls from the rank's own vendor list, on the pavements around it.
-  _rankStalls(rng, place, typeFor) {
+  // Kombi ranks and markets: stalls from the site's own vendor list, on the pavements around it.
+  _siteStalls(rng, place, typeFor, sites) {
     const w = this.walk;
-    const seen = [];
-    for (const rank of this.game.data.ranks || []) {
-      if (seen.some((s) => Math.hypot(s.x - rank.x, s.z - rank.z) < 40)) continue;
-      seen.push(rank);
-      const info = RANKS.find((r) => rank.name.toLowerCase().includes(r.name.toLowerCase().split(' ')[0]));
-      const types = (info?.vendors || []).map((id) => TYPES.find((t) => t.type === id)).filter((t) => t && BUILDERS.has(t.type));
+    for (const rank of sites) {
+      const types = (rank.info?.vendors || []).map((id) => TYPES.find((t) => t.type === id)).filter((t) => t && BUILDERS.has(t.type));
       let n = 0;
-      const want = rank.kind === 'bus_stop' ? 3 : 8;
+      const want = rank.kind === 'bus_stop' ? 3 : rank.kind === 'market' ? 12 : 8;
       for (let tries = 0; tries < 80 && n < want; tries++) {
         const near = w.nearestEdge(rank.x + rng.range(-45, 45), rank.z + rng.range(-45, 45), 25);
         if (!near) continue;
@@ -233,7 +227,7 @@ export class Vendors {
         if (e.kind !== WALK && e.kind !== PATH) continue;
         const out = e.side || (rng() < 0.5 ? 1 : -1);
         const p = w.pointOn(e, near.t * e.len, out * (e.spread + (e.kind === PATH ? -0.4 : 0.15)), _p);
-        if (place(types.length ? rng.pick(types) : typeFor('rank'), p.x, p.z, w.nodes[e.a].y, facingIn(e, out), 'rank', rank.name)) n++;
+        if (place(types.length ? rng.pick(types) : typeFor('rank'), p.x, p.z, w.nodes[e.a].y, facingIn(e, out), rank.kind === 'market' ? 'market' : 'rank', rank.name)) n++;
       }
     }
   }

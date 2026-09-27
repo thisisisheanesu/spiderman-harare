@@ -1,3 +1,4 @@
+import './touch.css';
 import { el } from './dom.js';
 import { ICONS } from './icons.js';
 
@@ -23,6 +24,7 @@ export class TouchControls {
     this.enabled = false;
     this.stickId = null;
     this.lookId = null;
+    this.held = new Map(); // action -> pointer id holding its button
 
     this.zone = el('div', 'touch-zone');
     this.knob = el('div', 'stick-knob');
@@ -57,31 +59,38 @@ export class TouchControls {
     this.hud.onResize();
   }
 
-  // Release everything (overlay opened, tab hidden...).
+  // Release everything (overlay opened, tab hidden...). A no-op until touch is in use: feeding the
+  // virtual inputs marks the input as touch-driven, which would stop mouse capture on desktop.
   reset() {
+    if (!this.enabled) return;
     this.stickId = null;
     this.lookId = null;
     this._setStick(0, 0);
     this.stick.classList.remove('active');
     this.stick.style.transform = '';
+    this.held.clear();
     for (const [action] of BUTTONS) this.input.setVirtualButton(action, false);
     for (const b of this.root.querySelectorAll('.tb.pressed')) b.classList.remove('pressed');
   }
 
   _holdButton(action, label, cls) {
     const b = el('button', `tb ${cls}`, { type: 'button', 'aria-label': label, html: ICONS[action] }, [el('span', 'tb-label', { text: label })]);
-    let id = null;
     const release = (e) => {
-      if (e.pointerId !== id) return;
-      id = null;
+      if (this.held.get(action) !== e.pointerId) return;
+      this.held.delete(action);
       b.classList.remove('pressed');
-      this.input.setVirtualButton(action, false);
+      // A tap shorter than one frame would never reach input.update(): let a frame pass first.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          if (!this.held.has(action)) this.input.setVirtualButton(action, false);
+        }),
+      );
     };
     b.addEventListener('pointerdown', (e) => {
-      if (id !== null) return;
+      if (this.held.has(action)) return;
       e.preventDefault();
-      id = e.pointerId;
-      b.setPointerCapture(id);
+      this.held.set(action, e.pointerId);
+      b.setPointerCapture(e.pointerId);
       b.classList.add('pressed');
       this.input.setVirtualButton(action, true);
     });

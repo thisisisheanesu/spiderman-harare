@@ -5,9 +5,10 @@ import { createSkyDome, createStars } from './skyDome.js';
 // solar declination -1.7 deg, solar noon 11:47 CAT, sunrise 05:41, sunset 17:53). The moon is
 // one day past full, so it rises in the east just after dusk.
 //
-// Public: sun (DirectionalLight, follows the player), hemi, setTimeOfDay(hours), timeOfDay,
-// isNight, nightFactor (0..1), sunDirection (unit Vector3 towards the sun, or the moon at night),
-// palette {zenith, horizon, ground (linear Colors), version} for reflections.
+// Public: sun (DirectionalLight, follows the player: the sun by day, the moon at night), hemi,
+// setTimeOfDay(hours), timeOfDay, isNight, nightFactor (0..1), sunDirection / moonDirection (unit
+// vectors towards them, may point below the horizon), lightDirection (towards the current key
+// light), palette {zenith, horizon, ground (linear Colors), version} for reflections.
 
 const LAT = (-17.83 * Math.PI) / 180;
 const SUN_DECL = (-1.7 * Math.PI) / 180;
@@ -31,11 +32,12 @@ const KEYS = [
   { el: 5, zenith: '#6a88bd', horizon: '#ebbf93', fog: '#d6b99a', glow: '#ffb070', hemiSky: '#c8c2c4', hemiGround: '#8a6c56', hemi: 0.78, sun: '#ffbd80', sunI: 2.0 },
   { el: 0, zenith: '#4d6399', horizon: '#ee9868', fog: '#c38f74', glow: '#ff8040', hemiSky: '#a99cae', hemiGround: '#665044', hemi: 0.56, sun: '#ff8a4a', sunI: 0.9 },
   { el: -4, zenith: '#2b3666', horizon: '#a8695c', fog: '#735657', glow: '#d06040', hemiSky: '#666a8a', hemiGround: '#3a302c', hemi: 0.36, sun: '#ff7040', sunI: 0 },
-  { el: -9, zenith: '#131b3a', horizon: '#46374a', fog: '#352d3c', glow: '#503040', hemiSky: '#3a4262', hemiGround: '#221c1c', hemi: 0.24, sun: '#000000', sunI: 0 },
-  { el: -16, zenith: '#060916', horizon: '#1d1a24', fog: '#18161d', glow: '#1a1418', hemiSky: '#253052', hemiGround: '#141110', hemi: 0.17, sun: '#000000', sunI: 0 },
+  { el: -9, zenith: '#131b3a', horizon: '#46374a', fog: '#352d3c', glow: '#503040', hemiSky: '#3e4a70', hemiGround: '#2a2220', hemi: 0.34, sun: '#000000', sunI: 0 },
+  { el: -16, zenith: '#060916', horizon: '#221c24', fog: '#1b181f', glow: '#1a1418', hemiSky: '#34426e', hemiGround: '#1c1714', hemi: 0.3, sun: '#000000', sunI: 0 },
 ];
 
 const MOON_COLOR = new THREE.Color('#9fb4dc');
+const COLOR_KEYS = ['zenith', 'horizon', 'fog', 'glow', 'hemiSky', 'hemiGround', 'sun'];
 
 function celestial(hours, decl, transit) {
   const H = ((hours - transit) * 15 * Math.PI) / 180;
@@ -74,8 +76,8 @@ export class Sky {
     this.nightFactor = 0;
     this.sunDirection = new THREE.Vector3(0, 1, 0);
     this.moonDirection = new THREE.Vector3();
+    this.lightDirection = new THREE.Vector3(0, 1, 0);
     this.palette = { zenith: new THREE.Color(), horizon: new THREE.Color(), ground: new THREE.Color(), version: 0 };
-    this._sunDir = new THREE.Vector3();
     this._raw = { zenith: new THREE.Color(), horizon: new THREE.Color(), fog: new THREE.Color(), glow: new THREE.Color(), hemiSky: new THREE.Color(), hemiGround: new THREE.Color(), sun: new THREE.Color() };
     this._tween = null;
     this._focus = new THREE.Vector3();
@@ -120,11 +122,11 @@ export class Sky {
     this.timeOfDay = h;
     const sunPos = celestial(h, SUN_DECL, SOLAR_NOON);
     const moonPos = celestial(h, MOON_DECL, MOON_TRANSIT);
-    dirFrom(sunPos, this._sunDir);
+    dirFrom(sunPos, this.sunDirection);
     dirFrom(moonPos, this.moonDirection);
     const el = THREE.MathUtils.radToDeg(sunPos.el);
     const raw = this._raw;
-    for (const k of ['zenith', 'horizon', 'fog', 'glow', 'hemiSky', 'hemiGround', 'sun']) lerpKey(el, k, raw[k]);
+    for (const k of COLOR_KEYS) lerpKey(el, k, raw[k]);
     const hemiI = lerpKey(el, 'hemi');
     const sunI = lerpKey(el, 'sunI');
 
@@ -134,17 +136,18 @@ export class Sky {
     const moonLight = this.nightFactor * moonUp;
 
     // Directional light: the sun by day, the moon at night.
+    const light = this.lightDirection;
     if (sunI > 0.05 || moonLight < 0.05) {
-      this.sunDirection.copy(this._sunDir);
-      if (this.sunDirection.y < 0.05) this.sunDirection.y = 0.05;
+      light.copy(this.sunDirection);
+      if (light.y < 0.05) light.y = 0.05;
       this.sun.color.setRGB(raw.sun.r, raw.sun.g, raw.sun.b, THREE.SRGBColorSpace);
       this.sun.intensity = sunI;
     } else {
-      this.sunDirection.copy(this.moonDirection);
+      light.copy(this.moonDirection);
       this.sun.color.copy(MOON_COLOR);
-      this.sun.intensity = 0.45 * moonLight;
+      this.sun.intensity = 0.75 * moonLight;
     }
-    this.sunDirection.normalize();
+    light.normalize();
     this.hemi.color.setRGB(raw.hemiSky.r, raw.hemiSky.g, raw.hemiSky.b, THREE.SRGBColorSpace);
     this.hemi.groundColor.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace);
     this.hemi.intensity = hemiI;
@@ -154,26 +157,26 @@ export class Sky {
     scene.background.copy(scene.fog.color);
     scene.fog.near = THREE.MathUtils.lerp(150, 60, this.nightFactor);
     scene.fog.far = this.drawDistance * THREE.MathUtils.lerp(1, 0.7, this.nightFactor);
-    this.game.renderer.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.35, this.nightFactor);
+    this.game.renderer.toneMappingExposure = THREE.MathUtils.lerp(1.0, 1.25, this.nightFactor);
 
-    this.dome.setState(this._sunDir, this.moonDirection, raw, this.nightFactor, moonUp);
+    this.dome.setState(this.sunDirection, this.moonDirection, raw, this.nightFactor, moonUp);
     this.stars.material.uniforms.uAlpha.value = THREE.MathUtils.smoothstep(this.nightFactor, 0.55, 1);
 
     const pal = this.palette;
     pal.zenith.setRGB(raw.zenith.r, raw.zenith.g, raw.zenith.b, THREE.SRGBColorSpace).multiplyScalar(1.15);
     pal.horizon.setRGB(raw.horizon.r, raw.horizon.g, raw.horizon.b, THREE.SRGBColorSpace).multiplyScalar(1.1);
-    pal.ground.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace).multiplyScalar(0.35);
+    pal.ground.setRGB(raw.hemiGround.r, raw.hemiGround.g, raw.hemiGround.b, THREE.SRGBColorSpace).multiplyScalar(0.6);
     pal.version++;
     this.game.city?.setNight?.(this.nightFactor);
   }
 
   _cycle() {
     const now = this._tween ? this._tween.to : this.timeOfDay;
-    let next = CYCLE.find(([h]) => h > now + 0.01) || CYCLE[0];
+    const next = CYCLE.find(([h]) => h > now + 0.01) || CYCLE[0];
     const from = this.timeOfDay;
     let to = next[0];
     if (to < from) to += 24;
-    this._tween = { from, to, t: 0, dur: Math.min(3, 0.8 + (to - from) * 0.25) };
+    this._tween = { from, to, t: 0, dur: Math.min(2.2, 0.6 + (to - from) * 0.18) };
     const hh = Math.floor(next[0]);
     const mm = Math.round((next[0] - hh) * 60);
     const label = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')} · ${next[1]}`;
@@ -194,10 +197,14 @@ export class Sky {
     this.dome.mesh.position.copy(cam.position);
     this.stars.mesh.position.copy(cam.position);
 
-    // Shadow frustum centred ahead of the player, snapped to shadow-map texels so it doesn't swim.
+    // Shadow frustum centred a little ahead of the player (where the camera looks), snapped to
+    // shadow-map texels so the shadows don't swim.
     const focus = this._focus.copy(game.player?.position || cam.position);
+    const fwd = cam.getWorldDirection(this._r);
+    const flat = Math.hypot(fwd.x, fwd.z);
+    if (flat > 1e-3) focus.addScaledVector(fwd.set(fwd.x / flat, 0, fwd.z / flat), this.shadowSize * 0.4);
     const sun = this.sun;
-    const dir = this.sunDirection;
+    const dir = this.lightDirection;
     if (sun.castShadow) {
       const texel = (this.shadowSize * 2) / sun.shadow.mapSize.x;
       const r = this._r.set(0, 1, 0).cross(dir);

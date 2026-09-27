@@ -91,7 +91,7 @@ vec4 fTex = texture(facadeMap, vec3(vFacUv, fLayer));
 float isFacade = 1.0 - step(0.5, fKind);
 float fGlass = isFacade * smoothstep(0.44, 0.6, fTex.a);
 float fLocalV = clamp((fTex.a - 0.5) * 2.0, 0.0, 1.0);
-float fBlindAmt = fR2 < 0.5 ? fR1 * 0.9 : 0.0;
+float fBlindAmt = fR2 < 0.3 ? fR1 * 0.85 : 0.0;
 float fBlind = fGlass * step(1.0 - fBlindAmt, fLocalV) * (1.0 - step(1.5, fCls) * step(fCls, 2.5));
 vec3 fGlassTint = uGlass[int(vFac.w + 0.5)];
 vec3 fGlassCol = fTex.rgb * fGlassTint * (0.7 + 0.55 * fR1);
@@ -115,19 +115,21 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
 {
   float isRes = step(0.5, fCls) * (1.0 - step(1.5, fCls));
   float isShop = step(1.5, fCls) * (1.0 - step(2.5, fCls));
-  float litFrac = mix(mix(0.2, 0.5, isRes), 0.62, isShop) * (1.0 - step(3.5, fCls));
+  // Some buildings are dark, some busy; offices mostly empty at night, homes and hotels lit.
+  float bldBusy = cityHash(vec2(vFac.y, 1.7));
+  float litFrac = mix(mix(0.16, 0.45, isRes), 0.6, isShop) * (1.0 - step(3.5, fCls)) * smoothstep(0.1, 0.55, bldBusy) * 1.4;
   float lit = step(fR2, litFrac) * step(0.02, fR1);
-  vec3 warm = vec3(1.0, 0.7, 0.4);
-  vec3 cool = vec3(0.82, 0.9, 1.0);
-  vec3 winCol = mix(cool, warm, clamp(isRes + isShop * 0.6 + step(0.75, fR3) * 0.5, 0.0, 1.0));
-  winCol = mix(winCol, vec3(0.45, 0.6, 1.0), step(0.93, fR3) * isRes);
-  float glow = fGlass * lit * (0.55 + 0.9 * fR1) * (1.0 + fBlind * 0.6);
-  totalEmissiveRadiance += winCol * glow * uNight * 1.5;
+  vec3 warm = vec3(1.0, 0.62, 0.3);
+  vec3 cool = vec3(0.9, 0.88, 0.78);
+  vec3 winCol = mix(cool, warm, clamp(isRes + isShop * 0.7 + step(0.7, fR3) * 0.6, 0.0, 1.0));
+  winCol = mix(winCol, vec3(0.5, 0.62, 1.0), step(0.94, fR3) * isRes);
+  float glow = fGlass * lit * (0.45 + 0.75 * fR1) * (1.0 + fBlind * 0.4);
+  totalEmissiveRadiance += winCol * glow * uNight * 0.9;
   float isSign = step(0.5, fKind) * (1.0 - step(1.5, fKind));
   float signLit = step(0.25, cityHash(vec2(vFac.y, 3.0)));
   totalEmissiveRadiance += fTex.rgb * isSign * signLit * uNight * 0.9;
   float isLamp = step(2.5, fKind) * (1.0 - step(3.5, fKind));
-  totalEmissiveRadiance += vec3(1.0, 0.78, 0.5) * isLamp * uNight * 6.0;
+  totalEmissiveRadiance += vec3(1.0, 0.7, 0.38) * isLamp * uNight * 5.0;
   float isPanel = step(3.5, fKind) * (1.0 - step(4.5, fKind));
   totalEmissiveRadiance += fTex.rgb * diffuseColor.rgb * isPanel * uNight * 1.4;
 }`,
@@ -138,9 +140,9 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
   vec3 upV = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
   vec3 R = reflect(-geometryViewDir, geometryNormal);
   float ry = dot(R, upV);
-  vec3 refl = ry > 0.0 ? mix(uSkyHorizon, uSkyZenith, sqrt(ry)) : mix(uSkyHorizon, uSkyGround, sqrt(-ry * 3.0));
-  float fres = 0.05 + 0.95 * pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), 5.0);
-  outgoingLight += refl * fClear * mix(0.2, 1.0, fres) * uReflect;
+  vec3 refl = ry > 0.0 ? mix(uSkyHorizon, uSkyZenith, smoothstep(0.0, 0.75, ry)) : mix(uSkyHorizon, uSkyGround, smoothstep(0.0, 0.3, -ry));
+  float fres = pow(1.0 - saturate(dot(geometryNormal, geometryViewDir)), 5.0);
+  outgoingLight += refl * fClear * mix(0.22, 0.7, fres) * uReflect;
 }
 #include <opaque_fragment>`,
       );
@@ -151,7 +153,8 @@ roughnessFactor = mix(roughnessFactor, 0.1, fClear);`,
 
 // Ground surfaces (roads, pavements, grass, rail ballast...): texture-array albedo with a
 // large-scale variation layer so tiles do not visibly repeat. kind 1 = blended "base ground"
-// (paved in the city core, dry grass/red soil in the suburbs) driven by the urban mask texture.
+// (paved in the city core, dry grass/red soil in the suburbs) driven by the urban mask texture;
+// kind 2 = hillside (dry grass / granite by vertex alpha).
 export function createGroundMaterial(map, uniforms, layers, urban, opts = {}) {
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
@@ -170,6 +173,7 @@ export function createGroundMaterial(map, uniforms, layers, urban, opts = {}) {
     shader.uniforms.uPave = { value: layers.paving };
     shader.uniforms.uDry = { value: layers.dryGrass };
     shader.uniforms.uDirt = { value: layers.dirt };
+    shader.uniforms.uRock = { value: layers.rock };
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -198,6 +202,7 @@ uniform float uMacro;
 uniform float uPave;
 uniform float uDry;
 uniform float uDirt;
+uniform float uRock;
 varying vec4 vFac;
 varying vec2 vFacUv;
 varying vec2 vWorldXZ;`,
@@ -210,7 +215,12 @@ float gKind = floor(mod(vFac.z + 0.5, 8.0));
 vec3 gMacro = texture(groundMap, vec3(vWorldXZ / 173.0, uMacro)).rgb;
 vec3 gMacro2 = texture(groundMap, vec3(vWorldXZ / 41.0 + 0.37, uMacro)).rgb;
 vec3 gCol;
-if (gKind > 0.5) {
+if (gKind > 1.5) {
+  // Hillside: dry grass blended into granite by the vertex alpha (slope + noise).
+  vec3 dry = texture(groundMap, vec3(vWorldXZ / 9.0, uDry)).rgb;
+  vec3 rock = texture(groundMap, vec3(vWorldXZ / 7.0, uRock)).rgb * 1.1;
+  gCol = mix(dry, rock, smoothstep(0.3, 0.7, vColor.a + (gMacro2.r - 0.5) * 0.3));
+} else if (gKind > 0.5) {
   vec2 uvU = (vWorldXZ - urbanRect.xy) / urbanRect.zw;
   float urban = texture(urbanMap, uvU).r;
   urban = smoothstep(0.2, 0.8, urban + (gMacro2.r - 0.5) * 0.5);

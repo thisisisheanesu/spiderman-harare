@@ -30,11 +30,11 @@ function streetlight(gb, L, x, y, z, rot, lit, seed, h = 9) {
   gb.clearTransform();
 }
 
-function bin(gb, L, x, z, color, seed) {
+function bin(gb, L, x, y, z, color, seed) {
   gb.brush(color, L.metal, seed, 2);
-  gb.cylinder(x, 0.15, z, 0.27, 0.9, 8, 1, true, 0.3);
+  gb.cylinder(x, y, z, 0.27, 0.9, 8, 1, true, 0.3);
   gb.brush(DARK, L.metal, seed, 2);
-  gb.cylinder(x, 1.05, z, 0.31, 0.06, 8, 1, true);
+  gb.cylinder(x, y + 0.9, z, 0.31, 0.06, 8, 1, true);
 }
 
 function bench(gb, L, x, z, rot, seed) {
@@ -141,12 +141,12 @@ export function buildProps(ctx) {
         if (world.buildingAt(px, pz)) continue;
         const on = rng() < 0.6;
         const seed = Math.floor(rng() * 255);
-        streetlight(chunks.at(px, pz), L, px, heightAt(px, pz) + 0.15, pz, Math.atan2(tx, tz), on, seed);
+        streetlight(chunks.detailAt(px, pz), L, px, heightAt(px, pz) + 0.15, pz, Math.atan2(tx, tz), on, seed);
         if (on) pools.push(px + tx * 2.05, pz + tz * 2.05);
         if (urban > 0.5 && rng() < 0.35 * density) {
           const bx = px + (dx / len) * 3;
           const bz = pz + (dz / len) * 3;
-          if (!world.buildingAt(bx, bz)) bin(chunks.at(bx, bz), L, bx, bz, rng.pick(BIN_COLORS), seed);
+          if (!world.buildingAt(bx, bz)) bin(chunks.detailAt(bx, bz), L, bx, heightAt(bx, bz) + 0.15, bz, rng.pick(BIN_COLORS), seed);
         }
       }
       acc = (acc - len) % spacing;
@@ -169,7 +169,7 @@ export function buildProps(ctx) {
         for (let k = -p.w / 2 + 0.8; k <= p.w / 2 - 0.8; k += 1.6) {
           const x = pts[end] + (dx / len) * 1.5 + nx * k;
           const z = pts[end + 1] + (dz / len) * 1.5 + nz * k;
-          bollard(chunks.at(x, z), L, x, z, 7);
+          bollard(chunks.detailAt(x, z), L, x, z, 7);
         }
       }
     }
@@ -191,7 +191,7 @@ export function buildProps(ctx) {
           if (world.buildingAt(x, z)) continue;
           // Mall benches sit back to back; park benches face their path.
           const face = p.cls === 'pedestrian' ? sgn : -sgn;
-          bench(chunks.at(x, z), L, x, z, Math.atan2(nx * face, nz * face), 3);
+          bench(chunks.detailAt(x, z), L, x, z, Math.atan2(nx * face, nz * face), 3);
         }
       }
     }
@@ -211,7 +211,7 @@ export function buildProps(ctx) {
       const x = obb.cx - obb.uz * v;
       const z = obb.cz + obb.ux * v;
       if (!pointInRing(x, z, ring) || world.buildingAt(x, z)) continue;
-      shelter(chunks.at(x, z), colliderFor(-5), L, x, z, rot, len, 11);
+      shelter(chunks.detailAt(x, z), colliderFor(-5), L, x, z, rot, len, 11);
     }
     for (let i = 0; i < ring.length; i += 2) {
       const j = (i + 2) % ring.length;
@@ -221,7 +221,7 @@ export function buildProps(ctx) {
       for (let t = 1; t < len - 1; t += 3 / density) {
         const x = ax + ((ring[j] - ax) / len) * t;
         const z = az + ((ring[j + 1] - az) / len) * t;
-        if (!world.buildingAt(x, z)) bollard(chunks.at(x, z), L, x, z, 5);
+        if (!world.buildingAt(x, z)) bollard(chunks.detailAt(x, z), L, x, z, 5);
       }
     }
   }
@@ -253,7 +253,7 @@ export function buildProps(ctx) {
   }
   for (const f of frontages) {
     const b = f.b;
-    if (b.h < 6 || b.h > 16 || f.len < 8 || !isMajor(f.street.road) || !farFromOthers(f.ax, f.az, 220)) continue;
+    if (b.h < 6 || b.h > 16 || f.len < 8 || !f.street.road || !isMajor(f.street.road) || !farFromOthers(f.ax, f.az, 220)) continue;
     const mx = (f.ax + f.bx) / 2 - f.nx * 1.2;
     const mz = (f.az + f.bz) / 2 - f.nz * 1.2;
     if (world.roofHeightAt(mx, mz) !== b.h) continue;
@@ -263,9 +263,9 @@ export function buildProps(ctx) {
 
   // Night light pools under working lamps.
   const n = pools.length / 2;
-  const geo = new THREE.PlaneGeometry(15, 15).rotateX(-Math.PI / 2);
+  const geo = new THREE.PlaneGeometry(19, 19).rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({
-    map: poolTexture(), color: new THREE.Color('#ffb46a'), transparent: true, opacity: 0, depthWrite: false,
+    map: poolTexture(), color: new THREE.Color('#ff9d4a'), transparent: true, opacity: 0, depthWrite: false,
     blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, fog: true,
   });
   const lightPools = new THREE.InstancedMesh(geo, mat, Math.max(1, n));

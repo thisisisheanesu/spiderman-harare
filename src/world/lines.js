@@ -145,7 +145,7 @@ export class SegmentGrid {
   }
 }
 
-export function distToSeg(x, z, ax, az, bx, bz) {
+function distToSeg(x, z, ax, az, bx, bz) {
   const dx = bx - ax;
   const dz = bz - az;
   const l2 = dx * dx + dz * dz;

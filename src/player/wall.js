@@ -11,6 +11,7 @@ const SIDE_SPEED = 7.5;
 const DOWN_SPEED = 9;
 const GRIP = 10;
 const TOP_REACH = 2.1;
+const SNAP = 0.2; // max facade-hugging correction per step (m)
 
 const UP = new THREE.Vector3(0, 1, 0);
 const _a = new THREE.Vector3();
@@ -105,7 +106,8 @@ export class WallMove {
       return;
     }
     n.set(hit.normal.x, 0, hit.normal.z).normalize();
-    p.position.addScaledVector(n, p.radius + 0.05 - hit.distance);
+    // Hug the facade, easing over setbacks instead of snapping.
+    p.position.addScaledVector(n, Math.max(-SNAP, Math.min(SNAP, p.radius + 0.05 - hit.distance)));
 
     const res = c.collide();
     if (res.ground && v.y <= 0.1) {

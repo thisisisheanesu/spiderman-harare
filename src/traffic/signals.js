@@ -4,15 +4,17 @@ import { TRAFFIC } from '../data/streetlife.js';
 import { ROAD_CLASSES } from './roadGraph.js';
 
 // Traffic lights ("robots"). Signalised junctions are the mapped traffic_signals plus every crossing of
-// two different major streets. Nodes within CLUSTER_DIST share one controller, so a dual carriageway
-// crossing (two nodes) runs one phase plan and its median link is exempt. Two phase groups per
-// controller: approaches along the main road's axis, and those across it.
+// two different major streets (and, inside the CBD grid, of a major street with a wide named street).
+// Junctions within CLUSTER_DIST share one controller, so a dual carriageway crossing runs one phase
+// plan and its median link is exempt. Two phase groups per controller: approaches along the main
+// road's axis, and those across it. A few controllers are dead, as ~30% of Harare's robots are.
 
 export const GREEN = 0;
 export const AMBER = 1;
 export const RED = 2;
 export const NONE = -1;
 
+const STATE_NAMES = ['green', 'amber', 'red'];
 const CLUSTER_DIST = 36;
 const MAJOR_RANK = ROAD_CLASSES.tertiary.rank;
 
@@ -36,9 +38,11 @@ function coreBounds(buildings) {
 }
 
 class Controller {
-  constructor(id, nodes, axis, rng) {
+  constructor(id, nodes, x, z, axis, rng) {
     this.id = id;
     this.nodes = nodes;
+    this.x = x;
+    this.z = z;
     this.axis = axis;
     const cyc = TRAFFIC?.robots?.cycle || {};
     this.amber = cyc.amber ?? 3;
@@ -58,7 +62,8 @@ class Controller {
     let b = RED;
     let ca = false;
     let cb = false;
-    const [gA, gB] = this.green;
+    const gA = this.green[0];
+    const gB = this.green[1];
     if (t < gA) a = GREEN;
     else if ((t -= gA) < this.amber) {
       a = AMBER;
@@ -96,7 +101,7 @@ export class Signals {
       if (list.length < 3) continue;
       // Inside the CBD grid, a major street crossing any wide named street gets a robot as well.
       const inCore = core && j.x > core.minX && j.x < core.maxX && j.z > core.minZ && j.z < core.maxZ;
-      let yes = mapped.some((f) => Math.hypot(f.x - j.x, f.z - j.z) < 18);
+      let yes = mapped.some((f) => (f.node !== undefined ? this.graph.junctions[f.node] === j : Math.hypot(f.x - j.x, f.z - j.z) < 18));
       for (let i = 0; i < list.length && !yes; i++) {
         for (let k = i + 1; k < list.length; k++) {
           const a = list[i];
@@ -144,9 +149,7 @@ export class Signals {
         }
       }
       const nodes = members.flatMap((j) => j.nodes);
-      const c = new Controller(this.controllers.length, nodes, { x: best.dir.x, z: best.dir.z }, rng);
-      c.x = members[0].x;
-      c.z = members[0].z;
+      const c = new Controller(this.controllers.length, nodes, members[0].x, members[0].z, { x: best.dir.x, z: best.dir.z }, rng);
       this.controllers.push(c);
       for (const n of nodes) this.byNode.set(n, c);
     }
@@ -194,7 +197,7 @@ export class Signals {
       if (lane.internal) return 'green';
       group = lane.signalGroup;
     }
-    return ['green', 'amber', 'red'][c.state[group]];
+    return STATE_NAMES[c.state[group]];
   }
 
   // Poles + back-to-back heads at the left kerb of every approach (plus the median side of one-way

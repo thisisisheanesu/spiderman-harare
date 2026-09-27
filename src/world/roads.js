@@ -13,6 +13,48 @@ const WHITE = tint('#f4f3ee');
 const YELLOW = tint('#e9b83a');
 const SIDE_STEP = 3;
 
+// Nearest street lookup for building frontages: carriageways (not service lanes / links) and
+// pedestrian malls such as First Street.
+export class StreetIndex {
+  constructor(data) {
+    this.grid = new SegmentGrid(40);
+    for (const r of data.roads) {
+      if (r.cls === 'service' || r.link) continue;
+      this.grid.addPolyline(r.pts, { road: r, w: r.w, sidewalk: sidewalkWidth(r), mall: false });
+    }
+    for (const p of data.paths) {
+      if (p.cls === 'pedestrian') this.grid.addPolyline(p.pts, { road: null, w: p.w, sidewalk: 0, mall: true });
+    }
+    this._hit = { road: null, mall: false, w: 0, sidewalk: 0, x: 0, z: 0, dx: 0, dz: 0, dist: 0 };
+  }
+
+  // Returns a shared result object (copy what you keep) or null.
+  nearest(x, z, maxDist) {
+    let best = null;
+    let bestD = maxDist;
+    this.grid.query(x, z, maxDist, (seg, d) => {
+      if (d < bestD) {
+        bestD = d;
+        best = seg;
+      }
+    });
+    if (!best) return null;
+    const h = this._hit;
+    const dx = best.bx - best.ax;
+    const dz = best.bz - best.az;
+    const l2 = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - best.ax) * dx + (z - best.az) * dz) / l2));
+    const l = Math.sqrt(l2);
+    Object.assign(h, best.ref);
+    h.x = best.ax + dx * t;
+    h.z = best.az + dz * t;
+    h.dx = dx / l;
+    h.dz = dz / l;
+    h.dist = bestD;
+    return h;
+  }
+}
+
 export function buildStreets(ctx) {
   const { data, G, heightAt, crossingPoints, densify } = ctx;
   const roads = data.roads;
@@ -47,7 +89,12 @@ export function buildStreets(ctx) {
   const trims = new Map();
   const crossingNodes = new Set();
   for (const [node, arr] of nodeRoads) {
-    if (arr.length < 3) continue;
+    if (arr.length < 2) continue;
+    if (arr.length === 2) {
+      // Plain bend or continuation: patch the wedge between the two ribbons.
+      emitJunction(asphalt, G, arr, trims, heightAt);
+      continue;
+    }
     let major = 0;
     for (const e of arr) if (isMajor(roads[e.ri])) major++;
     const [nx, nz] = data.nodes[node];
@@ -150,7 +197,7 @@ export function buildStreets(ctx) {
     }
   });
 
-  return { asphalt, walks, marks, sidewalkPaths, crossingNodes, nodeRoads, trims };
+  return { asphalt, walks, marks, sidewalkPaths, crossingNodes };
 }
 
 // Quad strip between lateral offsets o0..o1 along a polyline (mitred), world-space UVs.

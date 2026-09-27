@@ -121,7 +121,7 @@ else if ( abs( vTag - 1.0 ) < 0.5 ) roughnessFactor = 0.38;`,
         '#include <emissivemap_fragment>',
         `#include <emissivemap_fragment>
 if ( abs( vTag - 2.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.93, 0.78 ) * ( 0.1 + 3.2 * vState.x );
-else if ( abs( vTag - 3.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.05, 0.02 ) * ( 0.04 + 0.9 * vState.x + 2.6 * vState.y );
+else if ( abs( vTag - 3.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.02, 0.01 ) * ( 0.04 + 0.7 * vState.x + 1.5 * vState.y );
 else if ( abs( vTag - 5.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.z;
 else if ( abs( vTag - 7.0 ) < 0.5 ) totalEmissiveRadiance += vec3( 1.0, 0.42, 0.02 ) * 3.0 * vState.w;
 else if ( abs( vTag - 10.0 ) < 0.5 ) totalEmissiveRadiance += diffuseColor.rgb * ( 0.5 + 1.5 * vState.x );

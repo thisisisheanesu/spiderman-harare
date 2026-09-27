@@ -1,0 +1,229 @@
+/* Full-screen map overlay. Tokens: src/style.css; shared .overlay / .panel rules: hud.css. */
+
+.overlay.bigmap {
+  background: #153c70;
+}
+
+.bigmap-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.bigmap-canvas:active {
+  cursor: grabbing;
+}
+
+.bigmap-top,
+.bigmap-bottom {
+  position: absolute;
+  left: var(--left);
+  right: var(--right);
+  display: flex;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.bigmap-top {
+  top: var(--top);
+  align-items: flex-start;
+}
+
+.bigmap-bottom {
+  bottom: calc(var(--bottom) + 10px);
+  align-items: flex-end;
+}
+
+.bigmap-top > *,
+.bigmap-bottom > * {
+  pointer-events: auto;
+}
+
+.bigmap-title {
+  min-width: 0;
+  max-width: min(320px, 40%);
+  padding: 10px 14px 11px;
+}
+
+.bigmap-title h2 {
+  margin: 4px 0 2px;
+  font: 900 20px/1.1 var(--font);
+  text-transform: uppercase;
+}
+
+.bigmap-street {
+  font: 500 12.5px/1.3 var(--font);
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bigmap-waypoint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: 0 auto;
+  padding: 7px 7px 7px 12px;
+  border-radius: 99px;
+}
+
+.bigmap-top .close-btn {
+  margin-left: auto;
+}
+
+.wp-icon {
+  display: grid;
+  color: var(--gold);
+}
+
+.wp-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.wp-text {
+  min-width: 0;
+  font: 650 13px/1.2 var(--font);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bigmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  max-width: 330px;
+  padding: 9px 13px;
+  font: 600 12px/1.2 var(--font);
+  color: var(--muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-item i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+.legend-you {
+  background: #fff;
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+}
+
+.legend-landmark {
+  background: #fff;
+  transform: rotate(45deg) scale(0.8);
+  outline: 1.5px solid #10325f;
+}
+
+.legend-park {
+  border-radius: 50%;
+  background: #5fd39a;
+}
+
+.legend-rank {
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.legend-wp {
+  border-radius: 50% 50% 50% 0;
+  background: var(--gold);
+  transform: rotate(-45deg) scale(0.9);
+}
+
+.bigmap-hint {
+  flex: 1;
+  align-self: center;
+  min-width: 0;
+  font: 650 12.5px/1.35 var(--font);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none !important;
+}
+
+.bigmap-zoom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.bigmap-credit {
+  position: absolute;
+  left: 50%;
+  bottom: max(3px, calc(env(safe-area-inset-bottom) - 14px));
+  transform: translateX(-50%);
+  font: 500 10px/1 var(--font);
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bigmap-crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: none;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.bigmap[data-mode='gamepad'] .bigmap-crosshair {
+  display: block;
+}
+
+/* Narrow screens (portrait phones). */
+@media (max-width: 640px) {
+  .bigmap-title {
+    max-width: none;
+    flex: 1;
+  }
+
+  .bigmap-top {
+    flex-wrap: wrap;
+  }
+
+  .bigmap-waypoint {
+    order: 3;
+    flex-basis: 100%;
+    margin: 0;
+  }
+
+  .bigmap-legend {
+    display: none;
+  }
+}
+
+/* Short landscape screens (phones on their side). */
+@media (max-height: 480px) {
+  .bigmap-legend {
+    display: none;
+  }
+
+  .bigmap-title h2 {
+    font-size: 17px;
+  }
+
+  .bigmap-zoom {
+    flex-direction: row;
+  }
+}

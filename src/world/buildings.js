@@ -3,32 +3,43 @@ import { cleanRing, signedArea, edgeNormals, offsetRing, orientedBox, isConvex }
 import { hashString, makeRng } from '../core/rng.js';
 import { PALETTE, tint } from './palette.js';
 import { glassPresetFor, MISC_CELLS, miscUV } from './facades.js';
-import { addRooftopClutter, rbox } from './rooftops.js';
-import { sidewalkWidth } from './streetMetrics.js';
+import { addRooftopClutter } from './rooftops.js';
 
 // Buildings: every footprint becomes textured walls (texture-array facade styles with windows that
 // line up with the floors), a flat roof with a parapet (or a hip roof for small suburban houses),
 // street-level shopfronts, canopies / colonial verandahs over the pavement and rooftop clutter.
 // Geometry is merged per spatial chunk so the whole city is a few dozen draw calls.
 
-export const PARAPET = 0.35;
+const PARAPET = 0.35;
 export const CHUNK = 400;
 
-// Spatial chunks of merged geometry.
+// Spatial chunks of merged geometry. Each chunk has a `base` buffer (walls, roofs, landmark
+// silhouettes: always drawn) and a `detail` buffer (rooftop clutter, parapet caps, canopies,
+// street furniture, signs: drawn only near the camera).
 export class ChunkGrid {
   constructor(size = CHUNK) {
     this.size = size;
     this.map = new Map();
   }
 
-  at(x, z) {
-    const k = `${Math.floor(x / this.size)},${Math.floor(z / this.size)}`;
-    let gb = this.map.get(k);
-    if (!gb) {
-      gb = new GeoBuffer(8192);
-      this.map.set(k, gb);
+  _entry(x, z) {
+    const ix = Math.floor(x / this.size);
+    const iz = Math.floor(z / this.size);
+    const k = ix * 100003 + iz;
+    let e = this.map.get(k);
+    if (!e) {
+      e = { base: new GeoBuffer(8192), detail: new GeoBuffer(8192), cx: (ix + 0.5) * this.size, cz: (iz + 0.5) * this.size };
+      this.map.set(k, e);
     }
-    return gb;
+    return e;
+  }
+
+  at(x, z) {
+    return this._entry(x, z).base;
+  }
+
+  detailAt(x, z) {
+    return this._entry(x, z).detail;
   }
 }
 
@@ -61,7 +72,7 @@ export function planBuilding(b, ctx) {
     rng, area, obb,
     upper: 'punched', ground: null, tint: null, glass: 0, cls: residential ? 1 : 0,
     roof: 'flat', roofLayer: 'roofFlat', roofTint: tint(rng.pick(PALETTE.roofFlat)),
-    parapet: area > 30, verandah: false, canopy: 0, clutter: 0, solar: false, lobby: false,
+    parapet: area > 30, verandah: false, canopy: 0, clutter: 0, solar: false,
   };
   const pick = (weights) => {
     let t = 0;
@@ -139,6 +150,7 @@ export function planBuilding(b, ctx) {
     if (spec.upper === 'curtain') spec.glass = rng.pick([1, 2, 3, 4, 6, 1, 4]);
     else spec.glass = rng.pick([0, 0, 0, 4, 4, 1, 2, 3, 7]);
   }
+  if (b.lm && ctx.landmarks) ctx.landmarks.adjustSpec(b, spec);
   spec.solar = spec.cls === 1 ? rng() < 0.6 : rng() < 0.2;
 
   // Hip roofs: ridge a little above the physics roof (b.h), eaves below, so the average matches.
@@ -154,37 +166,29 @@ export function planBuilding(b, ctx) {
   const windowTop = spec.roof === 'hip' ? spec.wallTop : Math.max(2.6, b.h - (b.h > 6 ? 0.8 : 0.3));
   Object.assign(spec, floorsOf(b, windowTop));
   spec.windowTop = windowTop;
-  if (ctx.landmarks) ctx.landmarks.adjustSpec(b, spec, lmStyle);
   return spec;
 }
 
 // Which street (if any) an outer wall edge faces, and how much pavement lies in front of it.
-function streetFacing(world, ax, az, bx, bz, nx, nz, L) {
+// `streets` indexes carriageways and pedestrian malls (see StreetIndex in roads.js).
+function streetFacing(streets, ax, az, bx, bz, nx, nz, L) {
   const mx = (ax + bx) / 2;
   const mz = (az + bz) / 2;
-  const hit = world.nearestRoad(mx + nx * 1.5, mz + nz * 1.5, 45);
+  const hit = streets.nearest(mx + nx * 1.5, mz + nz * 1.5, 45);
   if (!hit) return null;
-  const r = hit.road;
-  if (r.cls === 'service' || r.link) return null;
-  const i = hit.seg * 2;
-  let rdx = r.pts[i + 2] - r.pts[i];
-  let rdz = r.pts[i + 3] - r.pts[i + 1];
-  const rl = Math.hypot(rdx, rdz) || 1;
-  rdx /= rl;
-  rdz /= rl;
   const ex = (bx - ax) / L;
   const ez = (bz - az) / L;
-  if (Math.abs(ex * rdx + ez * rdz) < 0.8) return null;
+  if (Math.abs(ex * hit.dx + ez * hit.dz) < 0.8) return null;
   const d = (hit.x - mx) * nx + (hit.z - mz) * nz;
   if (d < 0) return null;
-  const avail = d - r.w / 2;
-  if (avail < 0.3 || avail > sidewalkWidth(r) + 14) return null;
-  return { road: r, avail };
+  const avail = d - hit.w / 2;
+  if (avail < (hit.mall ? -1 : 0.3) || avail > hit.sidewalk + 14) return null;
+  return { road: hit.road, mall: hit.mall, avail: hit.mall ? 0 : avail };
 }
 
 // Emits one building into `gb`; solid extras (canopies, lift rooms...) go to `col`.
 // Returns street frontages usable for shop signs.
-export function emitBuilding(b, spec, gb, col, ctx) {
+export function emitBuilding(b, spec, gb, detail, col, ctx) {
   const { L, tileW, world, quality } = ctx;
   const seed = b.seed;
   const rng = spec.rng;
@@ -195,7 +199,9 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   const frontages = [];
   const { fh, wallTop } = spec;
   const flat = spec.roof === 'flat';
-  const parapetTop = flat && spec.parapet ? b.h + PARAPET : wallTop;
+  // Landmarks may end their standard walls below b.h and build their own top (Joina City's drum).
+  const roofY = spec.roofY ?? b.h;
+  const parapetTop = flat && spec.parapet ? roofY + PARAPET : Math.min(wallTop, roofY);
   const bandTint = tint('#ffffff', 0.93).map((v, i) => Math.round((v * spec.tint[i]) / 255));
 
   const rings = [fp, ...holes];
@@ -215,8 +221,8 @@ export function emitBuilding(b, spec, gb, col, ctx) {
       const nx = normals[i * 2];
       const nz = normals[i * 2 + 1];
       let y0 = 0;
-      const street = outer && spec.ground && b.core && len > 2.5 ? streetFacing(world, ax, az, bx, bz, nx, nz, len) : null;
-      if (street && spec.windowTop > fh * 1.6) {
+      const street = outer && spec.ground && b.core && len > 2.5 ? streetFacing(ctx.streets, ax, az, bx, bz, nx, nz, len) : null;
+      if (street && (spec.windowTop > fh * 1.6 || spec.fl === 1)) {
         const gl = spec.ground;
         const nb = Math.max(1, Math.round(len / tileW[gl]));
         gb.brush(spec.tint, L[gl], seed, 0, 2, spec.glass);
@@ -224,7 +230,7 @@ export function emitBuilding(b, spec, gb, col, ctx) {
         y0 = fh;
         frontages.push({ b, ax, az, bx, bz, nx, nz, len, y: fh, street, canopy: null, seed });
       }
-      const top = spec.windowTop;
+      const top = Math.min(spec.windowTop, roofY);
       if (top > y0 + 0.05) {
         const tiny = len < tileW[spec.upper] * 0.45;
         const layer = tiny ? 'blank' : spec.upper;
@@ -238,10 +244,10 @@ export function emitBuilding(b, spec, gb, col, ctx) {
         gb.wall(ax, az, bx, bz, top, parapetTop, nx, nz, 0, len / tileW.concrete, top / 4, parapetTop / 4);
       }
     }
-    // Parapet: inner face + cap.
+    // Parapet: inner face + cap (detail: only visible up close).
     if (flat && spec.parapet) {
       const inner = offsetRing(ring, normals, -0.28);
-      gb.brush(bandTint, L.concrete, seed, 2);
+      detail.brush(bandTint, L.concrete, seed, 2);
       for (let i = 0; i < n; i++) {
         const j = (i + 1) % n;
         const ax = ring[i * 2];
@@ -256,8 +262,8 @@ export function emitBuilding(b, spec, gb, col, ctx) {
         const cz = inner[i * 2 + 1];
         const dx = inner[j * 2];
         const dz = inner[j * 2 + 1];
-        gb.wall(cx, cz, dx, dz, b.h, parapetTop, -nx, -nz, 0, len / 4, 0, PARAPET / 4);
-        gb.quad(ax, parapetTop, az, bx, parapetTop, bz, dx, parapetTop, dz, cx, parapetTop, cz, 0, 1, 0, 0, 0, len / 4, 0.07);
+        detail.wall(cx, cz, dx, dz, roofY, parapetTop, -nx, -nz, 0, len / 4, 0, PARAPET / 4);
+        detail.quad(ax, parapetTop, az, bx, parapetTop, bz, dx, parapetTop, dz, cx, parapetTop, cz, 0, 1, 0, 0, 0, len / 4, 0.07);
       }
     }
   });
@@ -265,7 +271,7 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   if (flat) {
     const layer = spec.roofLayer || 'roofFlat';
     gb.brush(spec.roofTint, L[layer], seed, spec.roofKind ?? 2, spec.cls, spec.glass);
-    gb.polygon(fp, holes, b.h, tileW[layer]);
+    gb.polygon(fp, holes, roofY, tileW[layer]);
   } else {
     emitHipRoof(fp, spec, gb, L, tileW, seed);
   }
@@ -274,9 +280,9 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   for (const f of frontages) {
     const { street } = f;
     if (spec.verandah && street.avail > 1.6) {
-      f.canopy = emitVerandah(f, spec, gb, col, L, rng, Math.min(3.2, street.avail - 0.35));
+      f.canopy = emitVerandah(f, spec, detail, col, L, rng, Math.min(3.2, street.avail - 0.35));
     } else if (spec.canopy && street.avail > 1.9 && rng() < spec.canopy) {
-      f.canopy = emitCanopy(f, spec, gb, col, L, rng, Math.min(3.0, street.avail - 0.5));
+      f.canopy = emitCanopy(f, spec, detail, col, L, rng, Math.min(3.0, street.avail - 0.5));
     }
   }
 
@@ -284,11 +290,12 @@ export function emitBuilding(b, spec, gb, col, ctx) {
   if (b.lm && ctx.landmarks) ctx.landmarks.decorate(b, spec, gb, col, L, world);
 
   // Rooftop clutter on flat roofs.
-  if (flat && spec.obb && spec.area > 45 && b.h > 5 && spec.clutter > 0) {
+  if (flat && spec.obb && spec.area > 45 && roofY > 5 && spec.clutter > 0) {
     const normals = edgeNormals(fp, true);
     const inner = offsetRing(fp, normals, -1.1);
     const holeRings = holes.map((h) => offsetRing(h, edgeNormals(h, false), -1.1));
-    addRooftopClutter(gb, col, L, b, inner, holeRings, b.h, spec.obb, rng, {
+    addRooftopClutter(detail, col, L, b, inner, holeRings, roofY, spec.obb, rng, {
+      base: gb,
       liftRoom: b.h > 12 && spec.area > 140,
       clutter: spec.clutter * quality.props,
       solar: spec.solar,
@@ -429,7 +436,7 @@ function emitVerandah(f, spec, gb, col, L, rng, depth) {
   const y = Math.max(3.2, f.y + 0.15);
   const w = len - 0.05;
   const roofTint = tint(rng.pick(PALETTE.corrugated));
-  const postTint = tint(rng.pick(PALETTE.verandahPost));
+  const postTint = tint(spec.postColor || rng.pick(PALETTE.verandahPost));
   gb.setTransform(mx, 0, mz, rot);
   // Roof sheet (slopes 0.35 m down towards the street), top and underside.
   const y1 = y - 0.35;
@@ -452,4 +459,3 @@ function emitVerandah(f, spec, gb, col, L, rng, depth) {
   return { depth, top: y1, front: depth - 0.05, rot, mx, mz, verandah: true };
 }
 
-export { rbox };

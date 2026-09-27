@@ -74,6 +74,17 @@ export class Path {
   }
 }
 
+// Drops consecutive points closer than eps (mapped ways sometimes repeat a vertex).
+export function deduped(pts, eps = 0.05) {
+  const out = [pts[0], pts[1]];
+  for (let i = 2; i < pts.length; i += 2) {
+    if (Math.abs(pts[i] - out[out.length - 2]) < eps && Math.abs(pts[i + 1] - out[out.length - 1]) < eps) continue;
+    out.push(pts[i], pts[i + 1]);
+  }
+  if (out.length < 4) out.push(pts[pts.length - 2] + eps, pts[pts.length - 1]);
+  return Float32Array.from(out);
+}
+
 // Reverses a packed polyline.
 export function reversed(pts) {
   const n = pts.length / 2;

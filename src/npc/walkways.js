@@ -18,7 +18,7 @@ const CELL = 40; // spatial grid for edges and carriageway segments
 const MAX_EDGE = 16;
 const BODY = 0.3; // clearance kept from walls and kerbs
 
-const PATH_CLASSES = { pedestrian: 3.2, footway: 1.1, path: 0.5, steps: 0.4 };
+const PATH_CLASSES = { pedestrian: 4.5, footway: 1.1, path: 0.5, steps: 0.4 };
 
 function gridKey(gx, gz) {
   return gx * 100003 + gz;
@@ -175,7 +175,7 @@ export class Walkways {
     return !this.world.buildingAt(x, z) && this.carriage.at(x, z, 0.05) < 0;
   }
 
-  // Pedestrian activity per 40 m cell: named businesses, dense-core buildings and kombi ranks.
+  // Pedestrian activity per 40 m cell: named businesses, dense-core buildings, kombi ranks, markets.
   _activityField() {
     const cnt = new Map();
     const add = (x, z, w) => {
@@ -184,7 +184,7 @@ export class Walkways {
     };
     for (const p of this.data.pois || []) add(p.x, p.z, 1);
     for (const b of this.data.buildings) if (b.core) add(b.cx ?? b.fp[0], b.cz ?? b.fp[1], 0.6);
-    const ranks = this.data.ranks || [];
+    const ranks = [...(this.data.ranks || []), ...(this.data.markets || [])];
     return (x, z) => {
       const gx = Math.floor(x / CELL);
       const gz = Math.floor(z / CELL);
@@ -518,7 +518,9 @@ export class Walkways {
       const walk = samples.map((q) => (q && q.road === undefined ? q : null));
       const runEnds = [];
       const props = { path: pi, keepOut: p.cls === 'pedestrian' && hMax > 2 ? 1.3 : 0 };
-      this._emitRuns(walk, PATH, 0, (x, z) => weight * this.activity(x, z), props, (first, last, j, k) => {
+      // Park paths are busy even outside the dense core.
+      const floor = p.cls === 'pedestrian' ? 0 : 0.6;
+      this._emitRuns(walk, PATH, 0, (x, z) => weight * Math.max(floor, this.activity(x, z)), props, (first, last, j, k) => {
         runEnds.push({ first, last, j, k });
         joins.push(first, last);
       });

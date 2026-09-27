@@ -22,6 +22,7 @@ export class Minimap {
     this.size = 0;
     this.dpr = 1;
     this.gate = new RedrawGate(7);
+    this._pt = [0, 0];
   }
 
   // The canvas overhangs the circle by MARGIN px on every side so the N badge can sit on the rim.
@@ -81,22 +82,25 @@ export class Minimap {
     ctx.arc(r, r, r - 1, 0, Math.PI * 2);
     ctx.fill();
 
-    // World offset -> minimap pixel.
+    // World offset -> minimap pixel, written into one reused array (this runs every frame).
+    const pt = this._pt;
     const toScreen = (x, z) => {
       const dx = x - pos.x;
       const dz = z - pos.z;
-      return [r + (dx * cos + dz * sin) * k, r + (-dx * sin + dz * cos) * k];
+      pt[0] = r + (dx * cos + dz * sin) * k;
+      pt[1] = r + (-dx * sin + dz * cos) * k;
+      return pt;
     };
     const inner = r - 8;
     const iconR = Math.max(4, s * 0.028);
     for (const p of this.places.list) {
       if (p.distant) continue;
-      const [x, y] = toScreen(p.x, p.z);
-      if (Math.hypot(x - r, y - r) < inner) drawPlaceIcon(ctx, x, y, iconR, p.kind);
+      toScreen(p.x, p.z);
+      if (Math.hypot(pt[0] - r, pt[1] - r) < inner) drawPlaceIcon(ctx, pt[0], pt[1], iconR, p.kind);
     }
     for (const q of this.places.ranks) {
-      const [x, y] = toScreen(q.x, q.z);
-      if (Math.hypot(x - r, y - r) < inner) drawRankIcon(ctx, x, y, iconR * 1.35);
+      toScreen(q.x, q.z);
+      if (Math.hypot(pt[0] - r, pt[1] - r) < inner) drawRankIcon(ctx, pt[0], pt[1], iconR * 1.35);
     }
     if (waypoint) this._drawWaypoint(ctx, toScreen(waypoint.x, waypoint.z), Math.hypot(waypoint.x - pos.x, waypoint.z - pos.z), r);
 

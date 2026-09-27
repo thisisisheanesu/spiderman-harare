@@ -125,8 +125,50 @@ class WebLine {
   }
 }
 
+function markerTexture() {
+  const S = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const ctx = c.getContext('2d');
+  ctx.translate(S / 2, S / 2);
+  ctx.lineCap = 'round';
+  for (const [color, width] of [['rgba(10,12,20,0.55)', 7], ['#ffffff', 3]]) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.arc(0, 0, S * 0.26, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2 + Math.PI / 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * S * 0.33, Math.sin(a) * S * 0.33);
+      ctx.lineTo(Math.cos(a) * S * 0.44, Math.sin(a) * S * 0.44);
+      ctx.stroke();
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export class Webs {
   constructor(scene) {
+    // Zip aim marker: constant screen size, drawn on top.
+    this.marker = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: markerTexture(),
+        depthTest: false,
+        depthWrite: false,
+        transparent: true,
+        toneMapped: false,
+        sizeAttenuation: false,
+      }),
+    );
+    this.marker.scale.setScalar(0.045);
+    this.marker.renderOrder = 10;
+    this.marker.visible = false;
+    scene.add(this.marker);
+
     const alpha = ribbonAlphaTexture();
     this.lines = Array.from({ length: 5 }, () => new WebLine(alpha));
     for (const l of this.lines) scene.add(l.mesh);
@@ -144,7 +186,13 @@ export class Webs {
       SPLAT_COUNT,
     );
     this.splats.frustumCulled = false;
-    this.splatData = Array.from({ length: SPLAT_COUNT }, () => ({ age: SPLAT_LIFE, pos: new THREE.Vector3(), normal: new THREE.Vector3(), size: 1, spin: 0 }));
+    this.splatData = Array.from({ length: SPLAT_COUNT }, () => ({
+      age: SPLAT_LIFE,
+      pos: new THREE.Vector3(),
+      normal: new THREE.Vector3(),
+      size: 1,
+      spin: 0,
+    }));
     this.nextSplat = 0;
     _m.makeScale(0, 0, 0);
     for (let i = 0; i < SPLAT_COUNT; i++) this.splats.setMatrixAt(i, _m);
@@ -167,6 +215,12 @@ export class Webs {
     line.splat = splat;
     line.mesh.visible = true;
     return line;
+  }
+
+  // Show the zip marker at `point` (null hides it).
+  setAim(point) {
+    this.marker.visible = !!point;
+    if (point) this.marker.position.copy(point);
   }
 
   release(line) {
@@ -235,8 +289,10 @@ export class Webs {
       if (wobble) _p.y += Math.sin(s * 18 + l.progress * 30) * wobble * s * (1 - s);
       _view.subVectors(camera.position, _p);
       const dist = _view.length();
-      const width = Math.max(0.03, dist * 0.0021) * (l.state === 'loose' ? l.fade : 1);
-      _s.crossVectors(_t, _view).normalize().multiplyScalar(width);
+      const width = Math.max(0.018, dist * 0.0021) * (l.state === 'loose' ? l.fade : 1);
+      _s.crossVectors(_t, _view);
+      if (_s.lengthSq() < 1e-10) _s.set(0, 1, 0).cross(_t);
+      _s.normalize().multiplyScalar(width);
       pos.setXYZ(i * 2, _p.x - _s.x, _p.y - _s.y, _p.z - _s.z);
       pos.setXYZ(i * 2 + 1, _p.x + _s.x, _p.y + _s.y, _p.z + _s.z);
     }

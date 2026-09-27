@@ -4,7 +4,7 @@ import { SuitMaterial, SUITS } from './suits.js';
 import { Animator } from './animator.js';
 import { Controller } from './controller.js';
 import { Webs } from './web.js';
-import { roofEdgeFacing } from './anchors.js';
+import { roofEdgeFacing, groundBelow } from './anchors.js';
 
 // Spider-Man: procedural skinned model, traversal controller, animation and web visuals.
 //
@@ -21,6 +21,7 @@ import { roofEdgeFacing } from './anchors.js';
 // Emits player:jump / land / webShot / swingStart / swingEnd / zip / wallStart / perch / suit.
 
 const PALM = new THREE.Vector3(0, -0.09, -0.012);
+const AIM_INTERVAL = 0.1;
 
 export class Player {
   constructor() {
@@ -33,6 +34,8 @@ export class Player {
     this.suit = 'classic';
     this.object = null;
     this.hands = { L: new THREE.Vector3(), R: new THREE.Vector3() };
+    this._aim = { kind: '', point: new THREE.Vector3(), normal: new THREE.Vector3(), distance: 0 };
+    this._aimTimer = 0;
   }
 
   get speed() {
@@ -61,7 +64,9 @@ export class Player {
   _spawnOnRBZ(data) {
     const rbz = data.buildings.find((b) => b.lm === 'rbz') || data.buildings.reduce((a, b) => (b.h > a.h ? b : a));
     const edge = roofEdgeFacing(rbz, -rbz.cx, -rbz.cz);
-    this.teleport(edge.x - edge.nx * 0.35, rbz.h, edge.z - edge.nz * 0.35);
+    const x = edge.x - edge.nx * 0.35;
+    const z = edge.z - edge.nz * 0.35;
+    this.teleport(x, groundBelow(this.game.world, x, rbz.h + 5, z, 10, rbz.h), z);
     this.controller.perchAt(this.position, { x: edge.nx, z: edge.nz });
     this.heading = Math.atan2(-edge.nx, -edge.nz);
   }
@@ -83,10 +88,18 @@ export class Player {
   }
 
   update(dt, game) {
-    if (game.input.pressed('suit')) this.setSuit(this.suit === 'classic' ? 'symbiote' : 'classic');
+    if (game.input.pressed('suit') && !this.suitMaterial.transitioning) {
+      this.setSuit(this.suit === 'classic' ? 'symbiote' : 'classic');
+    }
     this.controller.update(dt);
     this._syncVisual(dt);
     this.webs.update(dt, game.camera, this.hands);
+    this._aimTimer -= dt;
+    if (this._aimTimer <= 0) {
+      this._aimTimer = AIM_INTERVAL;
+      const aim = this.state === 'zip' ? null : this.controller.zip.target(this._aim);
+      this.webs.setAim(aim && aim.point);
+    }
   }
 
   _syncVisual(dt) {

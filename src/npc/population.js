@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import * as STREETLIFE from '../data/streetlife.js';
 import { makeRng, hashString } from '../core/rng.js';
-import { pointInPoly, polyCentroid } from '../core/geo.js';
+import { pointInPoly, polyCentroid, polyArea } from '../core/geo.js';
 import { CROSS, WALK, PATH } from './walkways.js';
 import { Agent, headingOf } from './crowd.js';
 import { makeLook, pickArchetype, vendorLook } from './appearance.js';
 import { FLAG } from './bodies.js';
+import { rankSites } from './ranks.js';
 
 // Who is out, and where: keeps a population of walkers, chatting groups, people standing about,
 // rank crowds with their touts, and stall vendors in a radius around the player, scaled by the
@@ -15,7 +16,6 @@ const PER_METRE = 0.2; // people per metre of pavement at density 1
 const HOURLY = STREETLIFE.TRAFFIC?.densityByHour || { 0: 0.05, 6: 0.5, 7: 0.9, 12: 0.7, 17: 1, 19: 0.5, 21: 0.2 };
 const HOURS = Object.keys(HOURLY).map(Number).sort((a, b) => a - b);
 const SELLING = STREETLIFE.VENDOR_RAID?.sellingHours || [6, 18];
-const RANK_INFO = STREETLIFE.KOMBI_RANKS || [];
 const VENDOR_LABEL = {
   fruit_veg: 'fruit & veg seller',
   airtime_phone: 'airtime vendor',
@@ -32,7 +32,7 @@ const VENDOR_LABEL = {
 const ROLE_LABEL = { office_man: 'office worker', office_woman: 'office worker', school_kid: 'pupil', security_guard: 'security guard', police: 'police officer', street_preacher: 'preacher', market_woman: 'market trader', elder: 'elder', youth: 'youngster', apostolic: 'mupostori' };
 
 // Pedestrians per hour of day relative to the busiest hour (never fully empty: guards, late commuters).
-export function hourFactor(h) {
+function hourFactor(h) {
   h = ((h % 24) + 24) % 24;
   let i = 0;
   while (i < HOURS.length - 1 && HOURS[i + 1] <= h) i++;
@@ -71,6 +71,7 @@ export class Population {
     this._p = { x: 0, z: 0 };
     this._tmp = [];
     this.ranks = this._prepRanks();
+    this.parks = this._prepParks();
   }
 
   // --- Pool ------------------------------------------------------------------------------------
@@ -135,6 +136,7 @@ export class Population {
     }
     this._updateVendors(ctx, hour, jumped);
     this._updateRanks(ctx, tf, jumped);
+    this._updateParks(ctx, hour, tf, jumped);
     this._updateGroups(t, ctx.focus);
 
     // Walkers: despawn far ones, top up toward the target out of sight.
@@ -375,12 +377,12 @@ export class Population {
     const rng = makeRng(hashString('harare-ranks'));
     const W = this.walk;
     const out = [];
-    for (const rk of data.ranks || []) {
-      if (out.some((o) => Math.hypot(o.x - rk.x, o.z - rk.z) < 40)) continue;
-      const poly = (data.areas || [])
-        .filter((a) => a.kind === 'rank')
-        .map((a) => ({ a, c: polyCentroid(a.pts) }))
-        .filter(({ a, c }) => pointInPoly(rk.x, rk.z, a.pts) || Math.hypot(c.x - rk.x, c.z - rk.z) < 60)[0]?.a;
+    for (const rk of rankSites(data)) {
+      const poly = (data.areas || []).find((a) => {
+        if (a.kind !== 'rank') return false;
+        const c = polyCentroid(a.pts);
+        return pointInPoly(rk.x, rk.z, a.pts) || Math.hypot(c.x - rk.x, c.z - rk.z) < 60;
+      });
       // People gather in knots and in queues for the kombis, thickest at the heart of the rank.
       const spots = [];
       const ok = (x, z) => W.free(x, z) && W.free(x + 0.35, z) && W.free(x - 0.35, z) && W.free(x, z + 0.35) && W.free(x, z - 0.35) && !spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 0.75 * 0.75);
@@ -414,9 +416,7 @@ export class Population {
           }
         }
       }
-      const key = rk.name.toLowerCase();
-      const info = RANK_INFO.find((r) => [r.name, ...(r.altNames || [])].some((n) => key.includes(n.toLowerCase().split(' ')[0])));
-      out.push({ name: rk.name, x: rk.x, z: rk.z, kind: rk.kind, spots, agents: [], info });
+      out.push({ ...rk, spots, agents: [] });
     }
     return out;
   }
@@ -474,12 +474,94 @@ export class Population {
     }
   }
 
+  // --- Parks: friends sitting on the grass --------------------------------------------------------
+
+  _prepParks() {
+    const W = this.walk;
+    const rng = makeRng(hashString('harare-parks'));
+    const out = [];
+    for (const area of this.game.data.areas || []) {
+      if (area.kind !== 'park') continue;
+      const pts = area.pts;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (let i = 0; i < pts.length; i += 2) {
+        minX = Math.min(minX, pts[i]);
+        maxX = Math.max(maxX, pts[i]);
+        minZ = Math.min(minZ, pts[i + 1]);
+        maxZ = Math.max(maxZ, pts[i + 1]);
+      }
+      const want = Math.min(16, Math.round(polyArea(pts) / 1500));
+      const spots = [];
+      for (let i = 0; i < want * 30 && spots.length < want; i++) {
+        const x = rng.range(minX, maxX);
+        const z = rng.range(minZ, maxZ);
+        if (!pointInPoly(x, z, pts) || !W.free(x, z) || W.nearestEdge(x, z, 3)) continue;
+        if (spots.some((s) => (s.x - x) ** 2 + (s.z - z) ** 2 < 64)) continue;
+        spots.push({ x, z, group: null });
+      }
+      if (spots.length) out.push({ name: area.name || 'park', cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, r: Math.hypot(maxX - minX, maxZ - minZ) / 2, spots });
+    }
+    return out;
+  }
+
+  _updateParks(ctx, hour, tf, jumped) {
+    const R = this.radius;
+    const rng = this.rng;
+    const open = hour >= 7 && hour < 18.5;
+    for (const park of this.parks) {
+      const near = Math.hypot(park.cx - ctx.focus.x, park.cz - ctx.focus.z) < R + park.r;
+      for (const s of park.spots) {
+        const g = s.group;
+        const d2 = (s.x - ctx.focus.x) ** 2 + (s.z - ctx.focus.z) ** 2;
+        if (g && (!open || !near || d2 > (R * 1.1) ** 2)) {
+          for (const a of g.members.slice()) this.release(a);
+          s.group = null;
+          continue;
+        }
+        if (g || !open || !near || d2 > R * R || this.free.length < 6) continue;
+        if (!jumped && (this._inView(s.x, s.z) || rng() > 0.02 * tf)) continue;
+        s.group = this._spawnLoungers(s.x, s.z);
+      }
+    }
+  }
+
+  _spawnLoungers(cx, cz) {
+    const W = this.walk;
+    const rng = this.rng;
+    const n = rng.int(2, 4);
+    const group = { x: cx, z: cz, members: [], speaker: 0, switchAt: 0, until: Infinity, edge: -1 };
+    const base = rng() * Math.PI * 2;
+    for (let k = 0; k < n; k++) {
+      const ang = base + (k / n) * Math.PI * 2 + rng.range(-0.25, 0.25);
+      const x = cx + Math.cos(ang) * 0.85;
+      const z = cz + Math.sin(ang) * 0.85;
+      if (!W.free(x, z)) continue;
+      const look = makeLook(rng, pickArchetype(rng, { hour: this.hour }));
+      look.flags &= ~FLAG.LOAD;
+      if (look.flags & FLAG.LONG) look.flags = (look.flags & ~FLAG.LONG) | FLAG.SKIRT;
+      const a = this._alloc(look, 'group');
+      if (!a) break;
+      a.position.set(x, W.groundY(x, z), z);
+      a.heading = headingOf(cx - x, cz - z);
+      a.home = { x, z, heading: a.heading };
+      a.group = group;
+      a.lounge = true;
+      group.members.push(a);
+    }
+    if (group.members.length) this.groups.push(group);
+    return group;
+  }
+
   // --- Vendors ---------------------------------------------------------------------------------
 
   _updateVendors(ctx, hour, jumped) {
     const R = this.radius + 10;
     const open = hour >= SELLING[0] && hour < SELLING[1] + 0.5;
     if (this.vendors.group) this.vendors.group.visible = open;
+    this.crowd.obstaclesOn = open;
     let budget = jumped ? 100 : 2;
     for (const st of this.vendors.stalls) {
       const d2 = (st.x - ctx.focus.x) ** 2 + (st.z - ctx.focus.z) ** 2;

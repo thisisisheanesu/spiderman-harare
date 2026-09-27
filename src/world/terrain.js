@@ -70,6 +70,9 @@ export class Kopje {
       }
     }
     this.box = { minX, maxX, minZ, maxZ };
+    // Buildings on the hill's skirt: the ground levels out around them (physics extrudes every
+    // building from y = 0).
+    this.pads = data.buildings.filter((b) => b.maxX > minX && b.minX < maxX && b.maxZ > minZ && b.minZ < maxZ);
     this.heightAt = this.heightAt.bind(this);
   }
 
@@ -83,6 +86,11 @@ export class Kopje {
     if (this.ring) {
       if (!pointInRing(x, z, this.ring)) return 0;
       edge = THREE.MathUtils.smoothstep(distToRing(x, z, this.ring), 0, 70);
+    }
+    for (const p of this.pads) {
+      const dx = Math.max(p.minX - x, 0, x - p.maxX);
+      const dz = Math.max(p.minZ - z, 0, z - p.maxZ);
+      edge = Math.min(edge, THREE.MathUtils.smoothstep(Math.hypot(dx, dz), 2, 25));
     }
     const dome = Math.pow(1 - d * d, 1.6);
     const n = noise(x / 45, z / 45) * 0.6 + noise(x / 17, z / 17) * 0.4;
@@ -117,9 +125,9 @@ export class Kopje {
     const idx = new Int32Array((nx + 1) * (nz + 1)).fill(-1);
     const s = 1 / groundScale.dryGrass;
     const earth = new THREE.Color();
-    const grass = new THREE.Color('#fff4e0');
-    const red = new THREE.Color('#e0b090');
-    ground.brush([255, 255, 255], G.dryGrass, 0, 0);
+    const grass = new THREE.Color('#f2ead8');
+    const red = new THREE.Color('#d2b49c');
+    ground.brush([255, 255, 255], G.dryGrass, 0, 2);
     const vert = (i, j) => {
       const k = j * (nx + 1) + i;
       if (idx[k] >= 0) return idx[k];
@@ -129,8 +137,9 @@ export class Kopje {
       const gz = (H(i, j + 1) - H(i, j - 1)) / (2 * step);
       const inv = 1 / Math.hypot(gx, 1, gz);
       const slope = Math.min(1, Math.hypot(gx, gz) * 1.6);
-      earth.copy(grass).lerp(red, slope * 0.8);
-      ground.setTint([earth.r * 255, earth.g * 255, earth.b * 255].map(Math.round));
+      earth.copy(grass).lerp(red, slope * 0.5);
+      const rock = Math.min(1, Math.max(0, slope * 1.7 - 0.15 + (noise(x / 23, z / 23) - 0.5) * 1.1 + H(i, j) / 110));
+      ground.setTint([earth.r * 255, earth.g * 255, earth.b * 255].map(Math.round), Math.round(rock * 255));
       idx[k] = ground.vertex(x, H(i, j), z, -gx * inv, inv, -gz * inv, x * s, -z * s);
       return idx[k];
     };
@@ -159,7 +168,7 @@ export class Kopje {
     const rock = mergeVertices(ico);
     const rp = rock.attributes.position;
     const c = this.center;
-    const count = Math.round(70 * Math.max(0.5, quality.props));
+    const count = Math.round(110 * Math.max(0.5, quality.props));
     ground.brush(tint('#ffffff'), G.rock, 0, 0);
     for (let n = 0; n < count; n++) {
       const a = rng() * Math.PI * 2;

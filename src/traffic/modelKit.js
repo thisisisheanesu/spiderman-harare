@@ -155,7 +155,7 @@ export class ModelBuilder {
 }
 
 // Greenhouse helper: x half-width of a tapered cabin at height v.
-export function cabinHalfWidth(cabin, v) {
+function cabinHalfWidth(cabin, v) {
   const f = Math.max(0, Math.min(1, (v - cabin.v0) / (cabin.v1 - cabin.v0)));
   return (cabin.width / 2) * (1 - (1 - cabin.taper) * f);
 }

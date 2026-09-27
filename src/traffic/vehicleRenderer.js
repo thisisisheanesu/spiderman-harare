@@ -167,14 +167,14 @@ export class VehicleRenderer {
     return this.frustum.intersectsSphere(_sphere);
   }
 
-  // lights: {head, brake, left, right} 0..1. `pose` for the hwindi: 0 none, 1 hanging out, 2 on the kerb.
+  // head, brake, left, right: lamp intensities 0..1. hwindiPose: 0 none, 1 hanging out, 2 on the kerb.
   add(v, head, brake, left, right, hwindiPose, time) {
     const spec = v.model;
     const p = v.position;
-    if (!this.inView(p.x, p.y + v.height / 2, p.z, v.length * 0.6 + 1.5)) return false;
+    if (!this.inView(p.x, p.y + v.height / 2, p.z, v.length * 0.6 + 1.5)) return;
     const mesh = spec.mesh;
     const i = mesh.count;
-    if (i >= spec.capacity) return false;
+    if (i >= spec.capacity) return;
     mesh.count = i + 1;
     _chassis.makeRotationY(v.heading).setPosition(p.x, ROAD_Y, p.z);
     _euler.set(v.pitch, v.heading, v.roll);
@@ -200,7 +200,7 @@ export class VehicleRenderer {
 
     const dx = p.x - this.camPos.x;
     const dz = p.z - this.camPos.z;
-    if (dx * dx + dz * dz > DETAIL_DIST * DETAIL_DIST) return true;
+    if (dx * dx + dz * dz > DETAIL_DIST * DETAIL_DIST) return;
 
     if (head > 0.25 && this.beams.count < this.beams.instanceMatrix.count) {
       _local.makeScale(v.width * 2, 1, 11).setPosition(0, 0.03, -(v.length / 2 + 5.2));
@@ -242,7 +242,6 @@ export class VehicleRenderer {
       c[k * 4 + 2] = v.hwindiTrousers.b;
       c[k * 4 + 3] = NO_ROWS;
     }
-    return true;
   }
 
   end() {

@@ -1,3 +1,4 @@
+import './menus.css';
 import { el } from './dom.js';
 import { ICONS } from './icons.js';
 import { controlsColumns } from './controls.js';

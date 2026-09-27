@@ -43,6 +43,26 @@ ranks:     [{name, x, z, kind}]           kombi ranks / bus termini (Copacabana,
 features:  [{kind, name?, key?, x, z}]    traffic_signals, crossings, fountain, railway_station, researched places
 trees:     [[x,z], …]                     the few mapped trees (plant more procedurally)
 pois:      [{name, cat, x, z, b?}]        named businesses; b = index of the building they belong to (for shop signs)
+lamps:     [[x,z], …]                     OSM highway=street_lamp nodes (none mapped in the CBD yet: place procedurally)
+markets:   [{name, x, z, pts?}]           OSM amenity=marketplace (+ OSM shops named "… Market"); pts = outline if mapped
+```
+
+OSM extras (`tools/fetch_osm.py` → `build_map.py --osm osm.json`; all optional; without `--osm` they are absent
+(except buildings[].material from Overture) and lamps/markets are empty):
+```
+meta.osmTimestamp                         OSM snapshot time of the Overpass data
+roads[].lanes      from OSM lanes tags via the OSM way the Overture segment cites (lanes/2 on two-way roads,
+                   lanes:forward/backward averaged up; capped at 5); w widened (≤ +40 %) or lanes reduced so
+                   lanes stay ≥ 2.5 m
+roads[].lanesF?, lanesB?   OSM lane counts a→b / b→a, only on asymmetric two-way roads
+roads[].osmSidewalk?       'both'|'left'|'right'|'no'|'separate' (left/right relative to a→b)
+roads[].w          replaced by OSM width= when tagged and plausible
+buildings[].material?      building:material (Overture facade_material even without --osm, else the cited OSM way)
+buildings[]        facade?/roofColor?/roofShape? filled from the cited OSM building when Overture lacks them;
+                   est heights replaced by OSM height/building:levels (lm heights from overrides stay authoritative)
+features[]         + kind bus_stop (name?), stop, give_way, bench, waste_basket, taxi from OSM nodes;
+                   traffic_signals get node? = nearest road graph node within 25 m; crossing signals?:1 if signalised
+pois[]             + named OSM shop nodes Overture lacks (cat mapped to Overture-style, e.g. fashion_and_apparel_store)
 ```
 
 Reference research (produced alongside the code):

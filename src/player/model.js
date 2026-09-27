@@ -60,8 +60,8 @@ export const ATLAS = {
 
 // Profiles: [t, rx, rz, offZ] along each part's axis (t = 0..1 between its joints; caps beyond).
 // The torso and head are described directly in model-space heights.
-export const TORSO_Y0 = 0.83;
-export const TORSO_Y1 = 1.535;
+const TORSO_Y0 = 0.83;
+const TORSO_Y1 = 1.535;
 const TORSO_KEYS = [
   [0.83, 0.0, 0.0, 0.0],
   [0.835, 0.07, 0.06, 0.0],
@@ -80,9 +80,9 @@ const TORSO_KEYS = [
   [1.528, 0.04, 0.04, 0.01],
   [1.535, 0.0, 0.0, 0.01],
 ];
-export const HEAD_Y0 = 1.535;
-export const HEAD_Y1 = 1.785;
-export const HEAD_KEYS = [
+const HEAD_Y0 = 1.535;
+const HEAD_Y1 = 1.785;
+const HEAD_KEYS = [
   [1.535, 0.0, 0.0, -0.012],
   [1.54, 0.03, 0.04, -0.016],
   [1.555, 0.05, 0.068, -0.016],
@@ -117,7 +117,7 @@ function withCaps(keys, capStart, capEnd) {
 }
 
 // Catmull-Rom sample of a key table at parameter t. Writes [rx, rz, offZ] into out.
-export function sampleKeys(keys, t, out) {
+function sampleKeys(keys, t, out) {
   let i = 0;
   while (i < keys.length - 2 && keys[i + 1][0] < t) i++;
   const k1 = keys[i];
@@ -446,12 +446,12 @@ function buildArm(sb, side) {
     ez: Z,
     len: LIMB.upperArm,
     keys: withCaps([
-      [0, 0.064, 0.066, 0.004],
-      [0.18, 0.062, 0.064, 0.002],
+      [0, 0.06, 0.063, 0.004],
+      [0.18, 0.061, 0.063, 0.002],
       [0.45, 0.05, 0.056, -0.004],
       [0.75, 0.044, 0.046, -0.002],
       [1, 0.04, 0.041, 0],
-    ], 0.24, 0.12),
+    ], 0.19, 0.12),
     segU: 16,
     rect: ATLAS.upperArm,
     skin: (t) => (t < 0.2 ? blend(ua, sh, 0.2 - t, 0.1, 0.45, 0.35) : blend(ua, fa, t, 0.82, 1.08, 0.5)),
@@ -516,7 +516,6 @@ function buildLeg(sb, side) {
   const ex = new THREE.Vector3(s, 0, 0);
   const hip = jointPos(`thigh${side}`);
   const knee = jointPos(`shin${side}`);
-  const ankle = jointPos(`foot${side}`);
   const th = B[`thigh${side}`];
   const sn = B[`shin${side}`];
   const ft = B[`foot${side}`];

@@ -133,6 +133,7 @@ export class Hud {
   }
 
   setWaypoint(x, z) {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return;
     const near = this.places.nearest(x, z, 120);
     const label = near?.name || this.game.world.streetNameAt(x, z) || 'Marked spot';
     this.waypoint = { x, z, label };
@@ -208,7 +209,10 @@ export class Hud {
     const speed = game.player.speed ?? game.player.velocity?.length() ?? 0;
     this.minimap.draw(dt, p, this.heading, facing, speed, this.waypoint);
     this.compass.draw(this.heading, p, this.waypoint);
-    this.notices.updateSubtitles(dt * 1000);
+    // Subtitles follow wall-clock time like the voices do (dt is clamped when frames are slow).
+    const now = performance.now();
+    this.notices.updateSubtitles(Math.min(250, now - (this._lastFrame ?? now)));
+    this._lastFrame = now;
 
     if (this.started && this._hintOn) {
       this._hintT += dt;
@@ -223,6 +227,7 @@ export class Hud {
 
   pausedUpdate(dt, game) {
     const input = game.input;
+    this._lastFrame = performance.now(); // pause time doesn't count against subtitles
     if (!this.started) {
       // Gamepad players can start from the title screen with A.
       if (input.usingGamepad && input.pressed('jump')) document.getElementById('start')?.click();
@@ -251,14 +256,19 @@ export class Hud {
     else if (key === 'subtitles') this.notices.enabled = v;
   }
 
+  // Street as the title; the detail says which rooftop / park the player is on, or what is nearby.
   _location() {
+    const { world } = this.game;
     const p = this.game.player.position;
-    const street = this.game.world.streetNameAt(p.x, p.z);
+    const street = world.streetNameAt(p.x, p.z);
     const area = this.places.areaAt(p.x, p.z);
     const near = this.places.nearest(p.x, p.z, 350);
     const title = street || area || near?.name || 'Harare CBD';
+    const roof = world.buildingAt(p.x, p.z);
+    const roofName = roof && p.y > roof.h - 3 ? this.places.nameOf(roof) : '';
     let detail = '';
-    if (area && area !== title) detail = `in ${area}`;
+    if (roofName) detail = `atop ${roofName}`;
+    else if (area && area !== title) detail = `in ${area}`;
     else if (near && near.name !== title) detail = `near ${near.name}`;
     else if (title !== 'Harare CBD') detail = 'Harare CBD';
     return { street: title, detail };

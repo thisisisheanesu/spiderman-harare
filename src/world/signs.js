@@ -154,63 +154,91 @@ export class SignPainter {
       }));
     }
     this.max = n * PER_LAYER;
+    this.used = 0;
   }
 
-  // Picks POIs for frontages and paints them. Returns placements [{frontage, layer, uv, name}].
+  _slot() {
+    if (this.used >= this.max) return null;
+    const k = this.used++;
+    return { layer: this.layers[Math.floor(k / PER_LAYER)], slot: k % PER_LAYER };
+  }
+
+  // A 4:1 slot painted by draw(ctx, x, y, w, h) (murals, building lettering). Returns
+  // {layer, uv: [u0, v0, u1, v1]} or null when the sign layers are full.
+  custom(draw) {
+    const s = this._slot();
+    if (!s) return null;
+    const [x, y, w, h] = slotRect(s.slot, this.atlas.size);
+    draw(this.atlas.layers[s.layer].color.getContext('2d'), x + 2, y + 2, w - 4, h - 4);
+    return { layer: s.layer, uv: slotUV(s.slot) };
+  }
+
+  // Building-name lettering on a plain band (e.g. MEIKLES HOTEL on a parapet).
+  lettering(text, bg, fg) {
+    return this.custom((ctx, x, y, w, h) => {
+      ctx.fillStyle = bg;
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = fg;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      fitText(ctx, text, w * 0.94, h * 0.78);
+      ctx.fillText(text, x + w / 2, y + h * 0.53);
+    });
+  }
+
+  // Splits frontages into shop units (~7 m), gives named POIs the unit nearest to them (painting
+  // their signs) and generic trade signs to most other units. Returns placements
+  // [{frontage, t (0..1 along the edge), width, layer, slot, seed}].
   assign(frontages, pois) {
-    const byBuilding = new Map();
+    const units = new Map();
     for (const f of frontages) {
-      let arr = byBuilding.get(f.b.id);
-      if (!arr) byBuilding.set(f.b.id, (arr = []));
-      arr.push(f);
+      const n = Math.max(1, Math.floor(f.len / 7));
+      const arr = [];
+      for (let k = 0; k < n; k++) arr.push({ frontage: f, t: (k + 0.5) / n, width: Math.min(5.2, (f.len / n) * 0.8), used: false });
+      let list = units.get(f.b.id);
+      if (!list) units.set(f.b.id, (list = []));
+      list.push(...arr);
     }
     const seen = new Set();
     const cands = [];
     for (const p of pois) {
-      if (p.b === undefined || !byBuilding.has(p.b)) continue;
+      if (p.b === undefined || !units.has(p.b)) continue;
       const name = (p.name || '').replace(/[^\w &'.,-]/g, '').trim();
       if (name.length < 3 || name.length > 26 || seen.has(name.toLowerCase())) continue;
       seen.add(name.toLowerCase());
       const shop = SHOP_CATS.test(p.cat || '') ? 0 : 150;
-      const d = Math.hypot(p.x + 150, p.z) + shop;
-      cands.push({ p, name, d });
+      cands.push({ p, name, d: Math.hypot(p.x + 150, p.z) + shop });
     }
     cands.sort((a, b) => a.d - b.d);
-    const used = new Set();
     const out = [];
+    const S = this.atlas.size;
     for (const c of cands) {
-      if (out.length >= this.max) break;
-      const fs = byBuilding.get(c.p.b);
       let best = null;
       let bestD = Infinity;
-      for (const f of fs) {
-        if (used.has(f)) continue;
-        const d = Math.hypot((f.ax + f.bx) / 2 - c.p.x, (f.az + f.bz) / 2 - c.p.z);
+      for (const u of units.get(c.p.b)) {
+        if (u.used || u.width < 2.4) continue;
+        const f = u.frontage;
+        const d = Math.hypot(f.ax + (f.bx - f.ax) * u.t - c.p.x, f.az + (f.bz - f.az) * u.t - c.p.z);
         if (d < bestD) {
           bestD = d;
-          best = f;
+          best = u;
         }
       }
-      if (!best || best.len < 3.5) continue;
-      used.add(best);
-      const k = out.length;
-      const layer = this.layers[Math.floor(k / PER_LAYER)];
-      out.push({ frontage: best, layer, slot: k % PER_LAYER, name: c.name, seed: hashString(c.name) & 255 });
+      if (!best) continue;
+      const s = this._slot();
+      if (!s) break;
+      best.used = true;
+      const pl = { ...best, ...s, seed: hashString(c.name) & 255 };
+      const [x, y, w, h] = slotRect(pl.slot, S);
+      drawSign(this.atlas.layers[pl.layer].color.getContext('2d'), x + 2, y + 2, w - 4, h - 4, c.name, makeRng(pl.seed + 1));
+      out.push(pl);
     }
-    // Paint the named signs.
-    const S = this.atlas.size;
-    for (const o of out) {
-      const layer = this.atlas.layers[o.layer];
-      const ctx = layer.color.getContext('2d');
-      const [x, y, w, h] = slotRect(o.slot, S);
-      drawSign(ctx, x + 2, y + 2, w - 4, h - 4, o.name, makeRng(o.seed + 1));
-    }
-    // Generic trade signs on a share of the remaining shopfronts.
     const rng = makeRng(99);
-    for (const f of frontages) {
-      if (used.has(f) || f.len < 4 || rng() > 0.45) continue;
-      const slot = Math.floor(rng() * GENERIC.length);
-      out.push({ frontage: f, layer: this.genericLayer, slot, seed: Math.floor(rng() * 255) });
+    for (const list of units.values()) {
+      for (const u of list) {
+        if (u.used || u.width < 2.4 || rng() > 0.7) continue;
+        out.push({ ...u, layer: this.genericLayer, slot: Math.floor(rng() * GENERIC.length), seed: Math.floor(rng() * 255) });
+      }
     }
     return out;
   }
@@ -223,7 +251,7 @@ function slotRect(k, S) {
 }
 
 // UV rect (u0, v0, u1, v1) of a slot, accounting for the atlas row flip (canvas top = v 1).
-export function slotUV(slot, S = 1) {
+function slotUV(slot, S = 1) {
   const [x, y, w, h] = slotRect(slot, S);
   const inset = 0.004;
   return [x + inset, 1 - (y + h) + inset, x + w - inset, 1 - y - inset];
@@ -235,32 +263,27 @@ export function adUV(k) {
 
 // Emits a sign board for a placement: on the canopy fascia if the shop has one, else on the wall
 // above the shop window.
-export function emitSign(gb, L, pl) {
+export function emitSign(gb, pl) {
   const f = pl.frontage;
   const [u0, v0, u1, v1] = slotUV(pl.slot);
-  const width = Math.min(f.len * 0.8, 5.2);
-  const height = width / 4;
   const ex = (f.bx - f.ax) / f.len;
   const ez = (f.bz - f.az) / f.len;
-  const mx = (f.ax + f.bx) / 2;
-  const mz = (f.az + f.bz) / 2;
-  let px;
-  let pz;
+  const mx = f.ax + (f.bx - f.ax) * pl.t;
+  const mz = f.az + (f.bz - f.az) * pl.t;
+  let out = 0.07;
   let y0;
-  let h = height;
+  let h;
   if (f.canopy) {
-    const out = f.canopy.front + 0.12;
-    px = mx + f.nx * out;
-    pz = mz + f.nz * out;
+    out = f.canopy.front + 0.12;
+    h = Math.min(pl.width / 4, 0.75);
     y0 = f.canopy.top + (f.canopy.verandah ? -0.3 : 0.02);
-    h = Math.min(height, 0.75);
   } else {
-    px = mx + f.nx * 0.07;
-    pz = mz + f.nz * 0.07;
-    y0 = f.y - Math.min(height, 0.7) - 0.05;
-    h = Math.min(height, 0.7);
+    h = Math.min(pl.width / 4, 0.7);
+    y0 = f.y - h - 0.05;
   }
   const w = h * 4;
+  const px = mx + f.nx * out;
+  const pz = mz + f.nz * out;
   gb.brush(tint('#ffffff'), pl.layer, pl.seed, 1);
   gb.quad(
     px - (ex * w) / 2, y0, pz - (ez * w) / 2,
@@ -269,11 +292,9 @@ export function emitSign(gb, L, pl) {
     px - (ex * w) / 2, y0 + h, pz - (ez * w) / 2,
     f.nx, 0, f.nz, u0, v0, u1, v1,
   );
-  // Flip the uv direction if the edge runs the other way round (text must read left to right).
-  const flip = ex * f.nz - ez * f.nx < 0;
-  if (flip) {
+  // Text must read left to right for someone facing the wall: flip u if the edge runs the other way.
+  if (ex * f.nz - ez * f.nx < 0) {
     const U = gb.uv;
-    const n = gb.vCount;
-    for (let v = n - 4; v < n; v++) U[v * 2] = u0 + u1 - U[v * 2];
+    for (let v = gb.vCount - 4; v < gb.vCount; v++) U[v * 2] = u0 + u1 - U[v * 2];
   }
 }

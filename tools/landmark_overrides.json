@@ -1,7 +1,7 @@
 {
  "version": 1,
  "generated": "2026-09-27",
- "notes": "Researched landmark heights/styles for Harare CBD. See docs/references/LANDMARKS.md for sources. Colours are hex guesses. Entries with part_of are extra footprints of a landmark (podiums, wings, cores); style_confidence rates facade/colour notes separately from height/match confidence.",
+ "notes": "Researched landmark heights/styles for Harare CBD. See docs/references/LANDMARKS.md for sources. Colours are hex guesses. Entries with part_of are extra footprints of a landmark (podiums, wings, cores); style_confidence rates facade/colour notes separately from height/match confidence. Styles of the photo-checked entries were corrected from freely licensed photos on 2026-09-27; see docs/references/PHOTOS.md.",
  "landmarks": [
   {
    "key": "rbz",
@@ -18,16 +18,16 @@
    "year": 1997,
    "streets": "80 Samora Machel Ave (north side), between First St and Sam Nujoma St",
    "style": {
-    "facade": "#b8a99c",
-    "accent": "#6f625a",
-    "glass": "#26323b",
-    "pattern": "fins",
-    "roof": "crown",
-    "notes": "Tallest in Zimbabwe (1997, Clinton & Evans). Design modelled on the Great Zimbabwe conical tower / a grain silo: broad base tapering toward the top. ~37x37 m chamfered-square plan (OSM 9-sided). 5 podium levels + 23 office floors. Polished granite walls (etched rural-Zimbabwe scenes at podium) with narrow vertical dark-glass strips between granite piers. Taper/step the top ~6 floors in 2-3 setbacks to a narrow crown + short mast. Granite podium/banking hall = rbz_podium. Colours approximate."
+    "facade": "#aeb0ac",
+    "accent": "#80878a",
+    "glass": "#5b808c",
+    "pattern": "curtain",
+    "roof": "flat",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): NOT a granite tower: a chamfered-octagon shaft of continuous blue-green/teal reflective curtain glass (#5b808c; lit #6d93a9, shade #39555c) framed by slim light-grey polished-granite piers at every facet edge (#aeb0ac). No setbacks, no taper, no roof mast: the shaft runs straight up to a ~4 m light-grey carved granite frieze band (Great Zimbabwe chevron/zig-zag relief) whose facets flare slightly outward as a cornice; a matching frieze band sits at ~level 6. Below that frieze is a recessed, fully glazed lobby storey between raked granite legs that splay outward to the ground, over a 4-5 level grey granite podium with continuous horizontal ribbon-glass bands (see rbz_podium). A ~40 m galvanised lattice telecom mast stands on the low building just EAST of the tower (not on it) and appears in nearly every skyline photo. Clinton & Evans, 1997."
    },
    "label": true,
    "confidence": "high",
-   "style_confidence": "medium"
+   "style_confidence": "high"
   },
   {
    "key": "rbz_podium",
@@ -42,16 +42,16 @@
    "floors": 5,
    "year": 1997,
    "style": {
-    "facade": "#b8a99c",
-    "accent": "#6f625a",
-    "glass": "#26323b",
-    "pattern": "fins",
+    "facade": "#8f9593",
+    "accent": "#6b7274",
+    "glass": "#4f6f78",
+    "pattern": "bands",
     "roof": "flat",
-    "notes": "5-level granite podium attached to the RBZ tower (adjoining footprint; assumed)."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): 4-5 levels of mid-grey granite cladding (#8f9593, darker than the tower frieze) with continuous horizontal dark-teal ribbon windows (~35% glass); the tower above is carried on raked granite legs with a recessed glass lobby floor between podium and first frieze band."
    },
    "label": false,
    "confidence": "medium",
-   "style_confidence": "low",
+   "style_confidence": "medium",
    "part_of": "rbz"
   },
   {
@@ -69,16 +69,16 @@
    "year": 2010,
    "streets": "Cnr Jason Moyo Ave & Julius Nyerere Way",
    "style": {
-    "facade": "#dcd6ca",
-    "accent": "#8f9aa1",
-    "glass": "#3e6f80",
-    "pattern": "curtain",
+    "facade": "#b9bab6",
+    "accent": "#c9cac6",
+    "glass": "#5a7189",
+    "pattern": "bands",
     "roof": "crown",
-    "notes": "Office tower (opened 2010, 'second/third tallest in Zimbabwe') on the Jason Moyo Ave / Julius Nyerere Way corner. Concrete shaft that becomes glass-sheathed toward the top and ends in a circular ring crown ('concrete form rises to a crescendo atop a circular ring'). 3 basement parking levels, 4 retail floors, 16 office floors. Podium = joina_city_podium. Glass colour is a guess."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Pale grey precast shaft (#b9bab6 lit) with continuous horizontal strip windows on the broad faces (dark blue-grey glass, ~40% glazing) and a narrower punched-window bay with a vertical glass slot on the chamfered side. Crown: the top 3 storeys become a full-width CYLINDRICAL glass drum (blue-grey #5a7189 with light spandrel rings), above it a narrower (~60% dia) ~6 m silver ribbed metal drum, capped by a thin flat circular DISC ~1.4x that drum diameter (flying-saucer ring, #c9cac6) and two antenna masts. Model the ring as a solid disc on a drum, not a ring on four posts. Opened 2010."
    },
    "label": true,
    "confidence": "high",
-   "style_confidence": "medium"
+   "style_confidence": "high"
   },
   {
    "key": "joina_city_podium",
@@ -120,16 +120,16 @@
    "year": 1985,
    "streets": "53 Samora Machel Ave, cnr Julius Nyerere Way",
    "style": {
-    "facade": "#cfc8bb",
-    "accent": "#7d756b",
-    "glass": "#2d3a44",
-    "pattern": "grid",
-    "roof": "flat",
-    "notes": "1985 Clinton & Evans office tower of glass and concrete; Overture num_floors=8 is WRONG (20 floors, 92 m). Slender point tower (~26x22 m footprint) on the SE corner of Samora Machel Ave & Julius Nyerere Way; NBS (National Building Society) head office. The Mbuya Nehanda statue and pedestrian footbridges sit at this intersection. Facade details not verified."
+    "facade": "#b8b5b3",
+    "accent": "#e8e6e0",
+    "glass": "#5177a4",
+    "pattern": "curtain",
+    "roof": "spire",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Probable ID (bearings from five viewpoints all put this tower just WSW of RBZ): slender square tower, blue reflective glass (#5177a4 sunlit, grey-blue #677c8a overcast) in horizontal floor bands on all faces, framed by wide full-height light-grey concrete corner piers (#b8b5b3 in sun; they read dark when backlit) with a small emblem high on one pier. Top: a set-back one-storey glass screen/lantern and a slender white conical needle spire (~8-10 m). Overture num_floors=8 is WRONG (20 floors, 92 m). 1985 Clinton & Evans; NBS head office. Mbuya Nehanda statue + footbridges at this corner."
    },
    "label": true,
    "confidence": "high",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "livingstone_house",
@@ -146,16 +146,16 @@
    "year": 1960,
    "streets": "30 Samora Machel Ave (north side), between Leopold Takawira St and Julius Nyerere Way",
    "style": {
-    "facade": "#e3ddcf",
-    "accent": "#8c8579",
-    "glass": "#3a4a52",
-    "pattern": "bands",
+    "facade": "#dfdfda",
+    "accent": "#4a5258",
+    "glass": "#3f4a52",
+    "pattern": "grid",
     "roof": "flat",
-    "notes": "1960 modernist office slab; tallest building in the Federation when completed. Continuous horizontal spandrel bands with ribbon windows, flat roof with lift overrun. Low podium = livingstone_house_podium. Colours approximate."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Probable ID (white tower on the N side of Samora Machel just W of the Julius Nyerere footbridge, behind the green-spired church): white/off-white slab (#dfdfda; reads #acbcc0 in shade) with a punched-window grid, a full-height recessed dark-glass bay (#4a5258) down the middle of the long face, a semicircular rounded end bay with narrow vertical strip windows and a dark-glass curved top floor carrying a sign, and a boxy rooftop lift house with a round porthole window. 1960; was the tallest building in the Federation."
    },
    "label": true,
    "confidence": "high",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "livingstone_house_podium",
@@ -373,16 +373,16 @@
    "year": 1959,
    "streets": "61 Samora Machel Ave, cnr First St",
    "style": {
-    "facade": "#e0d9c9",
-    "accent": "#8d8577",
-    "glass": "#40505a",
-    "pattern": "bands",
+    "facade": "#c29a4e",
+    "accent": "#8c6c3a",
+    "glass": "#3b4249",
+    "pattern": "grid",
     "roof": "flat",
-    "notes": "1959 office slab, 17 floors ('First Mutual Building'). Matched via a tenant address point at 'Pearl House cnr Samora Machel & First St' that falls on this 35x13.5 m footprint (Overture labels it 'First Capital Bank', a ground-floor tenant). Alternative candidate across First St: 4b76a206 (60x23 m)."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Slender 1959 slab clad in golden-ochre/sandstone-coloured panels (#c29a4e lit, #736445 shade) with a regular punched-window grid. Roof: PEARL letters on the parapet and a ~8-10 m white/steel sculpture - a stick figure with splayed legs holding a gold sphere (the pearl) aloft - a skyline marker from Samora Machel Ave. (Photos 1995 and 2014.)"
    },
    "label": true,
    "confidence": "low",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "monomotapa",
@@ -399,16 +399,16 @@
    "year": 1974,
    "streets": "54 Park Lane (Overture: Jomo Kenyatta Lane) / Julius Nyerere Way",
    "style": {
-    "facade": "#ece8df",
-    "accent": "#b9b2a5",
-    "glass": "#3e4b52",
+    "facade": "#cdbd9c",
+    "accent": "#b09c78",
+    "glass": "#5f6c73",
     "pattern": "bands",
     "roof": "flat",
-    "notes": "1974 hotel (Roy Densem & Partners), crescent/semicircular 'open book' slab overlooking Harare Gardens; concave face toward the gardens (NW). Continuous horizontal balcony bands; rooftop hotel sign. OSM footprint is only a thin curved sliver (~82 m arc) - extrude a ~16-20 m deep curved slab along it. Forms an 'S' (Salisbury) with the curved Charter House from the air."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Concave crescent slab (~18 storeys) facing Harare Gardens. Sandy-beige/tan precast (#cdbd9c; warm light makes it read golden-brown #9f7644), NOT white: continuous horizontal spandrel bands alternating with continuous ribbon windows (light frames, grey glass) on the curved faces; blank solid end walls in the same tan with a faint square-panel texture. Rooftop sign MONOMOTAPA (was CROWNE PLAZA MONOMOTAPA), antennas. Palms and dense garden trees at the foot. 1974, Roy Densem & Partners."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "medium"
+   "style_confidence": "high"
   },
   {
    "key": "social_security_centre",
@@ -424,16 +424,16 @@
    "floors": 16,
    "streets": "Cnr Sam Nujoma St & Julius Nyerere Way (Selous Ave / Park Lane end)",
    "style": {
-    "facade": "#d8d0c0",
-    "accent": "#7a6e60",
-    "glass": "#2e3d47",
+    "facade": "#a9a497",
+    "accent": "#7d7a73",
+    "glass": "#6f9ab5",
     "pattern": "grid",
     "roof": "flat",
-    "notes": "NSSA HQ opposite the National Gallery at the head of Julius Nyerere Way; tenants up to 14th floor (>=15 floors, 16 assumed). Irregular 55x55 m footprint; adjoining 832051c2 (94x45 m) is the lower complex/annex."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Grey-beige stone-clad tower (#a9a497) with a dense punched-window grid, a full-height blue glass strip and a curved blue-glass wing (#6f9ab5) patterned with dark bird silhouettes; SSC letters on the roof. Seen behind the National Gallery; looks ~18 storeys, so 16 floors/58 m may be low (not changed)."
    },
    "label": true,
    "confidence": "low",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "chiyedza_house",
@@ -524,16 +524,16 @@
    "year": 1990,
    "streets": "Rotten Row (Overture: Abdel Gamal Nasser Rd) & Samora Machel Ave",
    "style": {
-    "facade": "#dcd3c2",
-    "accent": "#6b6a52",
-    "glass": "#2f3b3f",
+    "facade": "#a09a8c",
+    "accent": "#5f5b55",
+    "glass": "#2f3538",
     "pattern": "grid",
     "roof": "crown",
-    "notes": "15-storey postmodern HQ (completed 1990; architects Peter Martin & Tony Wales-Smith), nicknamed the 'Shake Shake' building after the gable-top Chibuku 'Shake Shake' beer carton - give it a pitched/gabled crown. Party emblem signage. Matched to the named OSM footprint ~140 m south of the Samora Machel / Rotten Row corner; adjoining b551a4bb may be its podium."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Photo confirms the Shake Shake crown: a steep gabled/hipped carton-top roof over a taupe-grey concrete slab tower (#a09a8c lit, #78766e shade) with chamfered corners, vertical window strips and a party cockerel emblem on the gable face. 15 storeys, 1990."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "rainbow_towers",
@@ -549,12 +549,12 @@
    "year": 1985,
    "streets": "Samora Machel Ave West / Pennefather Ave, west of the Kopje area",
    "style": {
-    "facade": "#c9a44f",
-    "accent": "#8a6d2e",
+    "facade": "#d6c48c",
+    "accent": "#b8a36a",
     "glass": "#b8923f",
     "pattern": "curtain",
     "roof": "flat",
-    "notes": "Ex-Sheraton (1985, Energoprojekt / arch. Dragoljub & Ljiljana Bakic) - 'golden icon': gold reflective-glass hotel tower with a curved lower section and flat top; rooms up to floor 17 (marketing claims 104 m; ~75 m assumed). Overture footprint 9db2ac07 (192x107 m) merges hotel + Harare International Conference Centre: put the tower near the east side (hotel POI -17.8315, 31.0361) and model the HICC (4,500-seat auditorium) as a ~22 m block on the rest. height/floors here are for the merged footprint (HICC level) so the pipeline does not extrude the whole 1.3 ha complex to tower height; the tower itself is in synthetic_parts."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Hotel tower = gold reflective glass curtain wall framed by thick solid sand-coloured end piers/frame (#d6c48c); the HICC beside it is a massive sand-coloured sculpted concrete volume with a curved roof profile. Ex-Sheraton (1985, Energoprojekt). Overture footprint 9db2ac07 merges hotel + HICC; height/floors here are HICC level, tower is in synthetic_parts."
    },
    "label": true,
    "confidence": "medium",
@@ -812,7 +812,7 @@
     "glass": "#5b6c70",
     "pattern": "fins",
     "roof": "chimneys",
-    "notes": "9 storeys (~31 m to eaves). Grey unpainted precast facade with deep protruding window hoods/'teeth' shading recessed glazing; columns of steel rings on the outside carry green creepers. Red-tiled pitched roof ridge along the block carrying ~24 brick chimney funnels (48 total across both blocks), each ~1.5x1.5 m, rising ~4-6 m above the ridge."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Long facades: dense grid of deep grey precast window hoods/\"teeth\" (#c5bbab lit, #534d47 in their shadows, reads ~#5a5953 from afar) with salmon-brick infill panels (#b5957c); full-height precast X-lattice (diamond-braced) service towers at ~30 m spacing that rise one storey above the roof; thin red tile roof strip; ~24 CYLINDRICAL chimney stacks per block (~2 m dia, 3-4 m tall, pale tan with flared caps and dark rings) evenly along the ridge with small triangular vents between. Street entrance on Robert Mugabe Rd: fan of radiating steel rods over an EASTGATE sign, dark-green steel pavement canopy."
    },
    "label": false,
    "confidence": "high",
@@ -837,7 +837,7 @@
     "glass": "#5b6c70",
     "pattern": "fins",
     "roof": "chimneys",
-    "notes": "Mirror of the south block (see eastgate_block_s)."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Long facades: dense grid of deep grey precast window hoods/\"teeth\" (#c5bbab lit, #534d47 in their shadows, reads ~#5a5953 from afar) with salmon-brick infill panels (#b5957c); full-height precast X-lattice (diamond-braced) service towers at ~30 m spacing that rise one storey above the roof; thin red tile roof strip; ~24 CYLINDRICAL chimney stacks per block (~2 m dia, 3-4 m tall, pale tan with flared caps and dark rings) evenly along the ridge with small triangular vents between. Street entrance on Robert Mugabe Rd: fan of radiating steel rods over an EASTGATE sign, dark-green steel pavement canopy."
    },
    "label": false,
    "confidence": "high",
@@ -859,16 +859,16 @@
    "year": 1976,
    "streets": "Cnr Jason Moyo Ave & Third St, south side of Africa Unity Square",
    "style": {
-    "facade": "#e3ddcf",
-    "accent": "#7a6a55",
-    "glass": "#3b4650",
-    "pattern": "bands",
+    "facade": "#e3e0da",
+    "accent": "#cfc8bc",
+    "glass": "#4b535d",
+    "pattern": "grid",
     "roof": "flat",
-    "notes": "Two offset multi-storey wings (North & South, 312 rooms) facing Africa Unity Square; hotel founded 1915, rebuilt 1974-76, 12-storey tower block 1980, +5 floors on North Wing 1991. This entry = north wing (OSM 43 m); south wing = meikles_south. Balconied north faces, 'MEIKLES' / 'HYATT REGENCY' roof signs."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): North (square-facing) tower, ~12-13 storeys: off-white precast grid - full-height vertical piers between bays of paired dark grey-blue windows with light spandrels (~45% glazing) - and a top storey of 8 semicircular ARCHES (arched attic/loggia) under a thin flat roof; not balcony bands. Hotel founded 1915, rebuilt 1974-76."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "low"
+   "style_confidence": "medium"
   },
   {
    "key": "meikles_south",
@@ -884,16 +884,16 @@
    "floors": 12,
    "year": 1980,
    "style": {
-    "facade": "#e3ddcf",
-    "accent": "#7a6a55",
-    "glass": "#3b4650",
+    "facade": "#9c9a92",
+    "accent": "#7a7870",
+    "glass": "#3f4448",
     "pattern": "bands",
     "roof": "flat",
-    "notes": "South wing / tower block (12 storeys, 1980) offset behind the north wing."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): South block seen from Eastgate/the station: grey unpainted concrete slab (~10 storeys) with horizontal window bands and a blank top band carrying raised letters MEIKLES HOTEL facing south over Eastgate."
    },
    "label": false,
    "confidence": "low",
-   "style_confidence": "low",
+   "style_confidence": "medium",
    "part_of": "meikles"
   },
   {
@@ -933,20 +933,20 @@
     "footprint_m2": 968
    },
    "height": 15,
-   "floors": 3,
+   "floors": 2,
    "year": 1899,
    "streets": "Cnr Nelson Mandela Ave & Third St, north side of Africa Unity Square",
    "style": {
-    "facade": "#e8e0cc",
+    "facade": "#dcd2b8",
     "accent": "#8a4a3a",
     "glass": "#3a3a36",
     "pattern": "colonial",
-    "roof": "flat",
-    "notes": "Began 1895 as a hotel, completed/inaugurated 1899 as the Legislative Assembly; used by Parliament until Nov 2023. 3-storey colonial block with arcaded/verandah front and hipped iron roof (renderer: flat + parapet OK). Parts: d1e9bc60, c99836f9 (later 5-floor annex)."
+    "roof": "hip",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Cream-painted render (#dcd2b8) 2 storeys + parapet with a strong cornice line and a ~1 m grey-painted plinth (#5b6267); white-framed multi-pane sash windows; projecting arched entrance porch with PARLIAMENT OF ZIMBABWE lettering and the coat of arms; red clay-tile pitched roof mostly hidden behind the parapet (white gable visible). Iron palisade fence along Nelson Mandela Ave. 1895-99; used by Parliament until Nov 2023. 2022 photo: cool cream walls (south face is in shade most of the day), pale peach gable ends with white trim above the parapet."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "low"
+   "style_confidence": "high"
   },
   {
    "key": "parliament_annex",
@@ -988,12 +988,12 @@
    "year": 1913,
    "streets": "Cnr Nelson Mandela Ave & Sam Nujoma St, NW corner of Africa Unity Square",
    "style": {
-    "facade": "#b39a7c",
-    "accent": "#6f5a45",
+    "facade": "#8f806c",
+    "accent": "#6f7a66",
     "glass": "#2f3a45",
     "pattern": "colonial",
     "roof": "clocktower",
-    "notes": "Anglican cathedral by Herbert Baker, begun 1913, finished 1961. Romanesque Revival in local stone (sandstone/granite), cruciform ~79x23 m plan. Square bell tower with 10 bells (~28 m, assumed; no clock face needed). Stained glass, round-arched openings."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Rough-dressed brown-grey granite ashlar (#8f806c), not pale sandstone. Square bell tower (~28 m) with twin louvred lancet openings, a round CLOCK face below them, and a green/grey-green copper pyramidal roof with a cross (#6f7a66); nave roofs grey-green. Herbert Baker, 1913-1961."
    },
    "label": true,
    "confidence": "medium",
@@ -1014,16 +1014,16 @@
    "year": 1925,
    "streets": "Cnr Fourth St & Herbert Chitepo Ave",
    "style": {
-    "facade": "#a86f52",
-    "accent": "#e0d3bd",
+    "facade": "#ad9d80",
+    "accent": "#5a4e42",
     "glass": "#2f3a45",
-    "pattern": "brick",
-    "roof": "spire",
-    "notes": "Catholic cathedral (1925), Gothic Revival with two heavily adorned front towers (~24 m, assumed) with pinnacles; timber roof, stained glass. Footprint 43x22 m."
+    "pattern": "colonial",
+    "roof": "towers",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): NOT brick: buff/tan rock-faced coursed stone blocks (#ad9d80 albedo; #8e8173 overcast) with a darker stone plinth (#5a4e42). Gothic Revival west front: two square towers with paired louvred lancets and FLAT crenellated tops with corner pinnacles (no spires, ~26 m), central gable with a cross, rose window, lancet windows with tracery, pointed-arch doorway, statues in niches; granite crucifix memorial on the forecourt. 1925."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "medium"
+   "style_confidence": "high"
   },
   {
    "key": "national_gallery",
@@ -1040,16 +1040,16 @@
    "year": 1957,
    "streets": "20 Julius Nyerere Way, cnr Park Lane",
    "style": {
-    "facade": "#ece9e1",
-    "accent": "#6d6d6d",
+    "facade": "#d9d4ca",
+    "accent": "#c8b068",
     "glass": "#2f3b44",
     "pattern": "grid",
     "roof": "flat",
-    "notes": "1957 modernist gallery (Montgomerie & Oldfield), large naturally-lit open-plan hall; white walls, flat roof with clerestory/roof-lights; sits at the SE corner of Harare Gardens."
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Upper storey clad in large pale stone/concrete panels (#d9d4ca), cantilevered over a recessed glazed ground floor on round pilotis; a huge abstract MOSAIC mural (~20x5 m, primary colours on an ochre ground #c8b068) on the Julius Nyerere Way face; a tall clerestory glass band to one side; reflecting pool and sculptures at the entrance. 1957."
    },
    "label": true,
    "confidence": "high",
-   "style_confidence": "medium"
+   "style_confidence": "high"
   },
   {
    "key": "main_post_office",
@@ -1086,20 +1086,20 @@
     "lon": 31.051171,
     "footprint_m2": 4685
    },
-   "height": 20,
-   "floors": 5,
+   "height": 16,
+   "floors": 3,
    "streets": "Samora Machel Ave / Sam Nujoma St",
    "style": {
-    "facade": "#e0d6c0",
-    "accent": "#7d7160",
-    "glass": "#343c40",
-    "pattern": "grid",
-    "roof": "flat",
-    "notes": "Seat of the Office of the President and Cabinet; ministries of Foreign Affairs/Information inside. Large 132x51 m irregular footprint (Overture num_floors 2 looks low). Height assumed."
+    "facade": "#e2d596",
+    "accent": "#8a5a42",
+    "glass": "#3a3f40",
+    "pattern": "colonial",
+    "roof": "clocktower",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Long 3-storey colonial government block in pale butter-yellow render (#e2d596 sunlit; reads sage #899e84 in shade) with white-framed sash windows, a heavier ground-floor plinth and red-brown clay-tile HIPPED roofs (#8a5a42). A tall square clock tower (~30 m) with clock faces on each side, an open arched belfry and a small hipped cap rises from the Samora Machel frontage. Office of the President and Cabinet."
    },
    "label": false,
    "confidence": "low",
-   "style_confidence": "low"
+   "style_confidence": "high"
   },
   {
    "key": "harare_station",
@@ -1115,16 +1115,16 @@
    "floors": 2,
    "streets": "Kenneth Kaunda Ave, at the south end of Sam Nujoma St",
    "style": {
-    "facade": "#e3d6b8",
-    "accent": "#8e3b2e",
+    "facade": "#8a5c46",
+    "accent": "#e6e4d6",
     "glass": "#34393c",
-    "pattern": "colonial",
-    "roof": "flat",
-    "notes": "Main passenger station + railway museum; low colonial-era block with pitched roof (renderer: flat+parapet OK). Style assumed."
+    "pattern": "brick",
+    "roof": "hip",
+    "notes": "Photo-checked (see docs/references/PHOTOS.md): Red-brown FACE BRICK (#8a5c46), not cream render: 2 storeys with cream/white trim bands, window surrounds and cornices (#e6e4d6), arched ground-floor windows, a ground-floor colonnade of BLUE-painted cast columns (#365374) under a balustraded first-floor balcony, red-brown tile hipped roofs, and a red cupola (white columns, red dome) on a brick base. HARARE STATION in black letters on a cream band. Platforms: blue steel canopies on lattice columns, black catenary gantries, red-brick signal cabin."
    },
    "label": true,
    "confidence": "medium",
-   "style_confidence": "low"
+   "style_confidence": "high"
   }
  ],
  "places": [

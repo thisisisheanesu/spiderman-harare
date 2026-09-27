@@ -144,6 +144,15 @@ export class Places {
     }
   }
 
+  // Display name of a building: its landmark's place name, else its mapped name ('' if none).
+  nameOf(b) {
+    if (b.lm) {
+      const p = this.list.find((q) => q.key === b.lm);
+      if (p) return p.name;
+    }
+    return b.name ? shortName(b.name) : '';
+  }
+
   // Nearest on-map place within maxDist (m), or null.
   nearest(x, z, maxDist) {
     let best = null;

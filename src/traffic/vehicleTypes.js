@@ -40,9 +40,10 @@ export class TrafficMix {
     const src = Array.isArray(VEHICLE_TYPES) && VEHICLE_TYPES.length ? VEHICLE_TYPES : FALLBACK_TYPES;
     this.types = src.filter((t) => MODEL[t.type] && (t.weight ?? 0) > 0);
     const behaviour = TRAFFIC?.behaviour || {};
+    this.runRed = new Map();
     for (const t of this.types) {
       const b = behaviour[t.type] || (t.type === 'bus' ? behaviour.bus : behaviour.private) || {};
-      t.runRed = b.runRedChance ?? (WILD.has(t.type) ? 0.35 : 0.05);
+      this.runRed.set(t.type, b.runRedChance ?? (WILD.has(t.type) ? 0.35 : 0.05));
     }
     this.calls = Array.isArray(HWINDI_CALLS) && HWINDI_CALLS.length ? HWINDI_CALLS : [{ text: 'Town! Town! Town!', en: 'To the city centre!', kind: 'dest' }];
     this.destCalls = this.calls.filter((c) => c.kind === 'dest');
@@ -85,7 +86,9 @@ export class TrafficMix {
     v.s0 = Math.max(1.0, 2.6 - aggr * 1.6);
     v.maxSpeed = def.maxSpeed ?? kmh(65);
     v.speedFactor = v.wild ? rng.range(1.0, 1.2) : rng.range(0.82, 1.05);
-    v.runRedChance = (def.runRed ?? 0.05) * 0.3;
+    // Per junction approach; the researched figure is per red light a driver meets, most of which
+    // they reach mid-phase with the box occupied, so only a fraction turns into an attempt here.
+    v.runRedChance = (this.runRed.get(def.type) ?? 0.05) * 0.3;
     v.stopChance = STOPPERS[def.type] ?? 0;
 
     const colors = sub?.colors || def.colors || ['#eeeeea'];

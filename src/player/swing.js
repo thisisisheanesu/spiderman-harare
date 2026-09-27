@@ -10,11 +10,13 @@ const SWING_G = 34;
 const PUMP = 8;
 const STEER = 7;
 const MAX_SPEED = 45;
-const REEL = 24;
-const CLEARANCE = 3.2; // lowest the body centre gets above the street/roof below the pivot (clears kombis)
+const REEL = 14;
+const MAX_REEL = 30;
+const CLEARANCE = 3.8; // lowest the body centre gets above the street/roof below the pivot (clears kombis)
 const PLANAR = 0.85; // how far the pivot moves from the anchor towards the line of travel
 const TURN_RATE = 1.4; // rad/s the swing bends towards the stick / camera direction
 const HAND_UP = 1.1;
+const TRICKS = ['flip', 'twirl', 'corkscrew'];
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
@@ -119,9 +121,11 @@ export class SwingMove {
       if (vtl > 0.5) v.addScaledVector(vt, (Math.max(0, c.wish.dot(vt) / vtl) * PUMP * h) / vtl);
       v.addScaledVector(_c.copy(c.wish).addScaledVector(rope, -c.wish.dot(rope)), STEER * h);
       c.steerTowardsWish(h, TURN_RATE);
-      const excess = this.ropeLen - this.ropeTarget;
-      if (excess > 0) this.ropeLen -= Math.min(excess, Math.max(REEL, excess * 10) * h);
     }
+    // Reeling in (rope longer than the arc allows): the web yanks you up towards the pivot.
+    const excess = this.ropeLen - this.ropeTarget;
+    const reel = this.delay <= 0 && excess > 0 ? Math.min(MAX_REEL, Math.max(REEL, excess * 6)) : 0;
+    this.ropeLen -= Math.min(Math.max(excess, 0), reel * h);
     p.position.addScaledVector(v, h);
     if (this.delay <= 0) {
       const d = _a.subVectors(c.center, this.pivot);
@@ -130,7 +134,7 @@ export class SwingMove {
         d.divideScalar(len);
         p.position.addScaledVector(d, this.ropeLen - len);
         const vr = v.dot(d);
-        if (vr > 0) v.addScaledVector(d, -vr);
+        if (vr > -reel) v.addScaledVector(d, -reel - vr);
       }
       if (this.line) this.line.slack = Math.max(0, this.ropeLen - len);
     }
@@ -170,7 +174,7 @@ export class SwingMove {
       } else if (v.y > 0 && sp > 14) {
         v.multiplyScalar(1.05);
         v.y += 2 + 0.12 * sp;
-        if (sp > 24 && Math.random() < 0.55) c.startTrick(Math.random() < 0.5 ? 'twirl' : 'flip');
+        if (sp > 24 && Math.random() < 0.55) c.startTrick(TRICKS[Math.floor(Math.random() * TRICKS.length)]);
       }
     }
     this.retry = 0.18;

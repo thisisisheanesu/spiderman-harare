@@ -6,9 +6,56 @@ import { Vehicle } from './vehicle.js';
 // themselves — a speech bubble plus a hoot when the player is within earshot.
 
 const CALL_RANGE = 40;
-const RANK_KERB_RANGE = 70;
+const RANK_KERB_RANGE = 120;
+const BAY_W = 3.2;
+const BAY_DEPTH = 6.5;
+const BAY_AISLE = 8;
+// Points of a parked kombi's footprint (metres forward, metres left) that must lie in the yard.
+const BAY_PROBES = [[0, 0], [2.3, 0.8], [2.3, -0.8], [-2.3, 0.8], [-2.3, -0.8]];
 const PARKED_RANGE = 460;
 const LOAD_KINDS = new Set(['seats', 'board', 'fare', 'cant', 'dest']);
+
+// Minimum-area oriented bounding box of a ring, long axis = (ux, uz).
+function orientedBox(pts) {
+  const n = pts.length / 2;
+  let best = null;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    let ux = pts[j * 2] - pts[i * 2];
+    let uz = pts[j * 2 + 1] - pts[i * 2 + 1];
+    const l = Math.hypot(ux, uz);
+    if (l < 1e-3) continue;
+    ux /= l;
+    uz /= l;
+    let minU = Infinity;
+    let maxU = -Infinity;
+    let minV = Infinity;
+    let maxV = -Infinity;
+    for (let k = 0; k < n; k++) {
+      const u = pts[k * 2] * ux + pts[k * 2 + 1] * uz;
+      const v = -pts[k * 2] * uz + pts[k * 2 + 1] * ux;
+      minU = Math.min(minU, u);
+      maxU = Math.max(maxU, u);
+      minV = Math.min(minV, v);
+      maxV = Math.max(maxV, v);
+    }
+    const area = (maxU - minU) * (maxV - minV);
+    if (!best || area < best.area) best = { area, ux, uz, minU, maxU, minV, maxV };
+  }
+  if (!best) return null;
+  let { ux, uz } = best;
+  let len = best.maxU - best.minU;
+  let wid = best.maxV - best.minV;
+  const cu = (best.minU + best.maxU) / 2;
+  const cv = (best.minV + best.maxV) / 2;
+  const cx = cu * ux - cv * uz;
+  const cz = cu * uz + cv * ux;
+  if (wid > len) {
+    [len, wid] = [wid, len];
+    [ux, uz] = [-uz, ux];
+  }
+  return { cx, cz, ux, uz, len, wid };
+}
 
 export class KombiLife {
   constructor(traffic) {
@@ -31,13 +78,19 @@ export class KombiLife {
     this.driveCalls = mix.calls.filter((c) => c.kind === 'dest' || c.kind === 'depart');
     const kombiDef = mix.types.find((t) => t.type === 'kombi');
 
+    const yards = [];
     for (const rank of this.ranks) {
       this._kerbStops(rank, graph);
-      if (!kombiDef) continue;
-      const area = this._rankArea(rank, data.areas || []);
-      if (!area) continue;
-      const budget = Math.min(maxParked - this.parked.length, Math.round(Math.sqrt(polyArea(area.pts)) * 0.35));
-      for (const spot of this._bays(area, data.areas, graph, game.world, rng).slice(0, Math.max(0, budget))) {
+      const area = kombiDef && this._rankArea(rank, data.areas || []);
+      if (area) yards.push(this._bays(area, rank, data.areas, graph, game.world, rng));
+    }
+    // Share the parked budget between the yards, round-robin, so every rank gets its row of kombis.
+    let left = maxParked;
+    while (left > 0 && yards.some((y) => y.length)) {
+      for (const spots of yards) {
+        const spot = spots.pop();
+        if (!spot || left <= 0) continue;
+        left--;
         const v = new Vehicle();
         mix.dress(v, kombiDef, rng, models);
         v.parked = true;
@@ -99,62 +152,43 @@ export class KombiLife {
     return best;
   }
 
-  // Rows of kombi-sized bays aligned with the yard's longest edge, clear of buildings, roads and islands.
-  _bays(area, areas, graph, world, rng) {
+  // Kombi bays in a rank yard. 'rank' yards use the bays the city paints (see paintBays in
+  // src/world/ground.js: double rows across the long axis of the minimum-area box); open 'platform'
+  // yards get plain rows. Bays inside buildings, on roads or on loading islands are skipped.
+  _bays(area, rank, areas, graph, world, rng) {
     const pts = area.pts;
-    const n = pts.length / 2;
-    let ax = 1;
-    let az = 0;
-    let longest = 0;
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;
-      const ex = pts[j * 2] - pts[i * 2];
-      const ez = pts[j * 2 + 1] - pts[i * 2 + 1];
-      const l = Math.hypot(ex, ez);
-      if (l > longest) {
-        longest = l;
-        ax = ex / l;
-        az = ez / l;
-      }
-    }
-    const bx = -az;
-    const bz = ax;
-    let minA = Infinity;
-    let maxA = -Infinity;
-    let minB = Infinity;
-    let maxB = -Infinity;
-    for (let i = 0; i < n; i++) {
-      const a = pts[i * 2] * ax + pts[i * 2 + 1] * az;
-      const b = pts[i * 2] * bx + pts[i * 2 + 1] * bz;
-      minA = Math.min(minA, a);
-      maxA = Math.max(maxA, a);
-      minB = Math.min(minB, b);
-      maxB = Math.max(maxB, b);
-    }
+    const box = orientedBox(pts);
+    if (!box) return [];
     const islands = areas.filter((q) => q.kind === 'platform' && q !== area && polyArea(q.pts) < 400);
-    const free = (x, z) =>
-      pointInPoly(x, z, pts) && !world?.buildingAt?.(x, z) && !islands.some((q) => pointInPoly(x, z, q.pts));
+    const free = (x, z) => pointInPoly(x, z, pts) && !world?.buildingAt?.(x, z) && !islands.some((q) => pointInPoly(x, z, q.pts));
+    const vx = -box.uz;
+    const vz = box.ux;
     const spots = [];
-    for (let b = minB + 2; b < maxB - 1.5; b += 2.7) {
-      const flip = rng() < 0.5;
-      for (let a = minA + 3; a < maxA - 3; a += 6.4) {
-        const x = a * ax + b * bx;
-        const z = a * az + b * bz;
-        if (rng() > 0.7) continue;
-        if (!free(x, z) || !free(x + ax * 2.4, z + az * 2.4) || !free(x - ax * 2.4, z - az * 2.4)) continue;
-        if (!free(x + bx * 0.9, z + bz * 0.9) || !free(x - bx * 0.9, z - bz * 0.9)) continue;
-        if (graph.nearestLane(x, z, 4.5)) continue;
-        const fx = flip ? -ax : ax;
-        const fz = flip ? -az : az;
-        spots.push({ x, z, heading: Math.atan2(-fx, -fz) });
+    const tryBay = (u, v, facing) => {
+      const x = box.cx + box.ux * u + vx * v;
+      const z = box.cz + box.uz * u + vz * v;
+      const fx = vx * facing;
+      const fz = vz * facing;
+      for (const [a, b] of BAY_PROBES) if (!free(x + fx * a - fz * b, z + fz * a + fx * b)) return;
+      if (graph.nearestLane(x, z, 4.5)) return;
+      // Busiest around the rank point; the far corners of big yards stay patchy.
+      const score = Math.hypot(x - rank.x, z - rank.z) * (0.5 + rng());
+      spots.push({ x, z, heading: Math.atan2(-fx, -fz), score });
+    };
+    if (area.kind === 'rank' && box.wid >= 10) {
+      for (let v0 = -box.wid / 2 + 1; v0 + 2 * BAY_DEPTH < box.wid / 2; v0 += 2 * BAY_DEPTH + BAY_AISLE) {
+        for (let u = -box.len / 2 + 1; u + BAY_W < box.len / 2 - 1; u += BAY_W) {
+          tryBay(u + BAY_W / 2, v0 + BAY_DEPTH / 2, -1);
+          tryBay(u + BAY_W / 2, v0 + BAY_DEPTH * 1.5, 1);
+        }
+      }
+    } else {
+      for (let v = -box.wid / 2 + 2; v < box.wid / 2 - 2; v += 2.7) {
+        for (let u = -box.len / 2 + 3; u < box.len / 2 - 3; u += 6.4) tryBay(u, v, rng() < 0.5 ? 1 : -1);
       }
     }
-    // Shuffle so a small budget spreads over the whole yard.
-    for (let i = spots.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [spots[i], spots[j]] = [spots[j], spots[i]];
-    }
-    return spots;
+    // Best bays last: the caller pops from the end.
+    return spots.sort((a, b) => b.score - a.score);
   }
 
   nearRank(x, z, r = 300) {
